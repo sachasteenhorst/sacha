@@ -136,41 +136,79 @@ def _extract_fields(text: str, email_from: str) -> dict:
     }
 
 
+# Mail.Read.Shared is a Delegated (not Application) permission -- it lets a
+# signed-in user's app read mail in any mailbox that user has been given
+# "Full Access" delegate rights to (e.g. a shared mailbox like info@...),
+# without requiring a Global Administrator to grant tenant-wide consent.
+# The trade-off: there's no unattended client-credentials login, so a human
+# has to sign in once (via scripts/graph_login.py) to produce a refresh
+# token, which this class then uses to keep getting new access tokens.
+GRAPH_SCOPES = "https://graph.microsoft.com/Mail.Read.Shared offline_access"
+REFRESH_TOKEN_FILE = "./data/graph_refresh_token.txt"
+
+
 class _GraphAuth:
     def __init__(self) -> None:
         self._access_token: str | None = None
         self._expires_at: float = 0.0
 
+    @staticmethod
+    def _read_refresh_token() -> str | None:
+        if os.path.exists(REFRESH_TOKEN_FILE):
+            with open(REFRESH_TOKEN_FILE) as fh:
+                token = fh.read().strip()
+                return token or None
+        return None
+
+    @staticmethod
+    def _write_refresh_token(token: str) -> None:
+        os.makedirs(os.path.dirname(REFRESH_TOKEN_FILE), exist_ok=True)
+        with open(REFRESH_TOKEN_FILE, "w") as fh:
+            fh.write(token)
+
     def token(self) -> str:
         if self._access_token and time.monotonic() < self._expires_at - 30:
             return self._access_token
 
-        if not (settings.graph_tenant_id and settings.graph_client_id and settings.graph_client_secret):
+        if not (settings.graph_tenant_id and settings.graph_client_id):
             raise GraphAuthError(
-                "Microsoft Graph is niet geconfigureerd. Vul GRAPH_TENANT_ID, "
-                "GRAPH_CLIENT_ID en GRAPH_CLIENT_SECRET in via .env (deze krijg "
-                "je bij de Azure AD app-registratie, zie README)."
+                "Microsoft Graph is niet geconfigureerd. Vul GRAPH_TENANT_ID "
+                "en GRAPH_CLIENT_ID in via .env (zie README)."
+            )
+
+        refresh_token = self._read_refresh_token()
+        if not refresh_token:
+            raise GraphAuthError(
+                "Nog niet ingelogd bij Microsoft Graph. Draai eenmalig "
+                "`python3 scripts/graph_login.py` en volg de instructies "
+                "(zie README)."
             )
 
         token_url = f"https://login.microsoftonline.com/{settings.graph_tenant_id}/oauth2/v2.0/token"
-        response = requests.post(
-            token_url,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": settings.graph_client_id,
-                "client_secret": settings.graph_client_secret,
-                "scope": "https://graph.microsoft.com/.default",
-            },
-            timeout=30,
-        )
+        data = {
+            "grant_type": "refresh_token",
+            "client_id": settings.graph_client_id,
+            "refresh_token": refresh_token,
+            "scope": GRAPH_SCOPES,
+        }
+        if settings.graph_client_secret:
+            data["client_secret"] = settings.graph_client_secret
+
+        response = requests.post(token_url, data=data, timeout=30)
         if response.status_code != 200:
             raise GraphAuthError(
-                f"Microsoft Graph authenticatie mislukt ({response.status_code}): {response.text}"
+                f"Microsoft Graph token vernieuwen mislukt ({response.status_code}): "
+                f"{response.text}. Mogelijk moet je opnieuw inloggen via "
+                "scripts/graph_login.py."
             )
 
         payload = response.json()
         self._access_token = payload["access_token"]
         self._expires_at = time.monotonic() + float(payload.get("expires_in", 3600))
+        # Microsoft rotates the refresh token on every use -- persist the new
+        # one immediately or the next refresh will fail with an invalid token.
+        if "refresh_token" in payload:
+            self._write_refresh_token(payload["refresh_token"])
         return self._access_token
 
 

@@ -59,23 +59,40 @@ beheercentrum moet dit doen:
 2. **Certificates & secrets → New client secret.** Kopieer de waarde
    meteen (die is later niet meer zichtbaar) -- dit is de **Client
    secret**.
-3. **API permissions → Add a permission → Microsoft Graph → Application
-   permissions → `Mail.Read` → Add permissions**, en daarna **Grant admin
-   consent**.
-4. **Belangrijk -- beperk de toegang tot één mailbox.** Zonder verdere
-   restrictie mag deze app met `Mail.Read` (application-permissie) bij
-   *elke* mailbox in de hele Microsoft 365-tenant. Beperk dit met een
-   Application Access Policy (via Exchange Online PowerShell):
-   ```powershell
-   New-DistributionGroup -Name "FactuurToolMailboxes" -Type Security
-   Add-DistributionGroupMember -Identity "FactuurToolMailboxes" -Member "facturen@jouwfietsenwinkel.nl"
-   New-ApplicationAccessPolicy -AppId "<client-id-van-stap-1>" `
-     -PolicyScopeGroupId "FactuurToolMailboxes" -AccessRight RestrictAccess `
-     -Description "Alleen facturen-mailbox voor de matcher-tool"
-   ```
+3. **API permissions → Add a permission → Microsoft Graph → Delegated
+   permissions → `Mail.Read.Shared` → Add permissions.**
+
+   We gebruiken bewust de **gedelegeerde** `Mail.Read.Shared` in plaats van
+   de toepassings-variant van `Mail.Read`: die laatste mag bij *elke*
+   mailbox in de hele tenant en vereist een Globale beheerder om goed te
+   keuren. `Mail.Read.Shared` vereist geen beheerderstoestemming (te zien
+   aan "Nee" in de kolom "Beheerderstoestemming vereist") -- een gewone
+   gebruiker keurt 'm zelf goed tijdens het inloggen in de volgende stap.
+
    Vul daarna `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` en
-   `GRAPH_MAILBOX` (het mailadres zelf, bijv.
-   `facturen@jouwfietsenwinkel.nl`) in via `.env`.
+   `GRAPH_MAILBOX` (het mailadres van de gedeelde mailbox, bijv.
+   `info@jouwfietsenwinkel.nl`) in via `.env`.
+
+## Eenmalig inloggen (device code flow)
+
+Omdat we een gedelegeerde permissie gebruiken (in plaats van een
+onbemand/"headless" app-only permissie), moet één keer een mens inloggen om
+een refresh-token te genereren. Dat hoeft geen beheerder te zijn -- gewoon
+iemand die de gedeelde mailbox (`GRAPH_MAILBOX`) al kan openen in zijn/haar
+eigen Outlook (dat betekent dat diegene daar al "Full Access"-rechten op
+heeft).
+
+```bash
+python3 scripts/graph_login.py
+```
+
+Dit toont een korte code en een link (`https://microsoft.com/devicelogin`).
+Open die link in een willekeurige browser, voer de code in, log in en
+bevestig. Het script slaat daarna een refresh-token op in
+`data/graph_refresh_token.txt` (staat in `.gitignore`, wordt nooit
+gecommit). De achtergrondtaak ververst dit token zelf steeds automatisch;
+je hoeft dit script alleen opnieuw te draaien als het ooit verloopt of
+wordt ingetrokken (bijv. na een wachtwoordwijziging).
 
 ## Setup
 
@@ -119,10 +136,12 @@ python3 -m pytest tests/ -v
 - `.env` (met wachtwoorden/API-keys) en de `data/`-map (database +
   gedownloade factuur-PDF's) staan in `.gitignore` en horen nooit gecommit
   te worden.
-- De Graph-app heeft alleen leestoegang (`Mail.Read`) en is via de
-  Application Access Policy beperkt tot één mailbox -- niet je hele
-  Microsoft 365-tenant. Bewaar `GRAPH_CLIENT_SECRET` net zo zorgvuldig als
-  een wachtwoord.
+- De Graph-app heeft alleen leestoegang (`Mail.Read.Shared`, gedelegeerd),
+  beperkt tot mailboxen waar de ingelogde gebruiker zelf al toegang toe
+  heeft -- niet je hele Microsoft 365-tenant. Bewaar
+  `data/graph_refresh_token.txt` en `GRAPH_CLIENT_SECRET` net zo zorgvuldig
+  als een wachtwoord: wie dat refresh-token heeft, kan namens de ingelogde
+  gebruiker bij die mailbox.
 
 ## Projectstructuur
 
