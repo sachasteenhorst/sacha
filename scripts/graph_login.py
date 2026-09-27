@@ -50,13 +50,13 @@ def main() -> None:
     while time.time() < deadline:
         time.sleep(interval)
 
+        # The app is a public client (required for device code login), so
+        # no client_secret goes on these requests -- Azure AD rejects one.
         data = {
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "client_id": settings.graph_client_id,
             "device_code": payload["device_code"],
         }
-        if settings.graph_client_secret:
-            data["client_secret"] = settings.graph_client_secret
 
         token_resp = requests.post(token_url, data=data, timeout=30)
         token_payload = token_resp.json()

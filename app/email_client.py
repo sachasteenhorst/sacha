@@ -184,6 +184,11 @@ class _GraphAuth:
                 "(zie README)."
             )
 
+        # The app registration is a public client ("Allow public client
+        # flows" = Yes, required for the device code login in
+        # scripts/graph_login.py) -- Azure AD rejects a client_secret on
+        # these token requests for a public client, so it's deliberately
+        # left out here.
         token_url = f"https://login.microsoftonline.com/{settings.graph_tenant_id}/oauth2/v2.0/token"
         data = {
             "grant_type": "refresh_token",
@@ -191,8 +196,6 @@ class _GraphAuth:
             "refresh_token": refresh_token,
             "scope": GRAPH_SCOPES,
         }
-        if settings.graph_client_secret:
-            data["client_secret"] = settings.graph_client_secret
 
         response = requests.post(token_url, data=data, timeout=30)
         if response.status_code != 200:

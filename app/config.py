@@ -25,13 +25,12 @@ class Settings(BaseSettings):
 
     # -- Mailbox (Microsoft Graph API) for invoice PDFs --
     # Microsoft 365 disables classic IMAP username/password login by default,
-    # so this reads mail through Graph instead: an Azure AD app registration
-    # with an application permission (Mail.Read), scoped down to just this
-    # one mailbox via an Application Access Policy. See README for the
-    # exact setup steps.
+    # so this reads mail through Graph instead: a public-client Azure AD app
+    # registration using the delegated Mail.Read.Shared permission (device
+    # code login, see scripts/graph_login.py). Public clients don't use a
+    # client secret. See README for the exact setup steps.
     graph_tenant_id: str = ""
     graph_client_id: str = ""
-    graph_client_secret: str = ""
     graph_mailbox: str = ""  # the mailbox address to read, e.g. facturen@fietsenwinkel.nl
     graph_mail_folder: str = "inbox"
     # Only attachments with this extension are treated as invoices.
