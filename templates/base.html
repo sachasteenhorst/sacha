@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fietsenwinkel administratie{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🚲 Administratie &ndash; afschriften &amp; facturen</h1>
+    <form method="post" action="/sync">
+      <button type="submit" class="btn btn-primary">Sync nu</button>
+    </form>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
