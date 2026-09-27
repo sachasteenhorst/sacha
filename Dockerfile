@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app/ ./app/
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY scripts/ ./scripts/
+
+# Database, invoice PDFs and the Graph refresh token all live here --
+# mount this as a persistent volume, or every restart loses them.
+VOLUME ["/app/data"]
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

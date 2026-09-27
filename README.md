@@ -126,6 +126,35 @@ triggeren.
 python3 -m pytest tests/ -v
 ```
 
+## Overdracht aan een hostingpartij
+
+Dit hoeft niet ontwikkeld te worden -- het staat al klaar. Wat een
+hostingpartij nodig heeft om dit blijvend te laten draaien:
+
+1. **Deze repository** (bevat een `Dockerfile`):
+   ```bash
+   docker build -t fietsenwinkel-admin .
+   docker run -d \
+     --name fietsenwinkel-admin \
+     -p 8000:8000 \
+     --env-file .env \
+     -v fietsenwinkel-admin-data:/app/data \
+     fietsenwinkel-admin
+   ```
+   De `-v ...:/app/data` regel is belangrijk: daar staan de database, de
+   gedownloade factuur-PDF's en het Microsoft-inlogtoken. Zonder een
+   persistent volume raakt dat alles kwijt bij elke herstart.
+2. **Een ingevuld `.env`-bestand** (niet in git -- apart aanleveren) met
+   daarin de Basecone- en Graph-gegevens uit deze README.
+3. **Een reverse proxy met HTTPS** ervoor (bijv. Caddy, nginx of Traefik) --
+   dit draait zelf alleen platte HTTP op poort 8000, en het dashboard bevat
+   financiële gegevens achter een wachtwoord dat niet onversleuteld over
+   internet mag.
+4. Het **eenmalige Microsoft-inlogbestand**
+   (`data/graph_refresh_token.txt`) kan gewoon worden meegenomen naar de
+   nieuwe server (in het volume hierboven) -- dan hoeft niemand de
+   Azure-inlogstappen opnieuw te doorlopen.
+
 ## Beveiliging
 
 - Het dashboard toont financiële gegevens en is beveiligd met HTTP Basic
@@ -139,9 +168,9 @@ python3 -m pytest tests/ -v
 - De Graph-app heeft alleen leestoegang (`Mail.Read.Shared`, gedelegeerd),
   beperkt tot mailboxen waar de ingelogde gebruiker zelf al toegang toe
   heeft -- niet je hele Microsoft 365-tenant. Bewaar
-  `data/graph_refresh_token.txt` en `GRAPH_CLIENT_SECRET` net zo zorgvuldig
-  als een wachtwoord: wie dat refresh-token heeft, kan namens de ingelogde
-  gebruiker bij die mailbox.
+  `data/graph_refresh_token.txt` net zo zorgvuldig als een wachtwoord: wie
+  dat refresh-token heeft, kan namens de ingelogde gebruiker bij die
+  mailbox.
 
 ## Projectstructuur
 
