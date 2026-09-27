@@ -36,21 +36,71 @@ DUTCH_MONTHS = {
     "juli": 7, "augustus": 8, "september": 9, "oktober": 10, "november": 11, "december": 12,
 }
 
-AMOUNT_LABEL_RE = re.compile(
-    r"(?:totaal(?:bedrag)?|te betalen|eindtotaal|invoice total|amount due)\D{0,15}"
-    r"(?:€|eur)?\s*([\d.,]+)",
-    re.IGNORECASE,
+# -- Amount --
+# Matches both Dutch (1.234,56) and plain (1,234.56 / 39.60) notation; which
+# separator is the decimal one is worked out in _parse_amount_literal from
+# whichever of "." or "," appears last, not from a fixed pattern branch.
+AMOUNT_NUMBER = r"\d{1,3}(?:[.,]\d{3})*[.,]\d{2}"
+AMOUNT_WITH_CURRENCY_RE = re.compile(r"(?:€|eur\.?)\s*(" + AMOUNT_NUMBER + r")", re.IGNORECASE)
+AMOUNT_BARE_RE = re.compile(r"(" + AMOUNT_NUMBER + r")")
+
+# Priority order: the first label that yields a parsable amount anywhere in
+# the document wins. "Totaal incl. BTW" et al beat a bare "Total" because a
+# document can have several unrelated numbers near the generic word "total".
+TOTAL_LABEL_PATTERNS = [
+    r"totaal\s*incl(?:usief)?\.?\s*(?:van\s*)?btw",
+    r"te\s*betalen",
+    r"totaalbedrag",
+    r"openstaand(?:e)?(?:\s*bedrag)?",
+    r"amount\s*due",
+    r"eindtotaal",
+    r"invoice\s*total",
+    r"\btotal\b",
+]
+
+# -- Invoice number --
+INVOICE_NUMBER_STRONG_LABEL_RE = re.compile(
+    r"factuurnummer|factuur\s*nr\.?|invoice\s*(?:number|no)\.?", re.IGNORECASE
 )
-ANY_AMOUNT_RE = re.compile(r"€\s*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})")
-INVOICE_NUMBER_RE = re.compile(
-    r"(?:factuurnummer|factuur\s*nr\.?|invoice\s*(?:number|no)\.?)\s*[:#]?\s*([A-Za-z0-9\-\/]+)",
-    re.IGNORECASE,
-)
+INVOICE_NUMBER_WEAK_LABEL_RE = re.compile(r"\bnummer\b", re.IGNORECASE)
+# Words that show up right after an invoice-number label purely because of
+# PDF layout (columns collapsed into running text) -- never the number itself.
+INVOICE_NUMBER_STOPWORDS = {
+    "datum", "factuurdatum", "factuur", "invoice", "pagina", "page",
+    "nummer", "number", "bedrag", "totaal", "btw", "klant", "klantnummer",
+    "referentie", "reference", "type", "van", "voor", "aan", "the",
+}
+INVOICE_NUMBER_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9\-/.]{1,30}")
+
 DATE_NUMERIC_RE = re.compile(r"\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b")
 DATE_DUTCH_RE = re.compile(
     r"\b(\d{1,2})\s+(" + "|".join(DUTCH_MONTHS.keys()) + r")\s+(\d{4})\b", re.IGNORECASE
 )
 INVOICE_DATE_LABEL_RE = re.compile(r"factuurdatum\D{0,10}", re.IGNORECASE)
+
+# -- Supplier name --
+# Domains we already know the proper company name for -- the automatic
+# domain-to-name fallback below can't reliably split concatenated Dutch
+# words ("vanderlaangroep" -> "Van der Laan Groep"), so known suppliers get
+# an exact answer instead of a best-effort guess.
+KNOWN_SUPPLIER_DOMAINS = {
+    "kruitbosch.nl": "Kruitbosch",
+    "accell.nl": "Accell",
+    "tenways.com": "Tenways",
+    "enra.nl": "ENRA",
+    "twsc.nl": "TWSC",
+    "gazelle.nl": "Gazelle",
+    "wrutteman.nl": "Wrutteman",
+    "hellorider.com": "HelloRider",
+    "essent.nl": "Essent",
+    "fietsunie.nl": "Fietsunie",
+    "vanderlaangroep.nl": "Van der Laan Groep",
+    "fietshuys.nl": "Fietshuys",
+    "zuidewind-bv.nl": "Zuidewind BV",
+    "retif.eu": "RETIF",
+    "shimano-eu.com": "Shimano",
+    "giant-europe.com": "Giant",
+}
 
 
 class GraphAuthError(RuntimeError):
@@ -77,27 +127,108 @@ class InvoiceAttachment:
     currency: str = "EUR"
 
 
-def _parse_amount_to_cents(text: str) -> int | None:
-    match = AMOUNT_LABEL_RE.search(text)
-    candidates = []
-    if match:
-        candidates.append(match.group(1))
-    all_amounts = ANY_AMOUNT_RE.findall(text)
-    candidates.extend(all_amounts)
+def _parse_amount_literal(raw: str) -> int:
+    """Turn "1.234,56", "1,234.56" or "39,60" into cents. Whichever "." or
+    ","  appears LAST in the string marks the decimal point; every other
+    separator before it (of either kind -- some extracted text mixes them,
+    e.g. "1.151.15") is just a thousands grouping and gets stripped."""
+    last_sep = max(raw.rfind("."), raw.rfind(","))
+    integer_part = re.sub(r"[.,]", "", raw[:last_sep])
+    decimal_part = raw[last_sep + 1:]
+    return round(float(f"{integer_part}.{decimal_part}") * 100)
 
-    best_cents = None
-    for raw in candidates:
-        normalized = raw.replace(".", "").replace(",", ".") if "," in raw else raw
-        try:
-            value = float(normalized)
-        except ValueError:
+
+def _find_amount_near_label(text: str, label_pattern: str) -> int | None:
+    label_re = re.compile(label_pattern, re.IGNORECASE)
+    for m in label_re.finditer(text):
+        # Look across the label's own line plus the next one -- some
+        # layouts put the value right after the label ("Totaal: 39,60"),
+        # others put it on the following line ("Totaal:\n39,60"), and some
+        # put more than one number on the label's line with the real total
+        # last ("Eindtotaal 0,00 197,17"). Capped in both line count and
+        # character count so it can't drift into an unrelated section.
+        end = m.end()
+        for _ in range(2):
+            next_nl = text.find("\n", end)
+            if next_nl == -1:
+                end = len(text)
+                break
+            end = next_nl + 1
+        window = text[m.end(): min(end, m.end() + 120)]
+        matches = list(AMOUNT_WITH_CURRENCY_RE.finditer(window)) or list(AMOUNT_BARE_RE.finditer(window))
+        if matches:
+            return _parse_amount_literal(matches[-1].group(1))
+    return None
+
+
+def _parse_amount_to_cents(text: str) -> int | None:
+    for pattern in TOTAL_LABEL_PATTERNS:
+        cents = _find_amount_near_label(text, pattern)
+        if cents is not None:
+            return cents
+
+    # No recognised "total" label anywhere -- fall back to the largest
+    # amount that has an explicit currency marker right in front of it. A
+    # bare number with no currency and no label nearby is too weak a signal
+    # (it's as likely to be a quantity, VAT rate or reference number).
+    candidates = [_parse_amount_literal(m.group(1)) for m in AMOUNT_WITH_CURRENCY_RE.finditer(text)]
+    return max(candidates) if candidates else None
+
+
+def _first_valid_number_token(window: str) -> str:
+    for token_match in INVOICE_NUMBER_TOKEN_RE.finditer(window):
+        token = token_match.group(0).strip(".-/")
+        if not token or token.lower() in INVOICE_NUMBER_STOPWORDS:
             continue
-        cents = round(value * 100)
-        # Prefer the label-matched amount; otherwise take the largest amount
-        # found (invoice totals are usually the largest number on the page).
-        if best_cents is None or cents > best_cents:
-            best_cents = cents
-    return best_cents
+        if not any(ch.isdigit() for ch in token):
+            continue
+        return token
+    return ""
+
+
+def _extract_invoice_number(text: str) -> str:
+    # Strong, unambiguous labels first, across every occurrence in the
+    # document; a generic bare "nummer" is only trusted if nothing better
+    # was found anywhere (it also matches "klantnummer"/"ordernummer" less
+    # often than you'd think, since those are single words with no space
+    # before "nummer" and INVOICE_NUMBER_WEAK_LABEL_RE requires a word
+    # boundary right before it).
+    for label_re in (INVOICE_NUMBER_STRONG_LABEL_RE, INVOICE_NUMBER_WEAK_LABEL_RE):
+        for m in label_re.finditer(text):
+            token = _first_valid_number_token(text[m.end(): m.end() + 60])
+            if token:
+                return token
+    return ""
+
+
+def _base_domain(domain: str) -> str:
+    domain = domain.lower().strip()
+    if domain.startswith("www."):
+        domain = domain[4:]
+    parts = domain.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else domain
+
+
+def _domain_to_supplier_name(domain: str) -> str:
+    base = _base_domain(domain)
+    if base in KNOWN_SUPPLIER_DOMAINS:
+        return KNOWN_SUPPLIER_DOMAINS[base]
+    label = base.split(".")[0]
+    words = [w for w in re.split(r"[-_]", label) if w]
+    return " ".join(w.capitalize() for w in words) if words else base
+
+
+def _derive_supplier_name(address: str, display_name: str) -> str:
+    address = (address or "").strip()
+    display_name = (display_name or "").strip()
+    # A real display name beats a guess from the domain -- unless it's
+    # missing, or is itself just the address again (some senders set both
+    # to the same value).
+    if display_name and "@" not in display_name and display_name.lower() != address.lower():
+        return display_name
+    if "@" in address:
+        return _domain_to_supplier_name(address.split("@", 1)[1])
+    return display_name or address or "Onbekende leverancier"
 
 
 def _parse_invoice_date(text: str) -> date | None:
@@ -125,14 +256,12 @@ def _parse_invoice_date(text: str) -> date | None:
     return None
 
 
-def _extract_fields(text: str, email_from: str) -> dict:
-    invoice_number_match = INVOICE_NUMBER_RE.search(text)
+def _extract_fields(text: str, address: str, display_name: str = "") -> dict:
     return {
-        "invoice_number": invoice_number_match.group(1) if invoice_number_match else "",
+        "invoice_number": _extract_invoice_number(text),
         "invoice_date": _parse_invoice_date(text),
         "amount_cents": _parse_amount_to_cents(text),
-        # Best-effort: the sender's display name/address is usually the supplier.
-        "supplier_name": email_from,
+        "supplier_name": _derive_supplier_name(address, display_name),
     }
 
 
@@ -274,7 +403,8 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
         message_id = message["id"]
         subject = message.get("subject", "")
         from_info = (message.get("from") or {}).get("emailAddress", {})
-        from_addr = from_info.get("address", "") or from_info.get("name", "")
+        from_addr = from_info.get("address", "") or ""
+        from_name = from_info.get("name", "") or ""
         received_raw = message.get("receivedDateTime")
         try:
             received_at = datetime.fromisoformat(received_raw.replace("Z", "+00:00"))
@@ -297,7 +427,7 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                 # Corrupt/unreadable PDF -- keep the file, leave fields empty.
                 extracted_text = ""
 
-            fields = _extract_fields(extracted_text, from_addr)
+            fields = _extract_fields(extracted_text, from_addr, from_name)
             results.append(
                 InvoiceAttachment(
                     email_message_id=message_id,
