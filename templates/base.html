@@ -10,7 +10,9 @@
   <header class="topbar">
     <h1>🚲 Administratie &ndash; afschriften &amp; facturen</h1>
     <form method="post" action="/sync">
-      <button type="submit" class="btn btn-primary">Sync nu</button>
+      <input type="hidden" name="q" value="{{ q|default('') }}">
+      <input type="hidden" name="maand" value="{{ maand|default('') }}">
+      <button type="submit" class="btn btn-primary">Nu ophalen</button>
     </form>
   </header>
   <main>

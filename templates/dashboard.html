@@ -1,58 +1,123 @@
 {% extends "base.html" %}
 {% block content %}
 
+<section class="stats-row" aria-label="Overzicht">
+  <a href="#te-controleren" class="stat-tile{% if counters.te_controleren > 0 %} stat-open{% endif %}">
+    <span class="stat-number">{{ counters.te_controleren }}</span>
+    <span class="stat-label">Te controleren</span>
+  </a>
+  <a href="#betalingen-zonder-factuur" class="stat-tile{% if counters.betalingen_zonder_factuur > 0 %} stat-open{% endif %}">
+    <span class="stat-number">{{ counters.betalingen_zonder_factuur }}</span>
+    <span class="stat-label">Betalingen zonder factuur</span>
+  </a>
+  <a href="#facturen-niet-betaald" class="stat-tile{% if counters.facturen_niet_betaald > 0 %} stat-open{% endif %}">
+    <span class="stat-number">{{ counters.facturen_niet_betaald }}</span>
+    <span class="stat-label">Facturen nog niet betaald</span>
+  </a>
+  <a href="#recent-gekoppeld" class="stat-tile stat-positive">
+    <span class="stat-number">{{ counters.gekoppeld_deze_maand }}</span>
+    <span class="stat-label">Gekoppeld in {{ counters.maand_label }}</span>
+  </a>
+</section>
+
+<section class="status-bar">
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.email_status }}"></span> E-mail
+  </span>
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.bank_status }}"></span> Bank (Basecone)
+  </span>
+  <span class="status-lastsync">
+    {% if status_bar.last_sync_label %}
+      Laatst opgehaald: {{ status_bar.last_sync_label }} &middot;
+      {{ status_bar.last_sync_new_invoices }} nieuwe factu(u)r(en),
+      {{ status_bar.last_sync_new_transactions }} nieuwe afschrift(en)
+    {% else %}
+      Nog niet opgehaald sinds het opstarten.
+    {% endif %}
+  </span>
+</section>
+
 {% if oldest_unmatched_days and oldest_unmatched_days > 30 %}
 <div class="banner banner-warning">
-  ⚠️ Je hebt niet-gekoppelde afschriften van {{ oldest_unmatched_days }} dagen oud. Los deze op voordat je accountant ermee komt.
+  ⚠️ Je hebt betalingen zonder factuur van {{ oldest_unmatched_days }} dagen oud. Los deze op voordat je accountant ermee komt.
 </div>
 {% endif %}
 
-<section>
-  <h2>Te bevestigen matches ({{ suggested_matches|length }})</h2>
+<form method="get" action="/dashboard" class="filter-form">
+  <input type="text" name="q" value="{{ q }}" placeholder="Zoek op leverancier, omschrijving, factuurnummer of bedrag...">
+  <select name="maand">
+    <option value="">Alle maanden</option>
+    {% for value, label in month_options %}
+    <option value="{{ value }}"{% if value == maand %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-secondary">Filteren</button>
+  {% if q or maand %}
+  <a href="/dashboard" class="clear-filter">Wis filter</a>
+  {% endif %}
+</form>
+
+<section id="te-controleren">
+  <h2>Te controleren ({{ suggested_matches|length }})</h2>
   <p class="hint">Bedrag en datum komen overeen, maar dit is niet 100% zeker &mdash; controleer even.</p>
   {% if suggested_matches %}
+  <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Factuur</th><th>Leverancier</th><th>Actie</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Factuur</th><th>Leverancier</th><th>Actie</th></tr>
     </thead>
     <tbody>
       {% for m in suggested_matches %}
       <tr>
-        <td>{{ m.transaction.booking_date }}</td>
-        <td>{{ m.transaction.amount_cents|euros }}</td>
-        <td>{{ m.transaction.counterparty_name }}</td>
-        <td>{{ m.transaction.description }}</td>
+        <td>{{ m.transaction.booking_date|dutch_date }}</td>
+        <td class="amount">{{ m.transaction.amount_cents|euros }}</td>
+        <td>
+          <strong>{{ m.transaction.counterparty_name or "?" }}</strong>
+          {% if m.transaction.description %}<br><small class="muted-text">{{ m.transaction.description }}</small>{% endif %}
+        </td>
         <td>{{ m.invoice.invoice_number or "-" }} ({{ m.invoice.amount_cents|euros }})</td>
         <td>{{ m.invoice.supplier_name }}</td>
         <td class="actions">
-          <form method="post" action="/matches/{{ m.id }}/confirm"><button class="btn btn-confirm">Bevestigen</button></form>
-          <form method="post" action="/matches/{{ m.id }}/reject"><button class="btn btn-reject">Afwijzen</button></form>
+          <form method="post" action="/matches/{{ m.id }}/confirm">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-confirm">Klopt</button>
+          </form>
+          <form method="post" action="/matches/{{ m.id }}/reject">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-reject">Klopt niet</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
-  <p class="empty">Niets om te bevestigen.</p>
+  <p class="empty">Niets om te controleren.</p>
   {% endif %}
 </section>
 
-<section>
-  <h2>Niet-gekoppelde afschriften ({{ unmatched_transactions|length }})</h2>
+<section id="betalingen-zonder-factuur">
+  <h2>Betalingen zonder factuur ({{ unmatched_transactions|length }})</h2>
   {% if unmatched_transactions %}
+  <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Koppel handmatig aan factuur</th><th>Actie</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Koppel handmatig aan factuur</th><th>Actie</th></tr>
     </thead>
     <tbody>
       {% for t in unmatched_transactions %}
       <tr>
-        <td>{{ t.booking_date }}</td>
-        <td>{{ t.amount_cents|euros }}</td>
-        <td>{{ t.counterparty_name }}</td>
-        <td>{{ t.description }}</td>
+        <td>{{ t.booking_date|dutch_date }}</td>
+        <td class="amount">{{ t.amount_cents|euros }}</td>
+        <td>
+          <strong>{{ t.counterparty_name or "?" }}</strong>
+          {% if t.description %}<br><small class="muted-text">{{ t.description }}</small>{% endif %}
+        </td>
         <td>
           <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <select name="invoice_id">
               {% for inv in all_open_invoices %}
               <option value="{{ inv.id }}">{{ inv.supplier_name }} &ndash; {{ inv.invoice_number or "geen nr" }} ({{ inv.amount_cents|euros }})</option>
@@ -62,47 +127,66 @@
           </form>
         </td>
         <td class="actions">
-          <form method="post" action="/transactions/{{ t.id }}/ignore"><button class="btn btn-ignore">Negeren (geen factuur nodig)</button></form>
+          <form method="post" action="/transactions/{{ t.id }}/ignore">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-ignore">Geen factuur nodig</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
-  <p class="empty">Alle afschriften zijn gekoppeld. 🎉</p>
+  <p class="empty">Alle betalingen zijn gekoppeld. 🎉</p>
   {% endif %}
 </section>
 
-<section>
-  <h2>Facturen zonder afschrift ({{ unmatched_invoices|length }})</h2>
+<section id="facturen-niet-betaald">
+  <h2>Facturen nog niet betaald ({{ unmatched_invoices|length }})</h2>
   {% if unmatched_invoices %}
+  <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>Bijlage</th><th>Actie</th></tr>
+      <tr><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>PDF</th><th>Actie</th></tr>
     </thead>
     <tbody>
       {% for inv in unmatched_invoices %}
       <tr>
-        <td>{{ inv.received_at.strftime("%d-%m-%Y") }}</td>
-        <td>{{ inv.supplier_name }}</td>
+        <td>{{ inv.received_at|dutch_date }}</td>
+        <td>
+          <strong>{{ inv.supplier_name or "?" }}</strong>
+          {% if inv.email_subject %}<br><small class="muted-text">{{ inv.email_subject }}</small>{% endif %}
+        </td>
         <td>{{ inv.invoice_number or "?" }}</td>
-        <td>{{ inv.amount_cents|euros }}</td>
-        <td>{{ inv.attachment_filename }}</td>
+        <td class="amount">{{ inv.amount_cents|euros }}</td>
+        <td>
+          {% if inv.pdf_path %}
+          <a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>
+          {% else %}
+          <span class="muted-text">-</span>
+          {% endif %}
+        </td>
         <td class="actions">
-          <form method="post" action="/invoices/{{ inv.id }}/ignore"><button class="btn btn-ignore">Negeren</button></form>
+          <form method="post" action="/invoices/{{ inv.id }}/ignore">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-ignore">Negeren</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p class="empty">Geen openstaande facturen.</p>
   {% endif %}
 </section>
 
-<section>
+<section id="recent-gekoppeld">
   <h2>Recent gekoppeld</h2>
   {% if recent_matches %}
+  <div class="table-scroll">
   <table class="muted">
     <thead>
       <tr><th>Datum</th><th>Bedrag</th><th>Factuur</th><th>Methode</th></tr>
@@ -110,14 +194,15 @@
     <tbody>
       {% for m in recent_matches %}
       <tr>
-        <td>{{ m.transaction.booking_date }}</td>
-        <td>{{ m.transaction.amount_cents|euros }}</td>
+        <td>{{ m.transaction.booking_date|dutch_date }}</td>
+        <td class="amount">{{ m.transaction.amount_cents|euros }}</td>
         <td>{{ m.invoice.invoice_number or m.invoice.attachment_filename }}</td>
-        <td>{{ m.method.value }}</td>
+        <td>{{ m.method|method_label }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p class="empty">Nog geen matches.</p>
   {% endif %}

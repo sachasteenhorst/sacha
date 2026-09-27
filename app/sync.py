@@ -15,6 +15,7 @@ from app.config import settings
 from app.email_client import fetch_invoice_attachments
 from app.matcher import MatchingSummary, run_matching
 from app.models import Invoice, Transaction
+from app import sync_state
 
 
 @dataclass
@@ -104,4 +105,5 @@ def run_sync(session: Session) -> SyncResult:
 
     result.matching = run_matching(session)
     session.commit()
+    sync_state.record(result)
     return result
