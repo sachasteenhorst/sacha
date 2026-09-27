@@ -63,7 +63,7 @@ def _sync_transactions(session: Session, since: date, result: SyncResult) -> Non
 def _sync_invoices(session: Session, since: date, result: SyncResult) -> None:
     try:
         fetched = fetch_invoice_attachments(since)
-    except Exception as exc:  # noqa: BLE001 -- surface any IMAP error to the dashboard
+    except Exception as exc:  # noqa: BLE001 -- surface any Graph API error to the dashboard
         result.errors.append(f"E-mail: {exc}")
         return
 

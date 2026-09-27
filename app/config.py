@@ -23,13 +23,17 @@ class Settings(BaseSettings):
     # "bankstatements" resource; confirm the exact path for your account.
     basecone_bank_transactions_path: str = "/v1/administrations/{administration_id}/bankstatementlines"
 
-    # -- Email (IMAP) for invoice PDFs --
-    imap_host: str = ""
-    imap_port: int = 993
-    imap_use_ssl: bool = True
-    imap_username: str = ""
-    imap_password: str = ""
-    imap_folder: str = "INBOX"
+    # -- Mailbox (Microsoft Graph API) for invoice PDFs --
+    # Microsoft 365 disables classic IMAP username/password login by default,
+    # so this reads mail through Graph instead: an Azure AD app registration
+    # with an application permission (Mail.Read), scoped down to just this
+    # one mailbox via an Application Access Policy. See README for the
+    # exact setup steps.
+    graph_tenant_id: str = ""
+    graph_client_id: str = ""
+    graph_client_secret: str = ""
+    graph_mailbox: str = ""  # the mailbox address to read, e.g. facturen@fietsenwinkel.nl
+    graph_mail_folder: str = "inbox"
     # Only attachments with this extension are treated as invoices.
     invoice_attachment_extension: str = ".pdf"
 

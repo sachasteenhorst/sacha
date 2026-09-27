@@ -1,5 +1,14 @@
-"""Fetches invoice PDFs from a mailbox over IMAP and extracts the fields we
-need for matching (amount, invoice date, invoice number, supplier).
+"""Fetches invoice PDFs from a mailbox via the Microsoft Graph API and
+extracts the fields we need for matching (amount, invoice date, invoice
+number, supplier).
+
+Why Graph and not plain IMAP: Microsoft 365 disables classic IMAP
+username/password ("Basic Auth") login by default for business mailboxes.
+Graph with an Azure AD app registration (OAuth2 client-credentials) is the
+supported way to read mail unattended. See README for the exact Azure
+setup steps, including the Application Access Policy that restricts this
+app to a single mailbox (application-level Mail.Read otherwise grants
+access to every mailbox in the tenant).
 
 PDF text extraction is heuristic (regex over the extracted text). It will
 not get every invoice layout right -- fields it can't find are left empty
@@ -7,20 +16,20 @@ and the invoice still shows up in the dashboard for you to fill in by hand.
 """
 from __future__ import annotations
 
-import email
-import imaplib
 import os
 import re
-from dataclasses import dataclass, field
+import time
+from base64 import b64decode
+from dataclasses import dataclass
 from datetime import date, datetime
-from email.header import decode_header
-from email.utils import parsedate_to_datetime
 
 import pdfplumber
+import requests
 
 from app.config import settings
 
 INVOICE_DIR = "./data/invoices"
+GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
 DUTCH_MONTHS = {
     "januari": 1, "februari": 2, "maart": 3, "april": 4, "mei": 5, "juni": 6,
@@ -44,6 +53,14 @@ DATE_DUTCH_RE = re.compile(
 INVOICE_DATE_LABEL_RE = re.compile(r"factuurdatum\D{0,10}", re.IGNORECASE)
 
 
+class GraphAuthError(RuntimeError):
+    pass
+
+
+class GraphApiError(RuntimeError):
+    pass
+
+
 @dataclass
 class InvoiceAttachment:
     email_message_id: str
@@ -58,19 +75,6 @@ class InvoiceAttachment:
     supplier_name: str = ""
     amount_cents: int | None = None
     currency: str = "EUR"
-
-
-def _decode(value: str | None) -> str:
-    if not value:
-        return ""
-    parts = decode_header(value)
-    out = []
-    for text, enc in parts:
-        if isinstance(text, bytes):
-            out.append(text.decode(enc or "utf-8", errors="replace"))
-        else:
-            out.append(text)
-    return "".join(out)
 
 
 def _parse_amount_to_cents(text: str) -> int | None:
@@ -127,95 +131,143 @@ def _extract_fields(text: str, email_from: str) -> dict:
         "invoice_number": invoice_number_match.group(1) if invoice_number_match else "",
         "invoice_date": _parse_invoice_date(text),
         "amount_cents": _parse_amount_to_cents(text),
-        # Best-effort: the sender's display name/domain is usually the supplier.
+        # Best-effort: the sender's display name/address is usually the supplier.
         "supplier_name": email_from,
     }
 
 
-def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
-    if not settings.imap_host or not settings.imap_username:
-        raise RuntimeError(
-            "IMAP is niet geconfigureerd. Vul IMAP_HOST/IMAP_USERNAME/IMAP_PASSWORD "
-            "in via .env (gebruik een app-wachtwoord, niet je gewone mailwachtwoord)."
+class _GraphAuth:
+    def __init__(self) -> None:
+        self._access_token: str | None = None
+        self._expires_at: float = 0.0
+
+    def token(self) -> str:
+        if self._access_token and time.monotonic() < self._expires_at - 30:
+            return self._access_token
+
+        if not (settings.graph_tenant_id and settings.graph_client_id and settings.graph_client_secret):
+            raise GraphAuthError(
+                "Microsoft Graph is niet geconfigureerd. Vul GRAPH_TENANT_ID, "
+                "GRAPH_CLIENT_ID en GRAPH_CLIENT_SECRET in via .env (deze krijg "
+                "je bij de Azure AD app-registratie, zie README)."
+            )
+
+        token_url = f"https://login.microsoftonline.com/{settings.graph_tenant_id}/oauth2/v2.0/token"
+        response = requests.post(
+            token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": settings.graph_client_id,
+                "client_secret": settings.graph_client_secret,
+                "scope": "https://graph.microsoft.com/.default",
+            },
+            timeout=30,
+        )
+        if response.status_code != 200:
+            raise GraphAuthError(
+                f"Microsoft Graph authenticatie mislukt ({response.status_code}): {response.text}"
+            )
+
+        payload = response.json()
+        self._access_token = payload["access_token"]
+        self._expires_at = time.monotonic() + float(payload.get("expires_in", 3600))
+        return self._access_token
+
+
+_auth = _GraphAuth()
+
+
+def _graph_get(url: str, params: dict | None = None) -> dict:
+    token = _auth.token()
+    response = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=30)
+    if response.status_code != 200:
+        raise GraphApiError(f"Graph API-fout ({response.status_code}) bij {url}: {response.text}")
+    return response.json()
+
+
+def _list_messages_since(since: date) -> list[dict]:
+    if not settings.graph_mailbox:
+        raise GraphAuthError(
+            "GRAPH_MAILBOX is niet ingesteld -- dit is het mailadres van de "
+            "mailbox waar facturen binnenkomen."
         )
 
+    since_iso = f"{since.isoformat()}T00:00:00Z"
+    url = (
+        f"{GRAPH_BASE_URL}/users/{settings.graph_mailbox}/mailFolders/"
+        f"{settings.graph_mail_folder}/messages"
+    )
+    params = {
+        "$filter": f"receivedDateTime ge {since_iso} and hasAttachments eq true",
+        "$select": "id,subject,from,receivedDateTime,hasAttachments",
+        "$top": "50",
+    }
+
+    messages: list[dict] = []
+    while url:
+        payload = _graph_get(url, params)
+        messages.extend(payload.get("value", []))
+        url = payload.get("@odata.nextLink")
+        params = None  # nextLink already contains the query string
+    return messages
+
+
+def _list_pdf_attachments(message_id: str) -> list[dict]:
+    url = f"{GRAPH_BASE_URL}/users/{settings.graph_mailbox}/messages/{message_id}/attachments"
+    payload = _graph_get(url)
+    attachments = []
+    for att in payload.get("value", []):
+        name = att.get("name", "")
+        if name.lower().endswith(settings.invoice_attachment_extension) and "contentBytes" in att:
+            attachments.append(att)
+    return attachments
+
+
+def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
     os.makedirs(INVOICE_DIR, exist_ok=True)
 
-    imap_cls = imaplib.IMAP4_SSL if settings.imap_use_ssl else imaplib.IMAP4
-    conn = imap_cls(settings.imap_host, settings.imap_port)
     results: list[InvoiceAttachment] = []
-    try:
-        conn.login(settings.imap_username, settings.imap_password)
-        conn.select(settings.imap_folder)
+    messages = _list_messages_since(since)
 
-        since_str = since.strftime("%d-%b-%Y")
-        status, data = conn.search(None, f'(SINCE "{since_str}")')
-        if status != "OK":
-            raise RuntimeError(f"IMAP-zoekopdracht mislukt: {status}")
-
-        message_ids = data[0].split()
-        for msg_id in message_ids:
-            status, msg_data = conn.fetch(msg_id, "(RFC822)")
-            if status != "OK" or not msg_data or msg_data[0] is None:
-                continue
-
-            raw_email = msg_data[0][1]
-            message = email.message_from_bytes(raw_email)
-            message_id = message.get("Message-ID", f"<no-id-{msg_id.decode()}>")
-            subject = _decode(message.get("Subject"))
-            from_addr = _decode(message.get("From"))
-            try:
-                received_at = parsedate_to_datetime(message.get("Date"))
-            except (TypeError, ValueError):
-                received_at = datetime.utcnow()
-
-            for part in message.walk():
-                filename = part.get_filename()
-                if not filename:
-                    continue
-                filename = _decode(filename)
-                if not filename.lower().endswith(settings.invoice_attachment_extension):
-                    continue
-
-                payload = part.get_payload(decode=True)
-                if not payload:
-                    continue
-
-                safe_name = re.sub(r"[^A-Za-z0-9_.\-]", "_", filename)
-                pdf_path = os.path.join(
-                    INVOICE_DIR, f"{msg_id.decode()}_{safe_name}"
-                )
-                with open(pdf_path, "wb") as fh:
-                    fh.write(payload)
-
-                extracted_text = ""
-                try:
-                    with pdfplumber.open(pdf_path) as pdf:
-                        extracted_text = "\n".join(
-                            page.extract_text() or "" for page in pdf.pages
-                        )
-                except Exception:
-                    # Corrupt/unreadable PDF -- keep the file, leave fields empty.
-                    extracted_text = ""
-
-                fields = _extract_fields(extracted_text, from_addr)
-                results.append(
-                    InvoiceAttachment(
-                        email_message_id=message_id,
-                        attachment_filename=filename,
-                        email_subject=subject,
-                        email_from=from_addr,
-                        received_at=received_at,
-                        pdf_path=pdf_path,
-                        extracted_text=extracted_text,
-                        **fields,
-                    )
-                )
-    finally:
+    for message in messages:
+        message_id = message["id"]
+        subject = message.get("subject", "")
+        from_info = (message.get("from") or {}).get("emailAddress", {})
+        from_addr = from_info.get("address", "") or from_info.get("name", "")
+        received_raw = message.get("receivedDateTime")
         try:
-            conn.close()
-        except Exception:
-            pass
-        conn.logout()
+            received_at = datetime.fromisoformat(received_raw.replace("Z", "+00:00"))
+        except (TypeError, ValueError, AttributeError):
+            received_at = datetime.utcnow()
+
+        for attachment in _list_pdf_attachments(message_id):
+            filename = attachment.get("name", "attachment.pdf")
+            safe_name = re.sub(r"[^A-Za-z0-9_.\-]", "_", filename)
+            pdf_path = os.path.join(INVOICE_DIR, f"{message_id}_{safe_name}")
+
+            with open(pdf_path, "wb") as fh:
+                fh.write(b64decode(attachment["contentBytes"]))
+
+            extracted_text = ""
+            try:
+                with pdfplumber.open(pdf_path) as pdf:
+                    extracted_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            except Exception:
+                # Corrupt/unreadable PDF -- keep the file, leave fields empty.
+                extracted_text = ""
+
+            fields = _extract_fields(extracted_text, from_addr)
+            results.append(
+                InvoiceAttachment(
+                    email_message_id=message_id,
+                    attachment_filename=filename,
+                    email_subject=subject,
+                    email_from=from_addr,
+                    received_at=received_at,
+                    pdf_path=pdf_path,
+                    extracted_text=extracted_text,
+                    **fields,
+                )
+            )
 
     return results
