@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Re-extracts invoice_number/invoice_date/amount_cents/supplier_name,
-richting (direction) and documentsoort (document_kind) for every invoice
-already in the database, straight from its stored PDF (pdf_path). Run this
-after improving the parsing rules in app/email_client.py so existing
-invoices benefit without needing a fresh mail sync.
+richting (direction), documentsoort (document_kind) and content_hash for
+every invoice already in the database, straight from its stored PDF
+(pdf_path). Run this after improving the parsing rules in
+app/email_client.py so existing invoices benefit without needing a fresh
+mail sync. Also cleans up invoices that turn out to be duplicates (the same
+document fetched from two mailboxes, e.g. facturen@ and info@).
 
 Never touches a document you (or the matcher) already made a real decision
 about -- MATCHED, manually IGNORED, SUGGESTED or RECEIPT_ELSEWHERE stay
@@ -11,22 +13,25 @@ exactly as they are. A document still sitting as UNMATCHED and newly
 recognised as "other" (general terms, a bank-account change notice, an
 amount-less packing slip, ...) gets set to IGNORED, since that's the
 classification this script exists to (re)apply -- not a status you set by
-hand.
+hand. Never touches in_basecone/basecone_forwarded_at either -- that's a
+real-world fact (was this ever forwarded?) this offline, PDF-only script has
+no way to check or un-know.
 """
+import hashlib
 import os
 import sys
+from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pdfplumber
 
 from app.db import SessionLocal
-from app.email_client import _extract_fields
+from app.email_client import _extract_fields, invoice_dedup_key
 from app.models import DocumentKind, Invoice, MatchStatus
 
 
-def main() -> None:
-    session = SessionLocal()
+def _reparse_fields(session) -> tuple[int, int, int, int]:
     invoices = session.query(Invoice).all()
     total = len(invoices)
     print(f"{total} facturen gevonden, opnieuw verwerken...")
@@ -40,6 +45,10 @@ def main() -> None:
         if not inv.pdf_path or not os.path.isfile(inv.pdf_path):
             missing_pdf += 1
             continue
+
+        with open(inv.pdf_path, "rb") as fh:
+            content_bytes = fh.read()
+        inv.content_hash = hashlib.sha256(content_bytes).hexdigest()
 
         try:
             with pdfplumber.open(inv.pdf_path) as pdf:
@@ -66,6 +75,44 @@ def main() -> None:
         updated += 1
 
     session.commit()
+    return total, updated, missing_pdf, unreadable, newly_other
+
+
+def _dedupe_invoices(session) -> int:
+    """Groups every invoice by document identity (content_hash, falling back
+    to leverancier+factuurnummer+bedrag) and removes every duplicate beyond
+    the one worth keeping: a MATCHED one first, else the oldest."""
+    groups: dict[str, list[Invoice]] = defaultdict(list)
+    for inv in session.query(Invoice).all():
+        key = invoice_dedup_key(inv.content_hash, inv.supplier_name, inv.invoice_number, inv.amount_cents)
+        if key is not None:
+            groups[key].append(inv)
+
+    removed = 0
+    for dupes in groups.values():
+        if len(dupes) < 2:
+            continue
+        dupes.sort(key=lambda i: (i.status != MatchStatus.MATCHED, i.received_at, i.id))
+        keeper, *rest = dupes
+        for dupe in rest:
+            if dupe.status == MatchStatus.MATCHED:
+                # Two genuinely matched copies of the same document -- both
+                # made a real decision, too risky to silently pick one; skip.
+                continue
+            if dupe.pdf_path and dupe.pdf_path != keeper.pdf_path and os.path.isfile(dupe.pdf_path):
+                os.remove(dupe.pdf_path)
+            session.delete(dupe)
+            removed += 1
+    if removed:
+        session.commit()
+    return removed
+
+
+def main() -> None:
+    session = SessionLocal()
+
+    total, updated, missing_pdf, unreadable, newly_other = _reparse_fields(session)
+    removed = _dedupe_invoices(session)
 
     open_invoices = session.query(Invoice).filter(Invoice.status == MatchStatus.UNMATCHED)
     zonder_bedrag = open_invoices.filter(Invoice.amount_cents.is_(None)).count()
@@ -81,7 +128,9 @@ def main() -> None:
         print(f"{unreadable} PDF's niet leesbaar (overgeslagen).")
     if newly_other:
         print(f"{newly_other} herkend als geen factuur (algemene voorwaarden e.d.) en op genegeerd gezet.")
-    print(f"\nNog openstaand (niet genegeerd/gekoppeld): {nog_open} van {total}")
+    if removed:
+        print(f"{removed} dubbele facturen verwijderd (zelfde document uit meerdere mailboxen).")
+    print(f"\nNog openstaand (niet genegeerd/gekoppeld): {nog_open} van {total - removed}")
     print(f"Daarvan zonder bedrag:        {zonder_bedrag}")
     print(f"Daarvan zonder factuurnummer: {zonder_nummer}")
 

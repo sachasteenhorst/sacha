@@ -7,6 +7,14 @@ an account that has "Full Access" mailbox permission on the shared mailbox
 configured as GRAPH_MAILBOX -- if you can already open that mailbox in your
 own Outlook, you have this.
 
+Also run this again after adding the Mail.Send and Mail.Send.Shared
+permissions in Entra (see README) -- that's what lets the dashboard
+actually send an invoice to Basecone instead of just checking. Until you
+do, the app keeps working exactly as before (read-only); it just can't
+send. This script always requests every permission this app knows about
+(see app.email_client.GRAPH_SCOPES); which of them you actually get depends
+on what's configured in Entra at the time you run it.
+
 No web server or redirect URL is needed: this prints a short code, you
 enter it at https://microsoft.com/devicelogin in any browser, and the
 script picks up the result.

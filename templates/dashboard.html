@@ -22,6 +22,10 @@
     <span class="stat-number">{{ counters.automatisch_afgehandeld }}</span>
     <span class="stat-label">Automatisch afgehandeld</span>
   </a>
+  <a href="#niet-naar-basecone" class="stat-tile{% if counters.niet_naar_basecone > 0 %} stat-open{% endif %}">
+    <span class="stat-number">{{ counters.niet_naar_basecone }}</span>
+    <span class="stat-label">Niet naar Basecone</span>
+  </a>
 </section>
 
 <section class="status-bar">
@@ -59,6 +63,12 @@
 <div class="banner banner-warning">
   ⚠️ Je hebt betalingen zonder factuur van {{ oldest_unmatched_days }} dagen oud. Los deze op voordat je accountant ermee komt.
 </div>
+{% endif %}
+
+{% if forward_error %}
+<div class="banner banner-error">⚠️ Doorsturen naar Basecone mislukt: {{ forward_error }}</div>
+{% elif forward_ok %}
+<div class="banner banner-ok">✅ {{ forward_ok }} document(en) naar Basecone gestuurd.</div>
 {% endif %}
 
 <form method="get" action="/dashboard" class="filter-form">
@@ -216,7 +226,7 @@
   <div class="table-scroll">
   <table class="muted">
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Document(en)</th><th>Methode</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Document(en)</th><th>Methode</th><th>Korting</th></tr>
     </thead>
     <tbody>
       {% for group in recent_groups %}
@@ -226,6 +236,7 @@
         <td class="amount">{{ tx.amount_cents|euros }}</td>
         <td>{{ group|map(attribute="invoice")|map(attribute="invoice_number")|select|join(", ") or group[0].invoice.attachment_filename }}</td>
         <td>{{ group[0].method|method_label }}{% if group|length > 1 %} ({{ group|length }} documenten){% endif %}</td>
+        <td class="amount">{% if group[0].discount_cents %}{{ group[0].discount_cents|euros }}{% else %}-{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -274,6 +285,78 @@
   </div>
   {% else %}
   <p class="empty">Nog niets automatisch afgehandeld.</p>
+  {% endif %}
+</section>
+
+<section id="niet-naar-basecone">
+  <h2>Niet naar Basecone ({{ basecone_todo|length }})</h2>
+  <p class="hint">Deze facturen/creditnota's zijn nog niet naar de boekhouder (Basecone) gestuurd. Zonder dat ziet de accountant het document niet, ook al staat het hier als "gekoppeld".</p>
+  {% if basecone_todo %}
+  <form method="post" action="/invoices/forward-to-basecone-bulk">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th></th><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>PDF</th><th>Actie</th></tr>
+      </thead>
+      <tbody>
+        {% for inv in basecone_todo %}
+        <tr>
+          <td class="checkbox-cell"><input type="checkbox" name="invoice_ids" value="{{ inv.id }}"></td>
+          <td>{{ inv.received_at|dutch_date }}</td>
+          <td>{{ inv.supplier_name or "?" }}</td>
+          <td>{{ inv.invoice_number or "?" }}</td>
+          <td class="amount">{{ inv.amount_cents|euros }}</td>
+          <td>
+            {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
+          </td>
+          <td class="actions">
+            <button class="btn btn-secondary" type="submit" formaction="/invoices/{{ inv.id }}/forward-to-basecone">Stuur naar Basecone</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <button class="btn btn-primary" type="submit">Stuur geselecteerde naar Basecone</button>
+  </form>
+  {% else %}
+  <p class="empty">Alles wat we konden versturen staat al in Basecone. 🎉</p>
+  {% endif %}
+</section>
+
+<section id="basecone-controleer">
+  <h2>Controleer eerst ({{ basecone_review|length }})</h2>
+  <p class="hint">Van deze documenten is het factuurnummer of bedrag niet goed herkend -- controleer ze zelf voordat je ze naar Basecone stuurt (daarom worden ze nooit automatisch verstuurd).</p>
+  {% if basecone_review %}
+  <div class="table-scroll">
+  <table class="muted">
+    <thead>
+      <tr><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>PDF</th><th>Actie</th></tr>
+    </thead>
+    <tbody>
+      {% for inv in basecone_review %}
+      <tr>
+        <td>{{ inv.received_at|dutch_date }}</td>
+        <td>{{ inv.supplier_name or "?" }}</td>
+        <td>{{ inv.invoice_number or "?" }}</td>
+        <td class="amount">{{ inv.amount_cents|euros }}</td>
+        <td>
+          {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
+        </td>
+        <td class="actions">
+          <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-secondary">Stuur toch naar Basecone</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Niets om te controleren.</p>
   {% endif %}
 </section>
 

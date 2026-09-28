@@ -16,6 +16,7 @@ and the invoice still shows up in the dashboard for you to fill in by hand.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import time
@@ -27,7 +28,7 @@ import pdfplumber
 import requests
 
 from app.config import settings
-from app.models import Direction, DocumentKind
+from app.models import BaseconeForwardStatus, Direction, DocumentKind
 
 INVOICE_DIR = "./data/invoices"
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
@@ -163,10 +164,30 @@ class InvoiceAttachment:
     direction: str = Direction.OUTGOING.value
     document_kind: str = DocumentKind.INVOICE.value
     referenced_invoice_numbers: list = None
+    content_hash: str = ""
+    graph_mailbox: str = ""
+    graph_message_id: str = ""
+    in_basecone: str = "unknown"
+    basecone_forward_method: str = ""
 
     def __post_init__(self):
         if self.referenced_invoice_numbers is None:
             self.referenced_invoice_numbers = []
+
+
+def invoice_dedup_key(content_hash: str, supplier_name: str, invoice_number: str, amount_cents: int | None) -> str | None:
+    """A document identity that survives being fetched twice from different
+    mailboxes (facturen@ and info@ both receiving the same supplier e-mail
+    as separate messages, each with its own message id) -- content_hash is
+    the strongest signal (byte-identical PDF); when that's not available
+    (e.g. an older row from before this existed), falls back to
+    leverancier+factuurnummer+bedrag. None means "can't tell", i.e. never
+    treated as a duplicate."""
+    if content_hash:
+        return f"hash:{content_hash}"
+    if invoice_number and amount_cents is not None:
+        return f"key:{(supplier_name or '').strip().lower()}|{invoice_number.strip().lower()}|{amount_cents}"
+    return None
 
 
 def _parse_amount_literal(raw: str) -> int:
@@ -231,19 +252,70 @@ def _first_valid_number_token(window: str) -> str:
     return ""
 
 
-def _extract_invoice_number(text: str) -> str:
+# A short, mostly-numeric token (an incassant ID, klantnummer, debiteurnummer
+# -- e.g. Kruitbosch's incassant ID "306228") that PDF-layout column collapse
+# sometimes puts right after a "Factuurnummer" label instead of the real
+# number. The real thing (e.g. "VFNL002280953") is longer and starts with
+# letters, so this is a narrow, deliberately conservative check.
+ID_LIKE_INVOICE_NUMBER_RE = re.compile(r"^\d{4,7}[A-Za-z]?$")
+# A real invoice number is almost always right there in the filename too
+# (suppliers name the PDF after it) -- e.g.
+# "Kruitbosch Factuur VFNL002280953_1.pdf". Used both as a fallback and to
+# override a label match that looks like an ID instead (see above).
+FILENAME_TOKEN_STOPWORDS = {
+    "factuur", "faktuur", "invoice", "creditnota", "credit", "note",
+    "copy", "kopie", "duplicate", "final", "specificatie",
+}
+
+
+def _looks_like_id_not_invoice_number(token: str) -> bool:
+    return bool(ID_LIKE_INVOICE_NUMBER_RE.match(token))
+
+
+def _extract_invoice_number_from_filename(filename: str) -> str:
+    base = re.sub(r"\.[A-Za-z0-9]{2,4}$", "", filename or "")
+    candidates = []
+    for token in re.split(r"[\s_\-]+", base):
+        cleaned = token.strip(".")
+        if not cleaned or cleaned.lower() in FILENAME_TOKEN_STOPWORDS:
+            continue
+        if not any(ch.isdigit() for ch in cleaned) or len(cleaned) < 5:
+            continue
+        candidates.append(cleaned)
+    # The real invoice number is the most distinctive (longest) token --
+    # a trailing copy-suffix like "_1" or "(2)" is short and loses.
+    return max(candidates, key=len) if candidates else ""
+
+
+def _labelled_invoice_number_candidates(text: str) -> list[str]:
     # Strong, unambiguous labels first, across every occurrence in the
-    # document; a generic bare "nummer" is only trusted if nothing better
-    # was found anywhere (it also matches "klantnummer"/"ordernummer" less
-    # often than you'd think, since those are single words with no space
-    # before "nummer" and INVOICE_NUMBER_WEAK_LABEL_RE requires a word
-    # boundary right before it).
+    # document; a generic bare "nummer" is only tried if the strong label
+    # yielded nothing at all anywhere (it also matches
+    # "klantnummer"/"ordernummer" less often than you'd think, since those
+    # are single words with no space before "nummer" and
+    # INVOICE_NUMBER_WEAK_LABEL_RE requires a word boundary right before it).
     for label_re in (INVOICE_NUMBER_STRONG_LABEL_RE, INVOICE_NUMBER_WEAK_LABEL_RE):
+        candidates = []
         for m in label_re.finditer(text):
             token = _first_valid_number_token(text[m.end(): m.end() + 60])
             if token:
-                return token
-    return ""
+                candidates.append(token)
+        if candidates:
+            return candidates
+    return []
+
+
+def _extract_invoice_number(text: str, filename: str = "") -> str:
+    candidates = _labelled_invoice_number_candidates(text)
+    for token in candidates:
+        if not _looks_like_id_not_invoice_number(token):
+            return token
+    # Every labelled candidate looked like an incassant/klantnummer (layout
+    # collapse) -- the filename usually carries the real number instead.
+    filename_number = _extract_invoice_number_from_filename(filename)
+    if filename_number:
+        return filename_number
+    return candidates[0] if candidates else ""
 
 
 def _extract_all_invoice_numbers(text: str) -> list[str]:
@@ -293,6 +365,24 @@ def _is_own_company(address: str, display_name: str) -> bool:
         return True
     name_lower = (display_name or "").strip().lower()
     return any(own_name in name_lower for own_name in settings.own_company_name_list if own_name)
+
+
+def _recipients_contain(message: dict, address: str) -> bool:
+    if not address:
+        return False
+    address = address.lower()
+    for field in ("toRecipients", "ccRecipients", "bccRecipients"):
+        for r in message.get(field) or []:
+            if (r.get("emailAddress", {}).get("address") or "").lower() == address:
+                return True
+    return False
+
+
+def message_was_sent_to_basecone(message: dict) -> bool:
+    """True when the ORIGINAL e-mail already had the Basecone-inbox address
+    on to/cc/bcc -- the supplier put it there directly, so it's already in
+    Basecone and auto-forwarding it again would be a duplicate."""
+    return _recipients_contain(message, settings.basecone_forward_address)
 
 
 def _assign_direction(supplier_name: str) -> str:
@@ -364,7 +454,7 @@ def _extract_fields(
     supplier_name = _derive_supplier_name(address, display_name)
     direction = _assign_direction(supplier_name)
     amount_cents = _parse_amount_to_cents(text, direction)
-    invoice_number = _extract_invoice_number(text) or _extract_invoice_number_from_subject(subject)
+    invoice_number = _extract_invoice_number(text, filename) or _extract_invoice_number_from_subject(subject)
     document_kind = _classify_document_kind(filename, subject, text, amount_cents)
     if _is_own_company(address, display_name):
         # A verkoopfactuur we sent ourselves is never a purchase to pay --
@@ -391,7 +481,18 @@ def _extract_fields(
 # The trade-off: there's no unattended client-credentials login, so a human
 # has to sign in once (via scripts/graph_login.py) to produce a refresh
 # token, which this class then uses to keep getting new access tokens.
-GRAPH_SCOPES = "https://graph.microsoft.com/Mail.Read.Shared offline_access"
+#
+# Mail.Send (send as "me") and Mail.Send.Shared (send as a shared mailbox,
+# needed to send from facturen@/info@) are ALSO requested here -- but only
+# ever consented to once someone re-runs graph_login.py after adding those
+# permissions in Entra (see README). Until then, an existing refresh token
+# only has Mail.Read.Shared consent, and _GraphAuth.token() below falls back
+# to requesting just that -- so upgrading this app to a newer version can
+# never break an already-working read-only sync, only leave forwarding
+# switched off until that one manual step happens.
+GRAPH_READ_SCOPES = "https://graph.microsoft.com/Mail.Read.Shared"
+GRAPH_SEND_SCOPES = "https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Send.Shared"
+GRAPH_SCOPES = f"{GRAPH_READ_SCOPES} {GRAPH_SEND_SCOPES} offline_access"
 REFRESH_TOKEN_FILE = "./data/graph_refresh_token.txt"
 
 
@@ -399,6 +500,7 @@ class _GraphAuth:
     def __init__(self) -> None:
         self._access_token: str | None = None
         self._expires_at: float = 0.0
+        self._has_send_scope: bool = False
 
     @staticmethod
     def _read_refresh_token() -> str | None:
@@ -438,18 +540,31 @@ class _GraphAuth:
         # these token requests for a public client, so it's deliberately
         # left out here.
         token_url = f"https://login.microsoftonline.com/{settings.graph_tenant_id}/oauth2/v2.0/token"
-        data = {
-            "grant_type": "refresh_token",
-            "client_id": settings.graph_client_id,
-            "refresh_token": refresh_token,
-            "scope": GRAPH_SCOPES,
-        }
 
-        response = requests.post(token_url, data=data, timeout=30)
-        if response.status_code != 200:
+        # Try the full scope (read + send) first; an OLDER refresh token that
+        # was only ever consented for Mail.Read.Shared gets rejected for
+        # that, so fall back to read-only -- this is what keeps an upgrade
+        # from breaking an already-working sync (see the comment on
+        # GRAPH_SCOPES above). self._sent_scope records which one actually
+        # won, so callers that need to send can tell whether that's even
+        # possible with the current consent before trying.
+        response = None
+        for scope, granted_send in ((GRAPH_SCOPES, True), (f"{GRAPH_READ_SCOPES} offline_access", False)):
+            data = {
+                "grant_type": "refresh_token",
+                "client_id": settings.graph_client_id,
+                "refresh_token": refresh_token,
+                "scope": scope,
+            }
+            response = requests.post(token_url, data=data, timeout=30)
+            if response.status_code == 200:
+                self._has_send_scope = granted_send
+                break
+
+        if response is None or response.status_code != 200:
             raise GraphAuthError(
-                f"Microsoft Graph token vernieuwen mislukt ({response.status_code}): "
-                f"{response.text}. Mogelijk moet je opnieuw inloggen via "
+                f"Microsoft Graph token vernieuwen mislukt ({response.status_code if response else '?'}): "
+                f"{response.text if response else ''}. Mogelijk moet je opnieuw inloggen via "
                 "scripts/graph_login.py."
             )
 
@@ -461,6 +576,13 @@ class _GraphAuth:
         if "refresh_token" in payload:
             self._write_refresh_token(payload["refresh_token"])
         return self._access_token
+
+    def has_send_scope(self) -> bool:
+        """Whether the current refresh token actually got Mail.Send(.Shared)
+        consent -- lets a caller give a clear "permission missing" message
+        instead of a raw 403 from Graph."""
+        self.token()
+        return self._has_send_scope
 
 
 _auth = _GraphAuth()
@@ -479,7 +601,7 @@ def _list_messages_since(mailbox: str, since: date) -> list[dict]:
     url = f"{GRAPH_BASE_URL}/users/{mailbox}/mailFolders/{settings.graph_mail_folder}/messages"
     params = {
         "$filter": f"receivedDateTime ge {since_iso} and hasAttachments eq true",
-        "$select": "id,internetMessageId,subject,from,receivedDateTime,hasAttachments",
+        "$select": "id,internetMessageId,subject,from,receivedDateTime,hasAttachments,toRecipients,ccRecipients,bccRecipients",
         "$top": "50",
     }
 
@@ -490,6 +612,62 @@ def _list_messages_since(mailbox: str, since: date) -> list[dict]:
         url = payload.get("@odata.nextLink")
         params = None  # nextLink already contains the query string
     return messages
+
+
+def list_sent_items_since(mailbox: str, since: date) -> list[dict]:
+    """Sent Items of `mailbox` -- pass "me" for the logged-in user's own
+    mailbox. Used to find an invoice that was already forwarded to Basecone
+    by hand, before this app could do it automatically."""
+    since_iso = f"{since.isoformat()}T00:00:00Z"
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    url = f"{base}/mailFolders/SentItems/messages"
+    params = {
+        "$filter": f"sentDateTime ge {since_iso}",
+        "$select": "id,subject,toRecipients,ccRecipients,bccRecipients,sentDateTime",
+        "$top": "50",
+    }
+    messages: list[dict] = []
+    while url:
+        payload = _graph_get(url, params)
+        messages.extend(payload.get("value", []))
+        url = payload.get("@odata.nextLink")
+        params = None
+    return messages
+
+
+def list_message_attachment_names(mailbox: str, message_id: str) -> list[str]:
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    url = f"{base}/messages/{message_id}/attachments"
+    try:
+        payload = _graph_get(url, {"$select": "name"})
+    except GraphApiError:
+        return []
+    return [a.get("name", "") for a in payload.get("value", [])]
+
+
+def send_mail(mailbox: str, message: dict) -> None:
+    """POSTs to /users/{mailbox}/sendMail (or /me/sendMail for the logged-in
+    user), saving a copy to Sent Items. Requires Mail.Send.Shared for a
+    shared mailbox or Mail.Send for "me" -- see GRAPH_SCOPES."""
+    token = _auth.token()
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    url = f"{base}/sendMail"
+    response = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        json={"message": message, "saveToSentItems": True},
+        timeout=30,
+    )
+    if response.status_code == 403:
+        scope_name = "Mail.Send" if mailbox == "me" else "Mail.Send.Shared"
+        raise GraphApiError(
+            f"Geen rechten om te versturen vanuit {mailbox} -- de gedelegeerde "
+            f"permissie {scope_name} ontbreekt (of is nog niet opnieuw "
+            "geconsenteerd). Voeg 'm toe in Entra en log opnieuw in met "
+            "scripts/graph_login.py (zie README)."
+        )
+    if response.status_code not in (200, 202):
+        raise GraphApiError(f"Versturen mislukt ({response.status_code}) vanuit {mailbox}: {response.text}")
 
 
 def _list_pdf_attachments(mailbox: str, message_id: str) -> list[dict]:
@@ -519,6 +697,11 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
     # Internet Message-ID + attachment filename within this run, on top of
     # the DB-level uniqueness check the caller (sync.py) does across runs.
     seen_keys: set[tuple[str, str]] = set()
+    # A second, independent line of defence: facturen@ and info@ often
+    # receive the SAME invoice as two genuinely separate messages (different
+    # internetMessageId each), so the check above alone lets both through --
+    # this catches that by document identity instead of message identity.
+    seen_dedup_keys: set[str] = set()
 
     for mailbox_index, mailbox in enumerate(mailboxes):
         # Only the first configured mailbox is treated as invoice-dedicated;
@@ -539,6 +722,7 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                 received_at = datetime.fromisoformat(received_raw.replace("Z", "+00:00"))
             except (TypeError, ValueError, AttributeError):
                 received_at = datetime.utcnow()
+            sent_to_basecone_directly = message_was_sent_to_basecone(message)
 
             for attachment in _list_pdf_attachments(mailbox, message_id):
                 filename = attachment.get("name", "attachment.pdf")
@@ -551,11 +735,14 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                     continue
                 seen_keys.add(key)
 
+                content_bytes = b64decode(attachment["contentBytes"])
+                content_hash = hashlib.sha256(content_bytes).hexdigest()
+
                 safe_name = re.sub(r"[^A-Za-z0-9_.\-]", "_", filename)
                 pdf_path = os.path.join(INVOICE_DIR, f"{message_id}_{safe_name}")
 
                 with open(pdf_path, "wb") as fh:
-                    fh.write(b64decode(attachment["contentBytes"]))
+                    fh.write(content_bytes)
 
                 extracted_text = ""
                 try:
@@ -566,6 +753,13 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                     extracted_text = ""
 
                 fields = _extract_fields(extracted_text, from_addr, from_name, subject, filename)
+                dedup_key = invoice_dedup_key(content_hash, fields["supplier_name"], fields["invoice_number"], fields["amount_cents"])
+                if dedup_key is not None and dedup_key in seen_dedup_keys:
+                    os.remove(pdf_path)  # the copy we just wrote is the duplicate -- don't keep it on disk
+                    continue
+                if dedup_key is not None:
+                    seen_dedup_keys.add(dedup_key)
+
                 results.append(
                     InvoiceAttachment(
                         email_message_id=internet_message_id,
@@ -575,6 +769,11 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                         received_at=received_at,
                         pdf_path=pdf_path,
                         extracted_text=extracted_text,
+                        content_hash=content_hash,
+                        graph_mailbox=mailbox,
+                        graph_message_id=message_id,
+                        in_basecone=BaseconeForwardStatus.YES.value if sent_to_basecone_directly else BaseconeForwardStatus.UNKNOWN.value,
+                        basecone_forward_method="original" if sent_to_basecone_directly else "",
                         **fields,
                     )
                 )

@@ -81,18 +81,37 @@ def _name_similarity(a: str, b: str) -> float:
     return 0.0
 
 
-def _reference_match(transaction: Transaction, invoices: list[Invoice]) -> Invoice | None:
+def _discount_tolerance_cents(amount_cents: int) -> int:
+    """How much less than invoiced a REFERENCE match may still accept as
+    betalingskorting (early-payment discount) -- capped at whichever is
+    SMALLER of a percentage of the amount or a flat ceiling, so a big
+    invoice can't wave away an implausibly large gap."""
+    percent_based = round(abs(amount_cents) * settings.payment_discount_percent / 100)
+    return min(percent_based, settings.payment_discount_max_cents)
+
+
+def _reference_match_group(transaction: Transaction, invoices: list[Invoice]) -> tuple[list[Invoice], int] | None:
+    """Every open invoice whose number is found verbatim in the transaction's
+    description/reference -- a single incasso payment often settles several
+    invoices at once (e.g. Kruitbosch/Accell direct debits listing multiple
+    comma-separated invoice numbers). Accepts the combined total being
+    slightly less than the sum invoiced (see _discount_tolerance_cents);
+    returns the matched invoices plus the (positive = discount) difference."""
     haystack = f"{transaction.description} {transaction.reference}".lower()
-    best: Invoice | None = None
-    for invoice in invoices:
-        if invoice.amount_cents is None:
-            continue
-        if abs(abs(transaction.amount_cents) - invoice.amount_cents) > settings.match_amount_tolerance_cents:
-            continue
-        if invoice.invoice_number and invoice.invoice_number.lower() in haystack:
-            if best is None or _date_diff(transaction, invoice) < _date_diff(transaction, best):
-                best = invoice
-    return best
+    matches = [
+        invoice for invoice in invoices
+        if invoice.amount_cents is not None
+        and invoice.invoice_number
+        and invoice.invoice_number.lower() in haystack
+    ]
+    if not matches:
+        return None
+    total = sum(invoice.amount_cents for invoice in matches)
+    diff = total - abs(transaction.amount_cents)  # positive = paid less than invoiced (discount)
+    tolerance = max(settings.match_amount_tolerance_cents, _discount_tolerance_cents(total))
+    if abs(diff) > tolerance:
+        return None
+    return matches, diff
 
 
 def _date_diff(transaction: Transaction, invoice: Invoice) -> int:
@@ -177,6 +196,7 @@ def _create_match_group(
     method: MatchMethod,
     confidence: str,
     confirmed: bool,
+    discount_cents: int = 0,
 ) -> None:
     group_id = uuid.uuid4().hex[:12]
     for invoice in invoices:
@@ -188,6 +208,7 @@ def _create_match_group(
                 confidence=confidence,
                 confirmed=confirmed,
                 group_id=group_id,
+                discount_cents=discount_cents,
             )
         )
         invoice.status = MatchStatus.MATCHED if confirmed else MatchStatus.SUGGESTED
@@ -206,11 +227,19 @@ def run_matching(session: Session) -> MatchingSummary:
         all_candidates = _candidate_invoices(session)  # re-fetch: earlier iterations may have consumed one
         invoices = _same_direction_invoices(transaction, all_candidates)
 
-        reference_hit = _reference_match(transaction, invoices)
-        if reference_hit is not None:
+        reference_group = _reference_match_group(transaction, invoices)
+        if reference_group is not None:
+            matched_invoices, discount_cents = reference_group
             _clear_unconfirmed_suggestions(session, transaction)
-            linked = _linked_specification_invoices(reference_hit, all_candidates)
-            _create_match_group(session, transaction, [reference_hit, *linked], MatchMethod.REFERENCE, "high", confirmed=True)
+            linked: list[Invoice] = []
+            for invoice in matched_invoices:
+                for candidate in _linked_specification_invoices(invoice, all_candidates):
+                    if candidate not in matched_invoices and candidate not in linked:
+                        linked.append(candidate)
+            _create_match_group(
+                session, transaction, [*matched_invoices, *linked],
+                MatchMethod.REFERENCE, "high", confirmed=True, discount_cents=discount_cents,
+            )
             summary.auto_matched += 1
             continue
 

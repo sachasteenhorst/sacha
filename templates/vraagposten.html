@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+
+<p><a href="/dashboard" class="clear-filter">&larr; Terug naar dashboard</a></p>
+
+<section id="vraagposten">
+  <h2>Vraagposten ({{ items|length }})</h2>
+  <p class="hint">
+    Alles wat je accountant nu nog zou vragen: betalingen zonder bewijsstuk, en facturen die wel gekoppeld
+    zijn maar nog niet naar Basecone zijn gestuurd. Gesorteerd op leeftijd (oudste eerst), dan op bedrag.
+    <a href="/vraagposten/export.csv">Exporteer als CSV</a>
+  </p>
+  {% if items %}
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr><th>Leeftijd</th><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Voorgestelde actie</th><th>Actie</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      {% set tx = item.transaction %}
+      <tr>
+        <td>{{ item.age_days }} dagen</td>
+        <td>{{ tx.booking_date|dutch_date }}</td>
+        <td class="amount">{{ tx.amount_cents|euros }}</td>
+        <td>{{ tx.counterparty_name or "?" }}</td>
+        <td><small class="muted-text">{{ tx.description }}</small></td>
+        <td>{{ item.label }}</td>
+        <td class="actions">
+          {% if item.kind == "controleren" %}
+          <a class="btn btn-secondary" href="/dashboard?q={{ tx.counterparty_name|urlencode }}">Bekijk in dashboard</a>
+          {% elif item.kind == "regel" %}
+          <a class="btn btn-secondary" href="/regels?counterparty={{ tx.counterparty_name|urlencode }}&amp;iban={{ tx.counterparty_iban|urlencode }}&amp;code={{ tx.bank_code|urlencode }}&amp;direction={{ tx|transaction_direction }}">Maak regel</a>
+          {% elif item.kind == "bon" %}
+          <form method="post" action="/transactions/{{ tx.id }}/receipt-in-basecone">
+            <button class="btn btn-secondary">Bon staat in Basecone</button>
+          </form>
+          {% elif item.kind == "opvragen" %}
+          <a class="btn btn-secondary" href="{{ item.mailto }}">Opvragen per mail</a>
+          {% elif item.kind == "doorsturen" and item.invoice %}
+          <form method="post" action="/invoices/{{ item.invoice.id }}/forward-to-basecone">
+            <button class="btn btn-secondary">Stuur naar Basecone</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Geen vraagposten. 🎉</p>
+  {% endif %}
+</section>
+
+{% endblock %}

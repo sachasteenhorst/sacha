@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,14 +23,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
+from app.basecone_forward import is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
 from app.db import get_session, init_db
-from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE
+from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE, GraphApiError, GraphAuthError
 from app.matcher import _transaction_direction
-from app.models import Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
+from app.models import BaseconeForwardStatus, Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
 from app.rules import apply_rules
 from app.scheduler import start_scheduler
 from app.sync import import_bank_file, run_sync
+from app.vraagposten import build_vraagposten
 
 app = FastAPI(title="Fietsenwinkel administratie")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -284,6 +286,19 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         )
     )
 
+    # -- Basecone forward status: any invoice/specification not yet sent,
+    # split into "confident enough to send" vs "check first" (see
+    # app/basecone_forward.py's is_confident/is_forwardable). Never filtered
+    # by q/maand -- this is its own worklist, not part of the search.
+    not_yet_in_basecone = [
+        inv for inv in session.scalars(
+            select(Invoice).where(Invoice.in_basecone != BaseconeForwardStatus.YES.value).order_by(Invoice.received_at.asc())
+        )
+        if is_forwardable(inv)
+    ]
+    basecone_todo = [inv for inv in not_yet_in_basecone if is_confident(inv)]
+    basecone_review = [inv for inv in not_yet_in_basecone if not is_confident(inv)]
+
     # For the manual-match dropdown -- never filtered by q/maand.
     all_open_invoices = list(
         session.scalars(
@@ -309,6 +324,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "facturen_niet_betaald": len(unmatched_invoices_all),
         "gekoppeld_deze_maand": matched_this_month,
         "automatisch_afgehandeld": len(rule_handled_all),
+        "niet_naar_basecone": len(basecone_todo),
         "maand_label": MONTHS_NL[now_ams.month - 1],
     }
 
@@ -372,6 +388,10 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "oldest_unmatched_days": oldest_unmatched_days,
             "rule_handled_transactions": _filter_transactions(rule_handled_all, q, maand),
             "monthly_progress": _monthly_progress(session),
+            "basecone_todo": basecone_todo,
+            "basecone_review": basecone_review,
+            "forward_error": request.query_params.get("forward_error"),
+            "forward_ok": request.query_params.get("forward_ok"),
         },
     )
 
@@ -641,3 +661,83 @@ def delete_rule(rule_id: int, user: str = Depends(require_auth), session: Sessio
     session.delete(rule)
     session.commit()
     return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/invoices/{invoice_id}/forward-to-basecone")
+def forward_to_basecone(
+    invoice_id: int,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "Factuur niet gevonden")
+    try:
+        send_invoice_to_basecone(invoice, method="manual")
+    except (GraphAuthError, GraphApiError) as exc:
+        session.rollback()
+        return _dashboard_redirect(q, maand, forward_error=str(exc))
+    session.commit()
+    return _dashboard_redirect(q, maand, forward_ok="1")
+
+
+@app.post("/invoices/forward-to-basecone-bulk")
+def forward_to_basecone_bulk(
+    invoice_ids: list[int] = Form(...),
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    sent = 0
+    first_error: str | None = None
+    for invoice_id in invoice_ids:
+        invoice = session.get(Invoice, invoice_id)
+        if invoice is None:
+            continue
+        try:
+            send_invoice_to_basecone(invoice, method="manual")
+            sent += 1
+        except (GraphAuthError, GraphApiError) as exc:
+            if first_error is None:
+                first_error = str(exc)
+    session.commit()
+    return _dashboard_redirect(
+        q, maand,
+        forward_ok=str(sent) if sent else "",
+        forward_error=first_error or "",
+    )
+
+
+@app.get("/vraagposten")
+def vraagposten_page(request: Request, user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    items = build_vraagposten(session)
+    return templates.TemplateResponse("vraagposten.html", {"request": request, "items": items})
+
+
+@app.get("/vraagposten/export.csv")
+def vraagposten_csv(user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    import csv
+    import io
+
+    items = build_vraagposten(session)
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["Leeftijd (dagen)", "Datum", "Bedrag", "Tegenpartij", "Omschrijving", "Voorgestelde actie", "Factuur/leverancier"])
+    for item in items:
+        writer.writerow([
+            item.age_days,
+            item.transaction.booking_date.strftime("%d-%m-%Y"),
+            f"{item.transaction.amount_cents / 100:.2f}".replace(".", ","),
+            item.transaction.counterparty_name,
+            item.transaction.description,
+            item.label,
+            item.invoice.supplier_name if item.invoice else "",
+        ])
+    return PlainTextResponse(
+        buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=vraagposten.csv"},
+    )

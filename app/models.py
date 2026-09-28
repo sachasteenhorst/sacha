@@ -65,6 +65,16 @@ class DocumentKind(str, enum.Enum):
     OTHER = "other"
 
 
+class BaseconeForwardStatus(str, enum.Enum):
+    """Whether an invoice's original e-mail was ever forwarded to the
+    accountant's Basecone inbox (BASECONE_FORWARD_ADDRESS) -- the boekhouder
+    never sees a document until it lands there, so a "matched" invoice that's
+    still UNKNOWN/NO is effectively still a vraagpost."""
+    YES = "yes"
+    NO = "no"
+    UNKNOWN = "unknown"
+
+
 class Transaction(Base):
     """A single bank statement line, imported from a Rabobank export
     (CSV/CAMT.053/MT940)."""
@@ -136,6 +146,28 @@ class Invoice(Base):
     # invoices settled by one direct debit).
     referenced_invoice_numbers: Mapped[list] = mapped_column(JSON, default=list)
 
+    # SHA-256 of the raw PDF bytes -- the same invoice often lands twice (once
+    # per scanned mailbox); this is what dedup keys on across mailboxes/runs,
+    # since the message ids genuinely differ but the attached file doesn't.
+    # Added after the first release -- see app/db.py's startup migration.
+    content_hash: Mapped[str] = mapped_column(String, default="", index=True)
+    # Which mailbox + Graph-internal message id (NOT internetMessageId) this
+    # came from -- needed to call the Graph "forward" endpoint later without
+    # having to re-search for the message. Added after the first release.
+    graph_mailbox: Mapped[str] = mapped_column(String, default="")
+    graph_message_id: Mapped[str] = mapped_column(String, default="")
+    # Whether the original e-mail was ever forwarded to the accountant's
+    # Basecone inbox (see BaseconeForwardStatus). Added after the first
+    # release -- see app/db.py's startup migration.
+    in_basecone: Mapped[str] = mapped_column(String, default=BaseconeForwardStatus.UNKNOWN.value)
+    basecone_forwarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # "original" (supplier already cc'd/bcc'd Basecone directly), "auto"
+    # (this app's own AUTO_FORWARD_BASECONE sync sent it), "manual" (sent by
+    # clicking the button), "detected" (found already sitting in Sent Items
+    # from before this feature existed).
+    basecone_forward_method: Mapped[str] = mapped_column(String, default="")
+    basecone_forwarded_to: Mapped[str] = mapped_column(String, default="")
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -168,6 +200,11 @@ class Match(Base):
     # group_id, so confirming/rejecting acts on the whole group at once.
     # Added after the first release -- see app/db.py's startup migration.
     group_id: Mapped[str] = mapped_column(String, index=True, default="")
+    # A REFERENCE match doesn't require the amount to line up exactly -- a
+    # small shortfall is accepted as betalingskorting (early-payment
+    # discount). Positive = paid less than invoiced. Added after the first
+    # release -- see app/db.py's startup migration.
+    discount_cents: Mapped[int] = mapped_column(Integer, default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

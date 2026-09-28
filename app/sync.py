@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.bank_import import BankImportError, parse_bank_file
 from app.basecone_client import BaseconeClient
+from app.basecone_forward import auto_forward_new_invoices, check_backlog_against_sent_items
 from app.config import settings
-from app.email_client import fetch_invoice_attachments
+from app.email_client import fetch_invoice_attachments, invoice_dedup_key
 from app.matcher import MatchingSummary, run_matching
 from app.models import DocumentKind, Invoice, MatchStatus, Transaction
 from app.rules import apply_rules
@@ -24,6 +25,7 @@ from app import sync_state
 class SyncResult:
     new_transactions: int = 0
     new_invoices: int = 0
+    basecone_auto_forwarded: int = 0
     errors: list[str] = None
     matching: MatchingSummary | None = None
 
@@ -92,11 +94,28 @@ def _sync_invoices(session: Session, since: date, result: SyncResult) -> None:
     existing_keys = set(
         session.execute(select(Invoice.email_message_id, Invoice.attachment_filename)).all()
     )
+    # Cross-mailbox/cross-run dedup by document identity, not just message
+    # identity -- facturen@ and info@ often receive the exact same invoice
+    # as two genuinely separate e-mails (see invoice_dedup_key).
+    existing_dedup_keys = {
+        key for key in (
+            invoice_dedup_key(content_hash, supplier_name, invoice_number, amount_cents)
+            for content_hash, supplier_name, invoice_number, amount_cents in session.execute(
+                select(Invoice.content_hash, Invoice.supplier_name, Invoice.invoice_number, Invoice.amount_cents)
+            )
+        )
+        if key is not None
+    }
 
     for inv in fetched:
         key = (inv.email_message_id, inv.attachment_filename)
         if key in existing_keys:
             continue
+        dedup_key = invoice_dedup_key(inv.content_hash, inv.supplier_name, inv.invoice_number, inv.amount_cents)
+        if dedup_key is not None and dedup_key in existing_dedup_keys:
+            continue
+        if dedup_key is not None:
+            existing_dedup_keys.add(dedup_key)
         # A document classified as "other" (general terms, a bank-account
         # change notice, an amount-less packing slip, ...) is never proof of
         # a payment -- filed straight to IGNORED so it doesn't clutter the
@@ -119,6 +138,13 @@ def _sync_invoices(session: Session, since: date, result: SyncResult) -> None:
                 direction=inv.direction,
                 document_kind=inv.document_kind,
                 referenced_invoice_numbers=inv.referenced_invoice_numbers,
+                content_hash=inv.content_hash,
+                graph_mailbox=inv.graph_mailbox,
+                graph_message_id=inv.graph_message_id,
+                in_basecone=inv.in_basecone,
+                basecone_forward_method=inv.basecone_forward_method,
+                basecone_forwarded_at=datetime.utcnow() if inv.basecone_forward_method == "original" else None,
+                basecone_forwarded_to=settings.basecone_forward_address if inv.basecone_forward_method == "original" else "",
                 status=status,
             )
         )
@@ -187,5 +213,19 @@ def run_sync(session: Session) -> SyncResult:
     apply_rules(session)
     result.matching = run_matching(session)
     session.commit()
+
+    # Independent of matching -- purely about getting documents to the
+    # accountant's Basecone inbox. Never let a Graph/permission problem here
+    # abort the rest of the sync; errors are just appended and shown.
+    try:
+        check_backlog_against_sent_items(session)
+        forward_result = auto_forward_new_invoices(session)
+        result.basecone_auto_forwarded = forward_result.sent
+        result.errors.extend(forward_result.errors)
+        session.commit()
+    except Exception as exc:  # noqa: BLE001 -- surface any Basecone-forward error to the dashboard
+        session.rollback()
+        result.errors.append(f"Basecone doorsturen: {exc}")
+
     sync_state.record(result)
     return result

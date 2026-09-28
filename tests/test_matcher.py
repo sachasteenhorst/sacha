@@ -65,6 +65,58 @@ def test_reference_match_is_auto_confirmed(session):
     assert tx.matches[0].confirmed is True
 
 
+def test_reference_match_groups_multiple_invoice_numbers_in_one_description(session):
+    # Kruitbosch/Accell-style incasso: one payment settles several invoices
+    # at once, all listed (comma-separated) in the same description.
+    tx = make_transaction(
+        description="Incasso factuur VFNL002275878,VFNL002277060", amount_cents=-(12345 + 6000),
+    )
+    inv1 = make_invoice(invoice_number="VFNL002275878", amount_cents=12345, email_message_id="<msg-1>")
+    inv2 = make_invoice(invoice_number="VFNL002277060", amount_cents=6000, email_message_id="<msg-2>")
+    session.add_all([tx, inv1, inv2])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert inv1.status == MatchStatus.MATCHED
+    assert inv2.status == MatchStatus.MATCHED
+    assert {m.invoice_id for m in tx.matches} == {inv1.id, inv2.id}
+    assert tx.matches[0].group_id == tx.matches[1].group_id
+
+
+def test_reference_match_accepts_small_payment_discount(session):
+    # Real Kruitbosch example: invoiced 590,10, paid 587,66 -- a 2,44
+    # betalingskorting, well within the default 3%/EUR25 tolerance.
+    tx = make_transaction(description="Incasso factuur VFNL002280953", amount_cents=-58766)
+    inv = make_invoice(invoice_number="VFNL002280953", amount_cents=59010)
+    session.add_all([tx, inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert tx.matches[0].discount_cents == 244
+
+
+def test_reference_match_rejects_difference_beyond_discount_tolerance(session):
+    tx = make_transaction(description="Incasso factuur VFNL002280953", amount_cents=-40000)
+    inv = make_invoice(invoice_number="VFNL002280953", amount_cents=59010)
+    session.add_all([tx, inv])
+    session.commit()
+
+    run_matching(session)
+    session.commit()
+
+    # Too far apart to be a discount -- must not auto-match.
+    assert tx.status == MatchStatus.UNMATCHED
+    assert inv.status == MatchStatus.UNMATCHED
+
+
 def test_amount_date_match_is_suggested_not_confirmed(session):
     tx = make_transaction(description="Overboeking", booking_date=date(2024, 3, 15))
     inv = make_invoice(invoice_number="", invoice_date=date(2024, 3, 1))

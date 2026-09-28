@@ -7,10 +7,12 @@ from app.email_client import (
     _extract_all_invoice_numbers,
     _extract_fields,
     _extract_invoice_number,
+    _extract_invoice_number_from_filename,
     _extract_invoice_number_from_subject,
     _is_own_company,
     _parse_amount_literal,
     _parse_amount_to_cents,
+    invoice_dedup_key,
 )
 from app.models import Direction, DocumentKind
 
@@ -120,6 +122,35 @@ def test_invoice_number_empty_when_nothing_found():
     assert _extract_invoice_number(text) == ""
 
 
+def test_invoice_number_prefers_filename_over_incassant_id():
+    # Real Kruitbosch failure mode: PDF-layout column collapse puts the
+    # incassant ID right after the "Factuurnummer" label instead of the real
+    # number, which is a short mostly-numeric token ("306228") -- the real
+    # number ("VFNL002280953") is recoverable from the filename.
+    text = "Factuurnummer 306228C Kenmerk machtiging / incassant ID"
+    filename = "Kruitbosch Factuur VFNL002280953_1.pdf"
+    assert _extract_invoice_number(text, filename) == "VFNL002280953"
+
+
+def test_invoice_number_falls_back_to_id_like_token_without_filename():
+    # No filename to cross-check against -- better a possibly-wrong guess
+    # than nothing, same as before this fix.
+    text = "Factuurnummer 306228C Kenmerk machtiging / incassant ID"
+    assert _extract_invoice_number(text) == "306228C"
+
+
+def test_invoice_number_real_label_not_overridden_by_filename():
+    text = "Factuurnummer: F-2026-00123\nFactuurdatum: 12-08-2026"
+    filename = "Some Supplier Factuur F-2026-00123.pdf"
+    assert _extract_invoice_number(text, filename) == "F-2026-00123"
+
+
+def test_extract_invoice_number_from_filename_picks_longest_meaningful_token():
+    assert _extract_invoice_number_from_filename("Kruitbosch Factuur VFNL002280953_1.pdf") == "VFNL002280953"
+    assert _extract_invoice_number_from_filename("factuur.pdf") == ""
+    assert _extract_invoice_number_from_filename("") == ""
+
+
 # -- Supplier name derivation --
 
 def test_known_supplier_domain_kruitbosch():
@@ -218,6 +249,31 @@ def test_is_own_company_false_for_external_supplier(monkeypatch):
     monkeypatch.setattr(settings, "own_company_names", "Van der Linden Tweewielers,Hing B.V.")
     monkeypatch.setattr(settings, "graph_mailbox", "facturen@vanderlindentweewielers.nl")
     assert _is_own_company("noreply@kruitbosch.nl", "Kruitbosch B.V.") is False
+
+
+# -- Dedup key (same invoice fetched twice, once per scanned mailbox) --
+
+def test_dedup_key_prefers_content_hash():
+    a = invoice_dedup_key("abc123", "Kruitbosch", "VFNL1", 1000)
+    b = invoice_dedup_key("abc123", "Different Name", "OTHER", 999)
+    assert a == b  # same PDF bytes -> same identity, regardless of extracted fields
+
+
+def test_dedup_key_falls_back_to_supplier_number_amount():
+    a = invoice_dedup_key("", "Kruitbosch", "VFNL002280953", 59010)
+    b = invoice_dedup_key("", "kruitbosch", "vfnl002280953", 59010)  # case-insensitive
+    assert a == b
+
+
+def test_dedup_key_differs_for_different_invoices():
+    a = invoice_dedup_key("", "Kruitbosch", "VFNL1", 1000)
+    b = invoice_dedup_key("", "Kruitbosch", "VFNL2", 1000)
+    assert a != b
+
+
+def test_dedup_key_none_when_nothing_to_identify_by():
+    assert invoice_dedup_key("", "Kruitbosch", "", None) is None
+    assert invoice_dedup_key("", "Kruitbosch", "VFNL1", None) is None
 
 
 def test_extract_fields_classifies_self_sent_sales_invoice_as_other(monkeypatch):

@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     # transaction only ever matches documents of the same direction
     # (positive amount = incoming).
     incoming_suppliers: str = "ENRA,HelloRider"
+    # A REFERENCE match (invoice number found in the transaction description)
+    # doesn't have to line up exactly on amount -- some suppliers (Kruitbosch,
+    # Accell) settle for slightly less than invoiced (betalingskorting /
+    # early-payment discount). The accepted gap is capped at whichever of
+    # these is SMALLER: a percentage of the invoice total, or a flat amount.
+    payment_discount_percent: float = 3.0
+    payment_discount_max_cents: int = 2500
     # Own company names (comma-separated, matched case-insensitively against
     # the sender's display name) -- a verkoopfactuur we ourselves sent to a
     # customer, that ends up in a mailbox we scan (e.g. archived/CC'd into
@@ -62,6 +69,27 @@ class Settings(BaseSettings):
     # (see graph_mailboxes) is always treated as "ourselves" too, with no
     # config needed.
     own_company_names: str = "Van der Linden Tweewielers,Hing B.V."
+    # Every inkoopfactuur must be forwarded here so it reaches Basecone/the
+    # boekhouder -- a matched invoice that never got forwarded is still
+    # effectively a vraagpost. Empty disables the whole Basecone-forward
+    # check (dashboard just shows "onbekend" for everything).
+    basecone_forward_address: str = "vdlg.161024@mailvanderlaangroep.nl"
+    # Off by default -- flip to true only once you've added the Mail.Send /
+    # Mail.Send.Shared permission in Entra and re-run scripts/graph_login.py
+    # (see README). While off, nothing is ever sent automatically; invoices
+    # just pile up in the dashboard's "Niet naar Basecone" list for you to
+    # send by hand.
+    auto_forward_basecone: bool = False
+    # Only documents received on/after this date are ever auto-forwarded --
+    # everything older is "backlog" (checked against Sent Items for a manual
+    # forward you already did, otherwise left for you to send by hand from
+    # the dashboard). Leave empty to have the app record "today" the first
+    # time AUTO_FORWARD_BASECONE is turned on (see app/basecone_forward.py);
+    # set explicitly (YYYY-MM-DD) to override that.
+    auto_forward_from_date: str = ""
+    # Safety cap: an auto-forward sync run never sends more than this many
+    # documents, so a config mistake can't spam the accountant's inbox.
+    auto_forward_max_per_sync: int = 50
 
     @property
     def graph_mailboxes(self) -> list[str]:
