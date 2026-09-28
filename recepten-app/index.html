@@ -111,6 +111,30 @@
   .snack h3 { font-size: 18px; }
   .snack p { margin: 0; grid-column: 1 / -1; font-size: 15px; color: var(--muted); }
 
+  .marks { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 40%; }
+  .marks:empty { display: none; }
+  .marks .pill { white-space: normal; text-align: right; }
+  .where { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; font-size: 13px; color: var(--muted); }
+  .where .wo b { color: var(--ink); font-weight: 700; }
+  .where .wo i { font-style: normal; opacity: .8; }
+  .where .wo i::before { content: "· "; }
+  .storesum { margin-top: 16px; background: var(--bg); border-radius: 10px; padding: 12px 14px; }
+  .storesum p { margin: 4px 0 8px; font-size: 15px; }
+  .storebars { display: grid; gap: 6px; }
+  .sb { display: grid; grid-template-columns: 96px 1fr 22px; gap: 10px; align-items: center; font-size: 14px; }
+  .sb .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .sb .bar span { display: block; height: 100%; background: var(--tag); }
+  .sb .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  ul.stores { list-style: none; margin: 12px 0 0; padding: 0; }
+  ul.stores > li { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+  ul.stores > li > input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--green); }
+  ul.stores > li > a { grid-column: 3; justify-self: end; }
+  .sinfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; grid-row: span 2; }
+  .sname { font-weight: 700; cursor: pointer; }
+  .sitems summary { cursor: pointer; font-size: 14px; color: var(--green); margin-top: 4px; }
+  .sitems ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; font-size: 14px; }
+  .chip.auto { border-color: var(--tag); box-shadow: inset 0 0 0 1px var(--tag); }
+
   /* Week */
   .day { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
   .day.today { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
@@ -484,12 +508,19 @@ const SNACKS = [
 
 const DEFAULT_OFFERS = ['pompoen', 'broccoli', 'zalm', 'kippendij', 'peer', 'champignons', 'gehakt', 'eieren', 'courgette', 'blauwe-bessen', 'kikkererwten', 'zoete-aardappel'];
 const STORES = {
-  'Albert Heijn': 'https://www.ah.nl/bonus', 'Jumbo': 'https://www.jumbo.com/aanbiedingen/nu', 'Lidl': 'https://www.lidl.nl',
-  'Aldi': 'https://www.aldi.nl', 'Plus': 'https://www.plus.nl/aanbiedingen', 'Dirk': 'https://www.dirk.nl/aanbiedingen', 'Anders': ''
+  'Albert Heijn': 'https://www.ah.nl/bonus', 'Jumbo': 'https://www.jumbo.com/aanbiedingen/nu', 'Dirk': 'https://www.dirk.nl/aanbiedingen',
+  'Aldi': 'https://www.aldi.nl/aanbiedingen.html', 'Lidl': 'https://www.lidl.nl', 'Plus': 'https://www.plus.nl/aanbiedingen'
 };
+const MANUAL_STORES = ['Albert Heijn', 'Lidl', 'Plus', 'Jumbo', 'Dirk', 'Aldi', 'Andere winkel'];
 
 /* ---------- Toestand ---------- */
-let offers = store.get('offers', { winkel: 'Albert Heijn', items: DEFAULT_OFFERS, voorbeeld: true });
+// Handmatig aangezette aanbiedingen (voor winkels zonder automatische folder, zoals Albert Heijn)
+let offers = store.get('offers', { winkel: 'Albert Heijn', items: [], voorbeeld: false });
+if (offers.voorbeeld) offers = { winkel: offers.winkel, items: [], voorbeeld: false };
+if (!MANUAL_STORES.includes(offers.winkel)) offers.winkel = 'Albert Heijn';
+// Automatisch opgehaalde folders (gedeelde opslag van de app); laatste versie ook lokaal voor snelle start
+let live = store.get('live', null);
+let mijnWinkels = store.get('mijnWinkels', ['Albert Heijn', 'Jumbo', 'Dirk', 'Aldi']);
 let personen = store.get('personen', 2);
 let geboorte = store.get('geboorte', '2026-01-28');
 let overrides = store.get('overrides', {});
@@ -509,12 +540,33 @@ const fmtDate = d => `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.ge
 
 /* ---------- Planning ---------- */
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const offerSet = () => new Set(offers.items);
+/* Waar is product k in de aanbieding? -> [{winkel, titel, actie}] */
+function liveStores() {
+  return live && live.winkels ? Object.entries(live.winkels).filter(([, v]) => v.items && v.items.length) : [];
+}
+const isExample = () => !liveStores().length && !offers.items.length;
+function where(k) {
+  if (isExample()) return DEFAULT_OFFERS.includes(k) ? [{ winkel: 'Voorbeeld', titel: CAT[k].n, actie: '' }] : [];
+  const out = [];
+  for (const [w, v] of liveStores()) {
+    if (!mijnWinkels.includes(w)) continue;
+    for (const it of v.items) if (it.k === k) out.push({ winkel: w, titel: it.titel, actie: it.actie });
+  }
+  if (offers.items.includes(k) && !out.some(o => o.winkel === offers.winkel))
+    out.push({ winkel: offers.winkel, titel: CAT[k].n, actie: 'met de hand aangezet' });
+  return out;
+}
+const offerSet = () => new Set(CATALOG.map(c => c[0]).filter(k => where(k).length));
+function storeCount(keys) {
+  const c = {};
+  keys.forEach(k => new Set(where(k).map(o => o.winkel)).forEach(w => c[w] = (c[w] || 0) + 1));
+  return Object.entries(c).sort((a, b) => b[1] - a[1]);
+}
 const hits = r => { const s = offerSet(); return [...new Set(r.ingr.filter(i => i.k && s.has(i.k)).map(i => i.k))]; };
 const isNitrate = r => r.ingr.some(i => NITRATE.has(i.k));
 
 function basePlan() {
-  const seed = Number(iso(monday).replace(/-/g, '')) + offers.items.join().length * 7919;
+  const seed = Number(iso(monday).replace(/-/g, '')) + [...offerSet()].sort().join().length * 7919;
   const rand = rng(seed);
   const scored = RECIPES.map(r => ({ r, s: hits(r).length * 10 + rand() * 7 }));
   const plan = [];
@@ -585,6 +637,20 @@ function fmtQ(i) {
   const n = (whole ? whole : '') + (half ? '½' : '') || '0';
   return `${n}${i.u ? ' ' + i.u : ''}`;
 }
+function whereLine(k) {
+  if (!k) return '';
+  const w = where(k).filter(o => o.winkel !== 'Voorbeeld');
+  if (!w.length) return '';
+  return `<span class="where">${w.map(o => `<span class="wo"><b>${esc(o.winkel)}</b> ${esc(o.actie)}${o.titel && o.titel.toLowerCase() !== CAT[k].n.toLowerCase() ? ` <i>${esc(o.titel)}</i>` : ''}</span>`).join('')}</span>`;
+}
+function storeSummary(r) {
+  const c = storeCount(hits(r)).filter(([w]) => w !== 'Voorbeeld');
+  if (!c.length) return '';
+  const [best, n] = c[0];
+  return `<div class="storesum"><div class="eyebrow">Waar haal je het?</div>
+    <p>Bij <b>${esc(best)}</b> zijn ${n} van de ${hits(r).length} actieproducten van dit recept in de aanbieding.</p>
+    <div class="storebars">${c.map(([w, x]) => `<span class="sb"><span>${esc(w)}</span><span class="bar"><span style="width:${Math.round(x / hits(r).length * 100)}%"></span></span><span class="num">${x}</span></span>`).join('')}</div></div>`;
+}
 const offerTag = (k, big) => `<span class="tag${big ? ' big' : ''}">${esc(CAT[k].n)}</span>`;
 
 function recipeBody(r, dayIndex) {
@@ -594,11 +660,10 @@ function recipeBody(r, dayIndex) {
   return `
     <div class="section-title">Ingrediënten</div>
     <ul class="ingr">${r.ingr.map(i => `
-      <li><span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}</span>
-        ${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}
-        ${GRAIN.has(i.k) ? '<span class="pill no">niet voor Julièn</span>' : ''}
-        ${i.baby ? '<span class="pill baby">Julièn</span>' : ''}</li>`).join('')}
+      <li><span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}${whereLine(i.k)}</span>
+        <span class="marks">${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}${GRAIN.has(i.k) ? '<span class="pill no">niet voor Julièn</span>' : ''}${i.baby ? '<span class="pill baby">Julièn</span>' : ''}</span></li>`).join('')}
     </ul>
+    ${storeSummary(r)}
     <div class="section-title">Bereiding</div>
     <ol class="steps">${r.stappen.map(t => `<li>${esc(t)}</li>`).join('')}</ol>
     <section class="babybox">
@@ -625,11 +690,11 @@ function viewToday() {
   const h = hits(r);
   const snack = pickSnack();
   return `
-  ${offers.voorbeeld ? `<div class="banner"><strong>Voorbeeldaanbiedingen.</strong> Zet onder <a href="#aanbiedingen" data-go="aanbiedingen">Aanbiedingen</a> aan wat er deze week in de folder staat. De recepten passen zich direct aan.</div>` : ''}
+  ${isExample() ? `<div class="banner"><strong>Voorbeeldaanbiedingen.</strong> De folders zijn nog niet geladen. Zet onder <a href="#aanbiedingen" data-go="aanbiedingen">Aanbiedingen</a> aan wat er deze week in de folder staat.</div>` : ''}
   <article class="card hero">
     <div class="eyebrow">Recept van vandaag · ${esc(r.soort)}</div>
     <h2>${esc(r.naam)}</h2>
-    <div class="meta"><span>${r.tijd} minuten</span><span>${personen} volwassene${personen > 1 ? 'n' : ''} + Julièn</span><span>${esc(offers.winkel)}</span></div>
+    <div class="meta"><span>${r.tijd} minuten</span><span>${personen} volwassene${personen > 1 ? 'n' : ''} + Julièn</span>${h.length && !isExample() ? `<span>Actie bij ${esc(storeCount(h).map(x => x[0]).join(', '))}</span>` : ''}</div>
     <div class="hits">${h.length ? h.map(k => offerTag(k, true)).join('') : '<span class="muted small">Geen producten uit de aanbieding. Dit recept is gekozen voor de afwisseling.</span>'}</div>
     ${recipeBody(r, dayIdx)}
   </article>
@@ -689,31 +754,58 @@ function viewWeek() {
       <div class="field"><label for="personen">Volwassenen</label>
         <input type="number" id="personen" min="1" max="8" value="${personen}" style="width:80px"></div>
     </div>
-    <p class="muted small" style="margin:6px 0 12px">Voor de hele week, met een portie voor Julièn inbegrepen. Producten in de aanbieding staan bovenaan.</p>
+    <p class="muted small" style="margin:6px 0 12px">Voor de hele week, met een portie voor Julièn inbegrepen. Producten in de aanbieding staan bovenaan, met de winkel erbij.</p>
     <ul class="ingr">${items.map(i => { const id = 'c-' + i.n + i.u; return `
       <li class="${checked[id] ? 'done' : ''}"><label><input type="checkbox" data-check="${esc(id)}" ${checked[id] ? 'checked' : ''}>
-        <span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}</span>
-        ${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}</label></li>`; }).join('')}
+        <span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}${whereLine(i.k)}</span>
+        <span class="marks">${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}</span></label></li>`; }).join('')}
     </ul>
     <div class="section-title" style="font-size:15px">Voorraadkast (even checken)</div>
     <p class="small muted" style="margin:0">${esc([...pantry].sort().join(' · '))}</p>
   </article>`;
 }
 
+function fmtStamp(t) {
+  const d = new Date(t);
+  return isNaN(d) ? '' : `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function viewOffers() {
   const s = offerSet();
   const cats = [...new Set(CATALOG.map(c => c[2]))];
+  const ws = live && live.winkels ? live.winkels : {};
+  const status = v => !v ? ['pill', 'Nog niet opgehaald'] : v.status === 'ok' ? ['pill ok', 'Opgehaald'] : v.status === 'vorige' ? ['pill warn', 'Vorige keer'] : v.status === 'handmatig' ? ['pill baby', 'Met de hand'] : ['pill no', 'Mislukt'];
   return `
   <section>
     <div class="eyebrow">Deze week</div>
-    <h2 style="font-size:28px;margin-top:4px">Wat is er in de aanbieding?</h2>
-    <p class="muted small" style="margin:6px 0 0">Tik de producten aan die deze week in de folder staan, of plak de tekst van de online folder hieronder.</p>
+    <h2 style="font-size:28px;margin-top:4px">Folders</h2>
+    <p class="muted small" style="margin:6px 0 0">De folders van Jumbo, Dirk en Aldi worden elke week automatisch opgehaald. Vink aan waar je boodschappen doet; alleen die winkels tellen mee.</p>
   </section>
-  ${offers.voorbeeld ? '<div class="banner"><strong>Dit is een voorbeeldweek.</strong> Pas de selectie aan naar de folder van jouw supermarkt.</div>' : ''}
+  ${isExample() ? '<div class="banner"><strong>De folders zijn nog niet geladen.</strong> De app toont zolang een voorbeeldweek. Zet hieronder zelf aanbiedingen aan, of wacht tot de folders binnen zijn.</div>' : ''}
   <article class="card">
+    <div class="row" style="justify-content:space-between;align-items:baseline">
+      <h2 style="font-size:20px">Supermarkten</h2>
+      <span class="small muted">${live && live.bijgewerkt ? 'Bijgewerkt ' + esc(fmtStamp(live.bijgewerkt)) : 'Nog niet bijgewerkt'}</span>
+    </div>
+    <ul class="stores">${Object.keys(STORES).map(w => { const v = ws[w]; const [cls, lbl] = status(v); const id = 'mw-' + w.replace(/\W/g, ''); return `
+      <li>
+        <input type="checkbox" id="${id}" data-winkel="${esc(w)}" ${mijnWinkels.includes(w) ? 'checked' : ''}>
+        <div class="sinfo">
+          <label for="${id}" class="sname">${esc(w)}</label>
+          <span class="small muted">${v && v.items ? `${v.items.length} producten voor de recepten${v.aantal ? ` uit ${v.aantal} acties` : ''}${v.geldig ? ` · ${esc(v.geldig)}` : ''}` : esc((v && v.melding) || 'Wordt bij de volgende ronde opgehaald.')}</span>
+          ${v && v.status === 'vorige' ? `<span class="small" style="color:var(--warn)">${esc(v.melding)}</span>` : ''}
+          ${v && v.items && v.items.length ? `<details class="sitems"><summary>Bekijk de producten</summary><ul>${v.items.map(it => `<li><span class="tag">${esc(CAT[it.k] ? CAT[it.k].n : it.k)}</span> ${esc(it.titel)} <span class="muted">${esc(it.actie)}</span></li>`).join('')}</ul></details>` : ''}
+        </div>
+        <span class="${cls}">${lbl}</span>
+        <a class="small" href="${STORES[w]}" target="_blank" rel="noopener">Folder</a>
+      </li>`; }).join('')}
+    </ul>
+  </article>
+  <article class="card">
+    <h2 style="font-size:20px">Met de hand aanvullen</h2>
+    <p class="muted small" style="margin:6px 0 12px">Voor Albert Heijn en andere winkels zonder automatische folder. Kies de winkel, plak de folder-tekst of tik de producten hieronder aan.</p>
     <div class="row">
-      <div class="field"><label for="winkel">Supermarkt</label>
-        <select id="winkel">${Object.keys(STORES).map(w => `<option ${w === offers.winkel ? 'selected' : ''}>${w}</option>`).join('')}</select></div>
+      <div class="field"><label for="winkel">Winkel</label>
+        <select id="winkel">${MANUAL_STORES.map(w => `<option ${w === offers.winkel ? 'selected' : ''}>${w}</option>`).join('')}</select></div>
       ${STORES[offers.winkel] ? `<a class="btn" href="${STORES[offers.winkel]}" target="_blank" rel="noopener" style="text-decoration:none">Open de folder van ${esc(offers.winkel)}</a>` : ''}
     </div>
     <div class="field" style="margin-top:16px">
@@ -722,8 +814,7 @@ function viewOffers() {
     </div>
     <div class="actions" style="margin-top:10px">
       <button class="btn primary" id="zoek">Producten herkennen</button>
-      <button class="btn" id="wis">Alles uitzetten</button>
-      <button class="btn" id="voorbeeld">Voorbeeldweek terugzetten</button>
+      <button class="btn" id="wis">Handmatige keuzes wissen</button>
     </div>
     <div class="found" id="found" aria-live="polite"></div>
   </article>
@@ -731,10 +822,13 @@ function viewOffers() {
     <div class="row" style="justify-content:space-between;align-items:baseline">
       <h2 style="font-size:20px">Producten</h2><span class="tag big">${s.size} in actie</span>
     </div>
+    <p class="muted small" style="margin:6px 0 0">Geel omrand: staat in een opgehaalde folder. Geel gevuld: met de hand aangezet voor ${esc(offers.winkel)}.</p>
+    <div>
+    </div>
     ${cats.map(c => `
       <div class="cat"><h3>${esc(c)}</h3>
         <div class="chips">${CATALOG.filter(x => x[2] === c).map(([k, n]) => `
-          <button class="chip" data-offer="${k}" aria-pressed="${s.has(k)}">${esc(n)}${GRAIN.has(k) ? '<span class="grain">alleen volwassenen</span>' : ''}</button>`).join('')}
+          <button class="chip${autoStores(k).length ? ' auto' : ''}" data-offer="${k}" aria-pressed="${offers.items.includes(k)}">${esc(n)}${autoStores(k).length ? `<span class="grain">${esc(autoStores(k).join(', '))}</span>` : ''}${GRAIN.has(k) ? '<span class="grain">alleen volwassenen</span>' : ''}</button>`).join('')}
         </div></div>`).join('')}
   </article>`;
 }
@@ -811,6 +905,7 @@ function render() {
 }
 function go(t) { tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
 function saveOffers(items, extra = {}) { offers = { ...offers, items, voorbeeld: false, ...extra }; store.set('offers', offers); }
+const autoStores = k => liveStores().filter(([w, v]) => mijnWinkels.includes(w) && v.items.some(it => it.k === k)).map(([w]) => w);
 
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) go(b.dataset.tab); });
 
@@ -821,24 +916,28 @@ app.addEventListener('click', e => {
   else if (t.dataset.swap) swap(+t.dataset.swap);
   else if (t.dataset.reset) resetDay(+t.dataset.reset);
   else if (t.dataset.offer) {
-    const s = offerSet(); s.has(t.dataset.offer) ? s.delete(t.dataset.offer) : s.add(t.dataset.offer);
+    const s = new Set(offers.items); s.has(t.dataset.offer) ? s.delete(t.dataset.offer) : s.add(t.dataset.offer);
     saveOffers([...s]); render();
   } else if (t.id === 'zoek') {
     const text = document.getElementById('plak').value.toLowerCase();
     const found = CATALOG.filter(([k, n, c, syn]) => syn.some(w =>
       new RegExp('(^|[^a-zà-ÿ])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-zà-ÿ])').test(text))).map(c => c[0]);
-    const s = offerSet(); found.forEach(k => s.add(k));
+    const s = new Set(offers.items); found.forEach(k => s.add(k));
     saveOffers([...s]); render();
     document.getElementById('found').textContent = found.length
-      ? 'Herkend en aangezet: ' + found.map(k => CAT[k].n).join(', ') + '.'
+      ? `Herkend en aangezet voor ${offers.winkel}: ` + found.map(k => CAT[k].n).join(', ') + '.'
       : 'Geen bekende producten gevonden. Zet ze hieronder met de hand aan.';
   } else if (t.id === 'wis') { saveOffers([]); render(); }
-  else if (t.id === 'voorbeeld') { offers = { winkel: offers.winkel, items: DEFAULT_OFFERS, voorbeeld: true }; store.set('offers', offers); render(); }
 });
 
 app.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'winkel') { offers = { ...offers, winkel: t.value }; store.set('offers', offers); render(); }
+  else if (t.dataset.winkel) {
+    const w = t.dataset.winkel;
+    mijnWinkels = t.checked ? [...new Set([...mijnWinkels, w])] : mijnWinkels.filter(x => x !== w);
+    store.set('mijnWinkels', mijnWinkels); render();
+  }
   else if (t.id === 'personen') { personen = Math.min(8, Math.max(1, +t.value || 2)); store.set('personen', personen); render(); }
   else if (t.id === 'geboorte') { geboorte = t.value; store.set('geboorte', geboorte); render(); }
   else if (t.dataset.check) {
@@ -849,6 +948,22 @@ app.addEventListener('change', e => {
 });
 
 render();
+
+/* Folders laden: eerst uit de gedeelde opslag van de app, anders uit aanbiedingen.json ernaast */
+function setLive(d) {
+  if (!d || !d.winkels) return;
+  live = d; store.set('live', d);
+  const ta = document.getElementById('plak');
+  if (!(ta && ta.value)) render();
+}
+(async () => {
+  const db = window.claude && window.claude.use ? await window.claude.use('db').catch(() => null) : null;
+  if (db) {
+    db.doc('folders/actueel').onSnapshot(snap => { if (snap.exists) setLive(snap.data()); }, () => {});
+    return;
+  }
+  try { const r = await fetch('aanbiedingen.json', { cache: 'no-store' }); if (r.ok) setLive(await r.json()); } catch (e) {}
+})();
 </script>
 <!--wrapper-->
 </body>

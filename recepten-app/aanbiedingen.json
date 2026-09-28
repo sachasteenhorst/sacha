@@ -1,0 +1,207 @@
+{
+ "bijgewerkt": "2026-09-28T14:51:30Z",
+ "winkels": {
+  "Jumbo": {
+   "status": "vorige",
+   "geldig": "wo 23 t/m di 29 sep",
+   "bron": "https://www.jumbo.com/aanbiedingen/nu",
+   "aantal": 44,
+   "items": [
+    {
+     "k": "kaas",
+     "titel": "Jumbo Goudse kaas plakken",
+     "actie": "OP=OP"
+    },
+    {
+     "k": "wortel",
+     "titel": "Wortelen",
+     "actie": "voor 1,49"
+    },
+    {
+     "k": "sperziebonen",
+     "titel": "Sperziebonen",
+     "actie": "voor 3,49"
+    },
+    {
+     "k": "appel",
+     "titel": "Conference peren of Jonagold appels",
+     "actie": "voor 1,29"
+    },
+    {
+     "k": "peer",
+     "titel": "Conference peren of Jonagold appels",
+     "actie": "voor 1,29"
+    },
+    {
+     "k": "rode-biet",
+     "titel": "Biologische gekookte bietjes",
+     "actie": "Alleen online"
+    },
+    {
+     "k": "broccoli",
+     "titel": "Broccoli",
+     "actie": "voor 2,19"
+    },
+    {
+     "k": "prei",
+     "titel": "Prei",
+     "actie": "voor 2,49"
+    },
+    {
+     "k": "paprika",
+     "titel": "Zoete punt paprika",
+     "actie": "1+1 gratis"
+    },
+    {
+     "k": "aardappel",
+     "titel": "Aardappelen",
+     "actie": "voor 3,29"
+    },
+    {
+     "k": "aardbeien",
+     "titel": "Nederlandse aardbeien",
+     "actie": "1+1 gratis"
+    },
+    {
+     "k": "zalm",
+     "titel": "Zalmfilet",
+     "actie": "1,19 per 100 gram"
+    },
+    {
+     "k": "gehakt",
+     "titel": "Slagersgehakt",
+     "actie": "2 voor 5,00"
+    }
+   ],
+   "melding": "Verversen lukte niet. Dit zijn de acties van de vorige keer."
+  },
+  "Dirk": {
+   "status": "ok",
+   "geldig": "t/m di 29 sep",
+   "bron": "https://www.dirk.nl/aanbiedingen",
+   "aantal": 103,
+   "items": [
+    {
+     "k": "aardappel",
+     "titel": "Stamppot groente of aardappelen",
+     "actie": "€ 0,99 (was € 1,59)"
+    },
+    {
+     "k": "pompoen",
+     "titel": "Flespompoen of oranje pompoen",
+     "actie": "€ 0,99 (was € 1,99)"
+    },
+    {
+     "k": "aardappel",
+     "titel": "1 de Beste Aardappelen",
+     "actie": "€ 1,09 (was € 1,19)"
+    },
+    {
+     "k": "avocado",
+     "titel": "Avocado's ready to eat",
+     "actie": "€ 2,39 (was € 2,49)"
+    },
+    {
+     "k": "blauwe-bessen",
+     "titel": "Blauwe bessen",
+     "actie": "€ 3,99"
+    },
+    {
+     "k": "aardbeien",
+     "titel": "Hollandse aardbeien",
+     "actie": "€ 3,49"
+    },
+    {
+     "k": "broccoli",
+     "titel": "Hollandse broccoli",
+     "actie": "€ 0,99 (was € 1,15)"
+    },
+    {
+     "k": "appel",
+     "titel": "Hollandse Elstar appels",
+     "actie": "€ 2,49"
+    },
+    {
+     "k": "pastinaak",
+     "titel": "Biologische pastinaak",
+     "actie": "€ 1,19"
+    },
+    {
+     "k": "appel",
+     "titel": "Cosmic crisp appels",
+     "actie": "€ 1,89"
+    },
+    {
+     "k": "kaas",
+     "titel": "Finest Selection kaas",
+     "actie": "€ 1,99 (was € 3,49)"
+    },
+    {
+     "k": "kaas",
+     "titel": "Goudse jonge kaas 48+",
+     "actie": "€ 5,99"
+    },
+    {
+     "k": "pasta",
+     "titel": "De Cecco pasta",
+     "actie": "€ 1,29 (was € 3,19)"
+    }
+   ]
+  },
+  "Aldi": {
+   "status": "ok",
+   "geldig": "t/m di 29 sep",
+   "bron": "https://www.aldi.nl/aanbiedingen.html",
+   "aantal": 154,
+   "items": [
+    {
+     "k": "mango",
+     "titel": "Mango",
+     "actie": "€ 1,39 (-22%)"
+    },
+    {
+     "k": "zalm",
+     "titel": "Zalmfilets op huid",
+     "actie": "€ 7,99 (-33%)"
+    },
+    {
+     "k": "wraps",
+     "titel": "Wraps",
+     "actie": "€ 1,69 (-11%)"
+    },
+    {
+     "k": "kalkoen",
+     "titel": "Kip- of kalkoenfilet",
+     "actie": "€ 1,99 (OP=OP)"
+    },
+    {
+     "k": "zoete-aardappel",
+     "titel": "Zoete aardappelen",
+     "actie": "€ 1,99 (OP=OP)"
+    },
+    {
+     "k": "paprika",
+     "titel": "Rode paprika's",
+     "actie": "€ 2,49 (OP=OP)"
+    },
+    {
+     "k": "rijst",
+     "titel": "Thaise jasmijn- of basmatirijst",
+     "actie": "€ 7,99 (OP=OP)"
+    }
+   ]
+  },
+  "Albert Heijn": {
+   "status": "handmatig",
+   "melding": "ah.nl blokkeert automatisch ophalen. Zet de bonus met de hand aan."
+  },
+  "Lidl": {
+   "status": "handmatig",
+   "melding": "Lidl laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan."
+  },
+  "Plus": {
+   "status": "handmatig",
+   "melding": "Plus laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan."
+  }
+ }
+}
