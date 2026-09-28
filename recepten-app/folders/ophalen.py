@@ -137,6 +137,32 @@ def euro(v) -> str:
     return f"€ {v:.2f}".replace(".", ",") if isinstance(v, (int, float)) and v else ""
 
 
+def per_kg(prijs, omschrijving: str):
+    """Prijs per kilo uit bijvoorbeeld '500 gram' of '4 stuks, 1 kg'; None als dat niet kan."""
+    if not isinstance(prijs, (int, float)) or not omschrijving:
+        return None
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|kilo|gram|gr|g)\b", omschrijving, re.I)
+    if not m:
+        return None
+    n = float(m.group(1).replace(",", "."))
+    kg = n if m.group(2).lower() in ("kg", "kilo") else n / 1000
+    return round(prijs / kg, 2) if kg > 0 else None
+
+
+def jumbo_prijs(actie: str):
+    """Leest een prijs uit Jumbo's actietekst: (prijs, prijs per kg)."""
+    t = actie.replace("\u20ac", "").strip()
+    if m := re.match(r"^(\d+) voor (\d+[.,]\d{2})$", t):
+        return round(float(m.group(2).replace(",", ".")) / int(m.group(1)), 2), None
+    if m := re.match(r"^voor (\d+[.,]\d{2})$", t):
+        return float(m.group(1).replace(",", ".")), None
+    if m := re.match(r"^(\d+[.,]\d{2}) per (\d+) ?(gram|g|kilo|kg)$", t):
+        p = float(m.group(1).replace(",", "."))
+        n = float(m.group(2)) * (1 if m.group(3) in ("kilo", "kg") else 0.001)
+        return None, round(p / n, 2)
+    return None, None
+
+
 # ---------- Per winkel ----------
 
 def jumbo() -> dict:
@@ -149,7 +175,9 @@ def jumbo() -> dict:
     for i, t in enumerate(toks):
         if periode.match(t) and i > 0 and i + 1 < len(toks):
             geldig = geldig or t
-            items.append({"titel": toks[i - 1], "actie": toks[i + 1], "geldig": t})
+            prijs, kg = jumbo_prijs(toks[i + 1])
+            items.append({"titel": toks[i - 1], "actie": toks[i + 1], "geldig": t,
+                          "prijs": prijs, "perKg": kg, "eenheid": ""})
     return {"geldig": geldig, "items": items, "bron": "https://www.jumbo.com/aanbiedingen/nu"}
 
 
@@ -175,7 +203,10 @@ def dirk() -> dict:
             actie = euro(prijs)
             if isinstance(normaal, (int, float)) and normaal and isinstance(prijs, (int, float)) and normaal > prijs:
                 actie += f" (was {euro(normaal)})"
-            items.append({"titel": titel, "actie": actie, "geldig": tm(eind)})
+            eenheid = str(val(v.get("packaging")) or "").strip().rstrip(".")
+            items.append({"titel": titel, "actie": actie, "geldig": tm(eind),
+                          "prijs": prijs if isinstance(prijs, (int, float)) else None,
+                          "perKg": per_kg(prijs, eenheid), "eenheid": eenheid})
     return {"geldig": tm(tot), "items": items, "bron": "https://www.dirk.nl/aanbiedingen"}
 
 
@@ -189,7 +220,10 @@ def aldi() -> dict:
         eind = datetime.fromtimestamp(int(m.group(4)), timezone.utc).strftime("%Y-%m-%d")
         tot = tot or eind
         actie = euro(prijs) + (f" ({promo.group(1)})" if promo else "")
-        items.append({"titel": titel, "actie": actie, "geldig": tm(eind)})
+        eenheid = html.unescape(re.search(r'"salesUnit":"([^"]*)"', s[max(0, m.start() - 400):m.start()] + '"salesUnit":""').group(1))
+        base = re.search(r'"basePriceValue":([\d.]+),"basePriceScale":"kg"', rest)
+        items.append({"titel": titel, "actie": actie, "geldig": tm(eind), "prijs": prijs,
+                      "perKg": float(base.group(1)) if base else per_kg(prijs, eenheid), "eenheid": eenheid})
     return {"geldig": tm(tot), "items": items, "bron": "https://www.aldi.nl/aanbiedingen.html"}
 
 
@@ -199,6 +233,15 @@ NIET_AUTOMATISCH = {
     "Lidl": "Lidl laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan.",
     "Plus": "Plus laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan.",
 }
+
+
+VLEES = {"kipfilet", "kippendij", "kalkoen", "gehakt"}
+
+
+def is_beleg(eenheid: str) -> bool:
+    """Een bakje van minder dan 200 gram kip of kalkoen is broodbeleg, geen vlees om te koken."""
+    m = re.fullmatch(r"\s*(\d+)\s*(g|gr|gram)\s*", eenheid, re.I)
+    return bool(m) and int(m.group(1)) < 200
 
 
 def main() -> None:
@@ -223,10 +266,14 @@ def main() -> None:
         gekoppeld, gezien = [], set()
         for it in r["items"]:
             for k in koppel(it["titel"]):
+                if k in VLEES and is_beleg(it.get("eenheid") or ""):
+                    continue
                 if (k, it["titel"]) in gezien:
                     continue
                 gezien.add((k, it["titel"]))
-                gekoppeld.append({"k": k, "titel": it["titel"][:90], "actie": it["actie"][:60]})
+                gekoppeld.append({"k": k, "titel": it["titel"][:90], "actie": it["actie"][:60],
+                                  "prijs": it.get("prijs"), "perKg": it.get("perKg"),
+                                  "eenheid": (it.get("eenheid") or "")[:40]})
         doc["winkels"][naam] = {"status": "ok", "geldig": r["geldig"], "bron": r["bron"],
                                 "aantal": len(r["items"]), "items": gekoppeld}
         print(f"{naam}: {len(r['items'])} acties, {len(gekoppeld)} gekoppeld", file=sys.stderr)

@@ -15,10 +15,14 @@ Alles wat je instelt, blijft bewaard in de browser.
 - **Week**: het weekmenu en een boodschappenlijst om af te vinken. De
   hoeveelheden passen zich aan het aantal volwassenen aan, met een portie voor
   Julièn inbegrepen.
-- **Aanbiedingen**: de folders van Jumbo, Dirk en Aldi worden automatisch
-  opgehaald. Vink aan bij welke winkels je boodschappen doet. Voor Albert Heijn,
-  Lidl en Plus zet je de aanbiedingen met de hand aan, of je plakt de
-  folder-tekst en de app herkent de producten.
+- **Aanbiedingen**: een overzicht van alles wat in jouw winkels in de
+  aanbieding is. Tik op een product om te zien waar het het goedkoopst is.
+
+Bovenaan kies je van welke winkels je de aanbiedingen wilt zien (Jumbo, Dirk,
+Aldi, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de goedkoopste actie
+in jouw winkels; tik erop voor de vergelijking met alle winkels, op prijs per
+kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
+zelf toe onder "Zelf aanbiedingen toevoegen".
 - **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
   per leeftijd en een teller voor nitraatrijke groente.
 
@@ -27,8 +31,9 @@ Alles wat je instelt, blijft bewaard in de browser.
 `folders/ophalen.py` haalt de actuele aanbiedingen op en koppelt elke
 folder-titel aan een product uit de recepten, bijvoorbeeld
 "Hollandse broccoli € 0,99 (was € 1,15)" bij Dirk aan `broccoli`. Bij elk
-ingrediënt toont de app daarna in welke winkel het in de aanbieding is, met de
-actie erbij. Per recept staat ook welke winkel de meeste actieproducten heeft.
+ingrediënt toont de app daarna de goedkoopste actie, en per product een
+vergelijking tussen winkels. Het script leest daarvoor ook de prijs, de
+verpakking en waar mogelijk de prijs per kilo uit.
 
 | Winkel | Hoe | Opmerking |
 | --- | --- | --- |
