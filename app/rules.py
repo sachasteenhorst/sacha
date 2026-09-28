@@ -63,4 +63,12 @@ def apply_rules(session: Session) -> RuleApplyResult:
                 transaction.applied_rule_id = rule.id
                 result.handled += 1
                 break
+
+    # SessionLocal has autoflush=False, so without this, run_matching()'s
+    # own status.in_([UNMATCHED, SUGGESTED]) queries would hit the DB before
+    # these pending status changes reach it, pull the still-RULE_HANDLED
+    # transaction back in as a "candidate" (same in-memory object, from the
+    # identity map), find no invoice for it, and reset it to UNMATCHED --
+    # silently undoing every rule this call just applied.
+    session.flush()
     return result

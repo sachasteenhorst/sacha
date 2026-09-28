@@ -283,6 +283,18 @@ def _classify_document_kind(filename: str, subject: str, text: str, amount_cents
     return DocumentKind.INVOICE.value
 
 
+def _is_own_company(address: str, display_name: str) -> bool:
+    """True when the sender is the shop itself -- e.g. a verkoopfactuur it
+    sent to a customer, archived/CC'd into a scanned mailbox like info@.
+    That's proof of money the shop is owed, never a bill to pay, so it must
+    not be treated as an open inkoopfactuur (see _extract_fields)."""
+    address = (address or "").strip().lower()
+    if "@" in address and address.split("@", 1)[1] in settings.own_mail_domains:
+        return True
+    name_lower = (display_name or "").strip().lower()
+    return any(own_name in name_lower for own_name in settings.own_company_name_list if own_name)
+
+
 def _assign_direction(supplier_name: str) -> str:
     name_lower = (supplier_name or "").lower()
     for incoming_name in settings.incoming_supplier_names:
@@ -354,6 +366,10 @@ def _extract_fields(
     amount_cents = _parse_amount_to_cents(text, direction)
     invoice_number = _extract_invoice_number(text) or _extract_invoice_number_from_subject(subject)
     document_kind = _classify_document_kind(filename, subject, text, amount_cents)
+    if _is_own_company(address, display_name):
+        # A verkoopfactuur we sent ourselves is never a purchase to pay --
+        # never let it show up as an open inkoopfactuur.
+        document_kind = DocumentKind.OTHER.value
     referenced_invoice_numbers = (
         _extract_all_invoice_numbers(text) if document_kind == DocumentKind.SPECIFICATION.value else []
     )

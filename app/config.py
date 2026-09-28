@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     # transaction only ever matches documents of the same direction
     # (positive amount = incoming).
     incoming_suppliers: str = "ENRA,HelloRider"
+    # Own company names (comma-separated, matched case-insensitively against
+    # the sender's display name) -- a verkoopfactuur we ourselves sent to a
+    # customer, that ends up in a mailbox we scan (e.g. archived/CC'd into
+    # info@), is never a purchase to pay and must never count as an open
+    # inkoopfactuur. Any sender on the same domain as a configured mailbox
+    # (see graph_mailboxes) is always treated as "ourselves" too, with no
+    # config needed.
+    own_company_names: str = "Van der Linden Tweewielers,Hing B.V."
 
     @property
     def graph_mailboxes(self) -> list[str]:
@@ -62,6 +70,14 @@ class Settings(BaseSettings):
     @property
     def incoming_supplier_names(self) -> list[str]:
         return [s.strip().lower() for s in self.incoming_suppliers.split(",") if s.strip()]
+
+    @property
+    def own_company_name_list(self) -> list[str]:
+        return [s.strip().lower() for s in self.own_company_names.split(",") if s.strip()]
+
+    @property
+    def own_mail_domains(self) -> set[str]:
+        return {m.split("@", 1)[1].lower() for m in self.graph_mailboxes if "@" in m}
 
     # -- Sync scheduling --
     sync_interval_minutes: int = 60

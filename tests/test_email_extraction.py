@@ -1,3 +1,4 @@
+from app.config import settings
 from app.email_client import (
     _assign_direction,
     _classify_document_kind,
@@ -7,6 +8,7 @@ from app.email_client import (
     _extract_fields,
     _extract_invoice_number,
     _extract_invoice_number_from_subject,
+    _is_own_company,
     _parse_amount_literal,
     _parse_amount_to_cents,
 )
@@ -194,6 +196,43 @@ def test_direction_incoming_for_configured_suppliers():
 def test_incoming_amount_label_gestort():
     text = "Rekening-courant overzicht\nSaldo vorige periode: 100,00\nGestort bedrag: EUR 245,00"
     assert _parse_amount_to_cents(text, direction=Direction.INCOMING.value) == 24500
+
+
+# -- Own-company detection (verkoopfacturen die wij zelf versturen) --
+
+def test_is_own_company_matches_configured_display_name(monkeypatch):
+    monkeypatch.setattr(settings, "own_company_names", "Van der Linden Tweewielers,Hing B.V.")
+    monkeypatch.setattr(settings, "graph_mailbox", "")
+    assert _is_own_company("verzonden@example.com", "Van der Linden Tweewielers") is True
+    assert _is_own_company("facturatie@boekhoudpakket.nl", "Hing B.V.") is True
+
+
+def test_is_own_company_matches_own_mail_domain(monkeypatch):
+    monkeypatch.setattr(settings, "own_company_names", "")
+    monkeypatch.setattr(settings, "graph_mailbox", "facturen@vanderlindentweewielers.nl,info@vanderlindentweewielers.nl")
+    assert _is_own_company("info@vanderlindentweewielers.nl", "") is True
+    assert _is_own_company("sacha@vanderlindentweewielers.nl", "") is True
+
+
+def test_is_own_company_false_for_external_supplier(monkeypatch):
+    monkeypatch.setattr(settings, "own_company_names", "Van der Linden Tweewielers,Hing B.V.")
+    monkeypatch.setattr(settings, "graph_mailbox", "facturen@vanderlindentweewielers.nl")
+    assert _is_own_company("noreply@kruitbosch.nl", "Kruitbosch B.V.") is False
+
+
+def test_extract_fields_classifies_self_sent_sales_invoice_as_other(monkeypatch):
+    monkeypatch.setattr(settings, "own_company_names", "Van der Linden Tweewielers,Hing B.V.")
+    monkeypatch.setattr(settings, "graph_mailbox", "facturen@vanderlindentweewielers.nl,info@vanderlindentweewielers.nl")
+    text = (
+        "Van der Linden Tweewielers\n"
+        "Factuurnummer: V2026-0042\n"
+        "Factuurdatum: 3 september 2026\n"
+        "Totaal incl. BTW: € 899,00\n"
+    )
+    fields = _extract_fields(text, "info@vanderlindentweewielers.nl", "Van der Linden Tweewielers", "Factuur V2026-0042", "factuur.pdf")
+    # A real invoice-looking document (has a number, an amount, "factuur" in
+    # it) but sent by the shop itself -- never an open inkoopfactuur.
+    assert fields["document_kind"] == DocumentKind.OTHER.value
 
 
 # -- Document classification --

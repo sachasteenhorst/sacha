@@ -5,15 +5,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
+from app.matcher import run_matching
 from app.models import MatchStatus, Rule, Transaction
 from app.rules import _rule_matches, apply_rules
 
 
 @pytest.fixture()
 def session():
+    # autoflush=False to match app.db.SessionLocal exactly -- the
+    # apply_rules()+run_matching() regression below only reproduces the real
+    # bug under that setting (see its docstring/comment).
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     s = Session()
     yield s
     s.close()
@@ -158,3 +162,26 @@ def test_apply_rules_leaves_non_matching_transactions_untouched(session):
 
     assert result.handled == 0
     assert tx.status == MatchStatus.UNMATCHED
+
+
+# -- Regression: apply_rules() immediately followed by run_matching() in the
+# same (autoflush=False) session, exactly like sync.py's import_bank_file()
+# and run_sync() do. Without a flush in apply_rules(), run_matching()'s own
+# status.in_([UNMATCHED, SUGGESTED]) query used to hit the DB before the
+# pending RULE_HANDLED change reached it, pull the same (still-UNMATCHED in
+# the DB) transaction back in from the identity map, find no invoice for it,
+# and silently reset it to UNMATCHED again -- wiping out every rule just
+# applied. Seen in production: 271 rule-handled transactions stayed
+# UNMATCHED with applied_rule_id set.
+
+def test_apply_rules_survives_run_matching_in_the_same_uncommitted_session(session):
+    tx = make_transaction(counterparty_name="Belastingdienst")
+    rule = make_rule(name="Belastingdienst", counterparty_contains="Belastingdienst")
+    session.add_all([tx, rule])
+    session.commit()
+
+    apply_rules(session)
+    run_matching(session)  # no commit in between, exactly like sync.py
+
+    assert tx.status == MatchStatus.RULE_HANDLED
+    assert tx.applied_rule_id == rule.id

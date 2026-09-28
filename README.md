@@ -48,7 +48,11 @@ dashboard zodat je het zelf kan aanvullen of matchen. Documenten die
 duidelijk geen factuur zijn (algemene voorwaarden, een
 bankrekening-wijzigingsbericht, een pakbon zonder bedrag) worden
 automatisch herkend en genegeerd, zodat ze niet als "openstaande factuur"
-blijven hangen.
+blijven hangen. Hetzelfde geldt voor een **verkoopfactuur die je zelf
+verstuurd hebt** (bijv. gearchiveerd of CC'd naar info@) -- die komt nooit
+als openstaande inkoopfactuur in het dashboard te staan. Herkenning gaat op
+het afzenderadres (zelfde domein als je mailbox-adres) en op de
+bedrijfsnaam uit `OWN_COMPANY_NAMES` (zie `.env.example`).
 
 ## Regels: automatisch afhandelen
 

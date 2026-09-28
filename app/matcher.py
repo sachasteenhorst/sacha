@@ -229,8 +229,15 @@ def run_matching(session: Session) -> MatchingSummary:
             summary.suggested += 1
             continue
 
-        # No candidate at all: leave/mark as unmatched.
-        if transaction.status != MatchStatus.UNMATCHED:
+        # No candidate at all: a previously SUGGESTED transaction whose
+        # invoice(s) disappeared (rejected, or consumed by another match)
+        # goes back to UNMATCHED. Anything else that reaches here already
+        # has its final status (RULE_HANDLED, MATCHED, ...) and must be left
+        # alone -- this must never be a bare "!= UNMATCHED" check, since a
+        # status change made earlier in the same session (e.g. by
+        # apply_rules) but not yet flushed could otherwise get clobbered
+        # back to UNMATCHED here.
+        if transaction.status == MatchStatus.SUGGESTED:
             _clear_unconfirmed_suggestions(session, transaction)
             transaction.status = MatchStatus.UNMATCHED
 
