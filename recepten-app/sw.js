@@ -1,7 +1,7 @@
 // Offline-laag voor de geïnstalleerde app (PWA).
 // De app zelf komt uit de cache zodat hij ook zonder bereik opent (handig in de winkel);
 // de folders worden altijd eerst vers opgehaald.
-const CACHE = 'aanbiedingskeuken-v5';
+const CACHE = 'aanbiedingskeuken-v6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js'];
 
