@@ -1,28 +1,27 @@
 # Fotocredits
 
-De voorbeeldfoto's bij de recepten komen van Flickr, gevonden via [Openverse](https://openverse.org).
-Ze zijn bijgesneden en verkleind. Foto's onder CC BY-SA blijven in deze aangepaste vorm onder dezelfde licentie vallen.
-De foto's laten zien hoe zo'n gerecht er ongeveer uitziet; het is niet exact dit recept.
+De foto's bij de recepten zijn gevonden via [Openverse](https://openverse.org) en bijgesneden, verkleind en licht kleurbewerkt.
+Een *sfeerfoto* toont een hoofdingrediënt in plaats van het gerecht zelf. Foto's onder CC BY-SA blijven in deze bewerkte vorm onder dezelfde licentie vallen.
 
-| Recept | Bestand | Fotograaf | Licentie | Bron |
-| --- | --- | --- | --- | --- |
-| zalm-zoet | `fotos/zalm-zoet.jpg` | nathanborror | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Sunday dinner](https://www.flickr.com/photos/72897141@N00/2815891083) |
-| pompoencurry | `fotos/pompoencurry.jpg` | OriginalJo | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Kim's Improv Dinner](https://www.flickr.com/photos/20081689@N00/4107782153) |
-| linzenstoof | `fotos/linzenstoof.jpg` | You As A Machine | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [Lentil Stew](https://www.flickr.com/photos/82815184@N03/8126652808) |
-| frittata | `fotos/frittata.jpg` | jeffreyw | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Mmm...spinach feta frittata](https://www.flickr.com/photos/7927684@N03/5182567699) |
-| kabeljauw-prei | `fotos/kabeljauw-prei.jpg` | susan@kingstreetmarketinggroup | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | ['Cesca Slow Roasted Cod with Fresh Pepper Cream](https://www.flickr.com/photos/64141731@N00/8211344754) |
-| gehaktballetjes | `fotos/gehaktballetjes.jpg` | Unsound Media | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Spaghetti meatballs](https://www.flickr.com/photos/39714654@N07/5953485010) |
-| bloemkool-ovenschotel | `fotos/bloemkool-ovenschotel.jpg` | ndrwfgg | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [cauliflower cheese](https://www.flickr.com/photos/69024001@N00/107549297) |
-| spinaziestoof | `fotos/spinaziestoof.jpg` | jules:stonesoup | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Moroccan chickpea & sweet potato tajine from 'Healthy & Tasty'](https://www.flickr.com/photos/58367355@N00/14850704523) |
-| kalkoen-sperzie | `fotos/kalkoen-sperzie.jpg` | jeffreyw | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [green beans and potatoes with cornbread](https://www.flickr.com/photos/7927684@N03/41113564590) |
-| wraps-kip | `fotos/wraps-kip.jpg` | Vegan Feast Catering | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Cuban Burrito with Soy Chicken](https://www.flickr.com/photos/25128194@N02/3389183328) |
-| pompoensoep | `fotos/pompoensoep.jpg` | stu_spivack | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [coconut pumpkin soup](https://www.flickr.com/photos/35034346243@N01/319266288) |
-| shakshuka | `fotos/shakshuka.jpg` | adactio | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Shakshuka](https://www.flickr.com/photos/74105777@N00/12149680454) |
-| kip-traybake | `fotos/kip-traybake.jpg` | wlayton | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [Roasted Chicken with Root Vegetables](https://www.flickr.com/photos/34917178@N08/5205365229) |
-| chili | `fotos/chili.jpg` | Thriving Vegetarian | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Two-Bean Vegetarian Chili](https://www.flickr.com/photos/90155432@N02/12021820346) |
-| hutspot | `fotos/hutspot.jpg` | kellyhogaboom | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [Hutspot! (Sophie)](https://www.flickr.com/photos/11597293@N00/3699380835) |
-| lasagne | `fotos/lasagne.jpg` | plasticrevolver | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [lasagna](https://www.flickr.com/photos/31474531@N00/5413268570) |
-| kip-pinda | `fotos/kip-pinda.jpg` | loustejskal.com | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [Chicken Satay, Peanut Sauce, Cucumber Salad ($7.95)](https://www.flickr.com/photos/63311602@N08/23521255278) |
-| bloemkoolcurry | `fotos/bloemkoolcurry.jpg` | draxil | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [Chickpea & cauliflower curry](https://www.flickr.com/photos/45977080@N00/5494667447) |
-
-Zonder foto (geen passende vrije foto gevonden): bietenstamppot, witvis-erwten. Die tonen een illustratie.
+| Recept | Bestand | Soort | Maker | Licentie | Bron |
+| --- | --- | --- | --- | --- | --- |
+| bietenstamppot | `fotos/bietenstamppot.jpg` | sfeer | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/6016688/beetroot-vegetable-free-public-domain-cc0-photo) |
+| bloemkool-ovenschotel | `fotos/bloemkool-ovenschotel.jpg` | sfeer | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5909666/image-flower-public-domain-plant) |
+| bloemkoolcurry | `fotos/bloemkoolcurry.jpg` | gerecht | U.S. Department of Agriculture (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/8735016/curry-vegetables) |
+| chili | `fotos/chili.jpg` | gerecht | Tim Sullivan (stocksnap) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://stocksnap.io/photo/chili-bowl-TOPPXSZHAV) |
+| frittata | `fotos/frittata.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5959552/free-public-domain-cc0-photo) |
+| gehaktballetjes | `fotos/gehaktballetjes.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5953711/free-public-domain-cc0-photo) |
+| hutspot | `fotos/hutspot.jpg` | gerecht | kellyhogaboom (flickr) | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [bron](https://www.flickr.com/photos/11597293@N00/3699380835) |
+| kabeljauw-prei | `fotos/kabeljauw-prei.jpg` | gerecht | susan@kingstreetmarketinggroup (flickr) | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) | [bron](https://www.flickr.com/photos/64141731@N00/8211344754) |
+| kalkoen-sperzie | `fotos/kalkoen-sperzie.jpg` | gerecht | Jakub Kapusnak (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/448215/free-photo-image-chicken-breast-chicken-food) |
+| kip-pinda | `fotos/kip-pinda.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5951404/free-public-domain-cc0-photo) |
+| kip-traybake | `fotos/kip-traybake.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5908643/image-public-domain-hand-lemon) |
+| lasagne | `fotos/lasagne.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5959452/free-public-domain-cc0-photo) |
+| linzenstoof | `fotos/linzenstoof.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5926638/photo-image-public-domain-plant-food) |
+| pompoencurry | `fotos/pompoencurry.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5922901/photo-image-public-domain-leaf-fruit) |
+| pompoensoep | `fotos/pompoensoep.jpg` | gerecht | Jakub Kapusnak (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/448288/delicious-autumn-pumpkin-soup) |
+| shakshuka | `fotos/shakshuka.jpg` | gerecht | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5924130/photo-image-public-domain-food-free) |
+| spinaziestoof | `fotos/spinaziestoof.jpg` | gerecht | jules:stonesoup (flickr) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) | [bron](https://www.flickr.com/photos/58367355@N00/14850704523) |
+| witvis-erwten | `fotos/witvis-erwten.jpg` | sfeer | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5925207/photo-image-public-domain-plant-green) |
+| wraps-kip | `fotos/wraps-kip.jpg` | gerecht | Nilo Velez (wordpress) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://wordpress.org/photos/photo/400678ba11/) |
+| zalm-zoet | `fotos/zalm-zoet.jpg` | sfeer | rawpixel (rawpixel) | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [bron](https://www.rawpixel.com/image/5914720/image-public-domain-leaf-plant) |

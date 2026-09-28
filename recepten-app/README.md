@@ -28,6 +28,23 @@ In de geïnstalleerde app worden boodschappenlijst, kaarten, gezin en filters op
 het apparaat zelf bewaard. De folders komen uit `aanbiedingen.json`; de
 wekelijkse taak werkt dat bestand bij en pusht het naar deze branch.
 
+## Tijdlijn (Supabase)
+
+De tijdlijn met gedeelde recepten gebruikt een gratis [Supabase](https://supabase.com)-project.
+
+1. Maak een account en een nieuw project op supabase.com (regio: Europe).
+2. Open **SQL Editor → New query**, plak de inhoud van `supabase/setup.sql` en klik **Run**.
+3. Zet onder **Authentication → Sign In / Providers** de optie
+   **Allow anonymous sign-ins** aan. Gebruikers hebben dan geen account nodig.
+4. Kopieer onder **Project Settings → API** de *Project URL* en de publieke
+   *anon*-sleutel en vul ze in bij `SUPA` in `index.html`.
+
+De anon-sleutel mag in de app staan: de regels in `setup.sql` zorgen dat iedereen
+alleen eigen recepten, hartjes en foto's kan plaatsen of verwijderen. Berichten
+van anderen verwijder je als beheerder via **Table Editor → recepten**.
+De tijdlijn werkt in de telefoonversie; binnen claude.ai blokkeert de pagina
+verbindingen met andere servers.
+
 ## Onderdelen
 
 - **Vandaag**: het recept van de dag, de producten uit de aanbieding die erin
