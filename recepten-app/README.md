@@ -23,6 +23,12 @@ Aldi, Vomar, DekaMarkt, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de 
 in jouw winkels; tik erop voor de vergelijking met alle winkels, op prijs per
 kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
+- **Recepten**: je favorieten (tik bij een recept op het hartje), filters en
+  alle recepten. Vink allergieën aan (gluten, melk, ei, vis, pinda, noten, soja,
+  selderij, kokos) en kies per soort gerecht (vega, vis, kip, vlees, ei) tussen
+  niet, normaal of vaker. Het weekmenu en "Ander recept" houden zich aan de
+  filters; voorkeuren en favorieten komen vaker voor. Ook deze instellingen
+  worden bij je account bewaard.
 - **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
   per leeftijd en een teller voor nitraatrijke groente.
 - **Lijst**: je boodschappenlijst. Met één tik zet je een gerecht of het hele

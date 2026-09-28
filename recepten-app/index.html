@@ -15,8 +15,9 @@
     --ink: #17221B;
     --muted: #57675D;
     --line: #D9E1D6;
-    --green: #2D6947;
-    --green-soft: #E3EEE5;
+    --green: #1E7A4C;
+    --green-soft: #E1F1E7;
+    --radius: 20px;
     --tag: #F6C31B;
     --tag-ink: #2A2000;
     --baby: #3F61A6;
@@ -25,25 +26,28 @@
     --warn-bg: #FBEBDD;
     --no: #9B2F2F;
     --no-bg: #F8E4E2;
-    --shadow: 0 1px 2px rgba(23, 34, 27, .06), 0 6px 20px rgba(23, 34, 27, .06);
+    --shadow: 0 1px 2px rgba(16, 40, 28, .05), 0 12px 32px -14px rgba(16, 40, 28, .22);
+    --glass: rgba(243, 246, 241, .82);
     --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
     --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --bg: #111713; --surface: #19211C; --ink: #E4ECE6; --muted: #98A89E; --line: #2A362F;
-      --green: #74C392; --green-soft: #1E3326; --tag: #EDBB12; --tag-ink: #231B00;
+      --bg: #0E1411; --surface: #161E19; --ink: #E4ECE6; --muted: #98A89E; --line: #25302A;
+      --green: #6CCB94; --green-soft: #1A3024; --tag: #EDBB12; --tag-ink: #231B00;
       --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
-      --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.3);
+      --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.7);
+      --glass: rgba(14, 20, 17, .8);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #111713; --surface: #19211C; --ink: #E4ECE6; --muted: #98A89E; --line: #2A362F;
-    --green: #74C392; --green-soft: #1E3326; --tag: #EDBB12; --tag-ink: #231B00;
+    --bg: #0E1411; --surface: #161E19; --ink: #E4ECE6; --muted: #98A89E; --line: #25302A;
+    --green: #6CCB94; --green-soft: #1A3024; --tag: #EDBB12; --tag-ink: #231B00;
     --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
-    --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.3);
+    --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.7);
+    --glass: rgba(14, 20, 17, .8);
   }
 
   * { box-sizing: border-box; }
@@ -128,7 +132,7 @@
   .orow { width: 100%; display: grid; grid-template-columns: 1fr auto 16px; gap: 10px; align-items: center; text-align: left; background: none; border: 0; border-top: 1px dashed var(--line); padding: 11px 0; cursor: pointer; font-size: 16px; }
   .group + .orow { border-top: 0; }
   .orow:hover .oname { color: var(--green); }
-  .obest { font-size: 14px; text-align: right; }
+  .obest { font-size: 14px; text-align: right; display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; }
   .chev { color: var(--muted); font-size: 20px; line-height: 1; }
   details.manual > summary { cursor: pointer; font-family: var(--display); font-weight: 700; font-size: 17px; }
   .sheet { position: fixed; inset: 0; z-index: 20; background: rgba(10, 16, 12, .45); display: flex; align-items: flex-end; justify-content: center; }
@@ -202,7 +206,8 @@
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface);
     border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   }
-  nav.tabs .inner { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+  nav.tabs .inner { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+  @media (max-width: 440px) { nav.tabs { padding-inline: 2px; } nav.tabs button { font-size: 10.5px; padding-inline: 1px; } nav.tabs button svg { width: 20px; height: 20px; } }
 
   /* Kosten, budget en boodschappenlijst */
   details.budget { margin-top: 16px; background: var(--bg); border-radius: 10px; padding: 12px 14px; }
@@ -238,6 +243,24 @@
   .lrm { background: none; border: 0; font-size: 20px; color: var(--muted); cursor: pointer; padding: 2px 6px; }
   ul.shop li.done .iname, ul.shop li.done .qty, ul.shop li.done .leur { text-decoration: line-through; opacity: .5; }
   @media (max-width: 380px) { nav.tabs button { font-size: 11px; } }
+
+  /* Recepten en filters */
+  .rrow > summary { grid-template-columns: 1fr auto; }
+  .rrow .rmeta { grid-column: 1 / -1; margin-top: -4px; }
+  .heart { color: var(--no); font-size: 16px; line-height: 1; }
+  .btn.fav.on { color: var(--no); border-color: var(--no); }
+  details.filters > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-family: var(--display); font-weight: 700; font-size: 18px; }
+  .fgroup { margin-top: 16px; }
+  .fgroup h4 { margin: 0 0 6px; font-size: 15px; }
+  .prefs { display: grid; gap: 8px; }
+  .pref { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--green); color: var(--bg); }
+  .seg button[data-pref$=":niet"][aria-pressed="true"] { background: var(--no); }
+  .snel { display: flex; gap: 10px; align-items: center; margin-top: 12px; font-size: 15px; cursor: pointer; }
+  .snel input { width: 18px; height: 18px; accent-color: var(--green); }
 
   /* Spaarkaarten */
   .cards { display: grid; gap: 12px; }
@@ -282,6 +305,72 @@
     .view { animation: rise .25s ease-out; }
     @keyframes rise { from { transform: translateY(6px); } to { transform: none; } }
   }
+
+  /* ---------- Moderne opmaak ---------- */
+  body { padding-block: 0 calc(104px + env(safe-area-inset-bottom, 0px)); -webkit-font-smoothing: antialiased; }
+  header.top {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; margin-inline: -16px; padding: 12px 16px 10px;
+    background: var(--glass); -webkit-backdrop-filter: saturate(1.5) blur(16px); backdrop-filter: saturate(1.5) blur(16px);
+    align-items: center; flex-wrap: nowrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; }
+  .applogo {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(150deg, #2AA566, var(--green) 70%); box-shadow: 0 8px 18px -8px rgba(30, 122, 76, .7);
+  }
+  .applogo svg { width: 22px; height: 22px; }
+  .brandtext { display: flex; flex-direction: column; line-height: 1.1; }
+  .brandtext small { font-family: var(--body); font-weight: 400; font-size: 12.5px; color: var(--muted); letter-spacing: 0; }
+  .date { text-align: right; font-size: 13px; }
+
+  .storebar-wrap { padding-block: 2px 14px; }
+  .storebar { flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding: 2px 16px 4px; scrollbar-width: none; gap: 8px; }
+  .storebar::-webkit-scrollbar { display: none; }
+  .schip {
+    display: inline-flex; align-items: center; gap: 8px; flex: none; padding: 5px 13px 5px 5px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--line); color: var(--muted); box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: border-color .15s, background .15s;
+  }
+  .schip .slogo { filter: grayscale(1); opacity: .45; transition: filter .15s, opacity .15s; }
+  .schip[aria-pressed="true"] { background: var(--green-soft); border-color: var(--green); color: var(--ink); box-shadow: inset 0 0 0 1px var(--green); }
+  .schip[aria-pressed="true"] .slogo { filter: none; opacity: 1; }
+
+  .slogo {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; flex: none;
+    font: 800 11px/1 var(--display); letter-spacing: -.03em; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); vertical-align: middle;
+  }
+  .slogo.sm { width: 18px; height: 18px; border-radius: 5px; font-size: 8.5px; margin-right: 4px; }
+  .slogo.lg { width: 42px; height: 42px; border-radius: 12px; font-size: 16px; }
+
+  .card { border-radius: var(--radius); border-color: var(--line); box-shadow: var(--shadow); }
+  .hero { background: linear-gradient(180deg, var(--green-soft) 0, var(--surface) 220px); border: 0; padding: 22px 20px; }
+  .hero h2 { font-size: clamp(28px, 7vw, 38px); }
+  .day { border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .btn { border-radius: 12px; padding: 10px 16px; transition: transform .1s, box-shadow .15s; }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { box-shadow: 0 8px 18px -10px var(--green); }
+  .price { display: inline-flex; align-items: center; border-radius: 10px; padding: 3px 9px 3px 4px; }
+  .price b, .obest b { margin-right: 5px; }
+  .babybox { border-radius: 16px; }
+  details.budget { border-radius: 14px; }
+  .sheet { background: rgba(8, 14, 10, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .sheet-panel { border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px -10px rgba(0,0,0,.35); }
+  .cstore { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .shopgroup h3 { display: flex; align-items: center; gap: 10px; }
+
+  nav.tabs {
+    left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); max-width: 700px; margin: 0 auto;
+    padding: 6px; border: 1px solid var(--line); border-radius: 22px; background: var(--glass);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px); backdrop-filter: saturate(1.5) blur(18px);
+    box-shadow: 0 14px 34px -12px rgba(0,0,0,.28);
+  }
+  nav.tabs button { border-radius: 16px; transition: background .15s, color .15s; }
+
+  .lcard { border-top: 0; position: relative; overflow: hidden; border-radius: var(--radius); }
+  .lcard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 6px; background: var(--sc, var(--green)); }
+  .lcard .chead { display: flex; align-items: center; gap: 12px; grid-column: 1; }
+
+  @media (prefers-reduced-motion: reduce) { .btn, .schip, .schip .slogo, nav.tabs button { transition: none; } }
 </style>
 <!--wrapper-->
 </head>
@@ -289,7 +378,10 @@
 <!--/wrapper-->
 <div class="wrap">
   <header class="top">
-    <div class="brand">Aanbiedings<span>keuken</span></div>
+    <div class="brand">
+      <span class="applogo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16l-1.6 7.2A2 2 0 0 1 16.4 20H7.6a2 2 0 0 1-2-1.8z"/><path d="M8 11c0-3 1.8-5 4-5s4 2 4 5"/><path d="M12 6c.4-1.6 1.6-2.6 3-2.8"/></svg></span>
+      <span class="brandtext">Aanbiedingskeuken<small id="greeting"></small></span>
+    </div>
     <div class="date" id="today-label"></div>
   </header>
   <div class="storebar-wrap">
@@ -311,6 +403,8 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Vandaag</button>
     <button role="tab" data-tab="week" id="tab-week">
       <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Week</button>
+    <button role="tab" data-tab="recepten" id="tab-recepten">
+      <svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M12 7.5c-.9-1-2.6-.4-2.4 1 .2 1.2 2.4 2.5 2.4 2.5s2.2-1.3 2.4-2.5c.2-1.4-1.5-2-2.4-1z"/></svg>Recepten</button>
     <button role="tab" data-tab="lijst" id="tab-lijst">
       <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Lijst</button>
     <button role="tab" data-tab="aanbiedingen" id="tab-aanbiedingen">
@@ -618,7 +712,7 @@ let personen = store.get('personen', 2);
 let geboorte = store.get('geboorte', '2026-01-28');
 let overrides = store.get('overrides', {});
 let tab = store.get('tab', 'vandaag');
-if (['vandaag', 'week', 'lijst', 'aanbiedingen', 'julien', 'kaarten'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
+if (['vandaag', 'week', 'recepten', 'lijst', 'aanbiedingen', 'julien', 'kaarten'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
 // Spaarkaarten: lokale kopie (werkt ook zonder bereik in de winkel); de echte opslag is je privédeel in de app-opslag
 let kaarten = store.get('kaarten', []);
 let kaartenSync = 'lokaal'; // 'lokaal' | 'account'
@@ -631,6 +725,11 @@ let swaps = store.get('swaps', {});           // per recept de gekozen goedkoper
 let budget = store.get('budget', null);       // budget per maaltijd in euro
 let standaardWinkel = store.get('standaardWinkel', null);
 const budgetOpen = new Set();
+// Favorieten, allergieën en voorkeuren (ook bij je account bewaard)
+let favorieten = store.get('favorieten', []);
+let allergieen = store.get('allergieen', []);
+let voorkeuren = store.get('voorkeuren', []);   // bijv. ['Vis:vaker', 'Vlees:niet', 'snel']
+let saveFav = null, saveAll = null, saveVk = null;
 
 /* ---------- Datum ---------- */
 const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
@@ -677,24 +776,63 @@ const offerSet = () => new Set(CATALOG.map(c => c[0]).filter(k => where(k).lengt
 const hits = r => { const s = offerSet(); return [...new Set(r.ingr.filter(i => i.k && s.has(i.k)).map(i => i.k))]; };
 const isNitrate = r => r.ingr.some(i => NITRATE.has(i.k));
 
+/* ---------- Allergieën, voorkeuren en favorieten ---------- */
+// Allergenen per ingrediënt (productsleutel of naam). Geldt voor het hele gezin.
+const ALLERGENS = [
+  { id: 'gluten', naam: 'Gluten (tarwe)', keys: ['pasta', 'wraps', 'brood'], re: /ketjap|currypasta/ },
+  { id: 'melk', naam: 'Melk', keys: ['yoghurt', 'feta', 'kaas'], re: /\bmelk\b|boter/ },
+  { id: 'ei', naam: 'Ei', keys: ['eieren'] },
+  { id: 'vis', naam: 'Vis', keys: ['zalm', 'witvis'] },
+  { id: 'pinda', naam: 'Pinda', keys: ['pindakaas'] },
+  { id: 'noten', naam: 'Noten', keys: [] },
+  { id: 'soja', naam: 'Soja', keys: [], re: /ketjap/ },
+  { id: 'selderij', naam: 'Selderij', keys: [], re: /bouillon|currypasta/ },
+  { id: 'kokos', naam: 'Kokos', keys: ['kokosmelk'] },
+];
+const SOORTEN = ['Vega', 'Vis', 'Kip', 'Vlees', 'Ei'];
+const hasAllergen = (ingrs, a) => ingrs.some(i => a.keys.includes(i.k) || (a.re && a.re.test(i.n)));
+const recipeAllergens = r => ALLERGENS.filter(a => hasAllergen(effIngr(r), a));
+const voorkeur = soort => (voorkeuren.find(v => v.startsWith(soort + ':')) || soort + ':normaal').split(':')[1];
+const isFav = r => favorieten.includes(r.id);
+function allowed(r) {
+  if (voorkeur(r.soort) === 'niet') return false;
+  const bad = ALLERGENS.filter(a => allergieen.includes(a.id));
+  return !bad.some(a => hasAllergen(effIngr(r), a));
+}
+const allowedRecipes = () => { const a = RECIPES.filter(allowed); return a.length ? a : RECIPES; };
+const filtersOn = () => allergieen.length > 0 || voorkeuren.some(v => !v.endsWith(':normaal'));
+function prefBonus(r) {
+  let b = 0;
+  if (voorkeur(r.soort) === 'vaker') b += 12;
+  if (voorkeuren.includes('snel') && r.tijd <= 30) b += 6;
+  if (isFav(r)) b += 8;
+  return b;
+}
+
 function basePlan() {
   const seed = Number(iso(monday).replace(/-/g, '')) + [...offerSet()].sort().join().length * 7919;
   const rand = rng(seed);
-  const scored = RECIPES.map(r => ({ r, s: hits(r).length * 10 + rand() * 7 }));
+  const scored = allowedRecipes().map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) + rand() * 7 }));
   const plan = [];
   let nitr = 0, fish = 0;
   for (let d = 0; d < 7; d++) {
     const prev = plan[d - 1];
     let best = null, bestS = -1e9;
-    for (const { r, s } of scored) {
-      if (plan.includes(r)) continue;
-      if (isNitrate(r) && (nitr >= 2 || (prev && isNitrate(prev)))) continue;
-      let adj = s;
-      if (prev && prev.soort === r.soort) adj -= 9;
-      if (r.soort === 'Vis' && fish >= 2) adj -= 12;
-      if (d >= 4 && fish === 0 && r.soort === 'Vis') adj += 8;
-      if (adj > bestS) { bestS = adj; best = r; }
+    // Eerst zonder herhaling; zijn er te weinig recepten over na de filters, dan mag een recept terugkomen
+    for (const herhaal of [false, true]) {
+      for (const { r, s } of scored) {
+        if (!herhaal && plan.includes(r)) continue;
+        if (r === prev) continue;
+        if (isNitrate(r) && (nitr >= 2 || (prev && isNitrate(prev)))) continue;
+        let adj = s;
+        if (prev && prev.soort === r.soort) adj -= 9;
+        if (r.soort === 'Vis' && fish >= 2) adj -= 12;
+        if (d >= 4 && fish === 0 && r.soort === 'Vis') adj += 8;
+        if (adj > bestS) { bestS = adj; best = r; }
+      }
+      if (best) break;
     }
+    best = best || scored[0].r;
     plan.push(best);
     if (isNitrate(best)) nitr++;
     if (best.soort === 'Vis') fish++;
@@ -703,16 +841,17 @@ function basePlan() {
 }
 function plan() {
   const b = basePlan();
-  return b.map((r, i) => RMAP[overrides[iso(weekDates[i])]] || r);
+  return b.map((r, i) => { const o = RMAP[overrides[iso(weekDates[i])]]; return o && allowed(o) ? o : r; });
 }
 function ranked() {
-  return RECIPES.map(r => ({ r, s: hits(r).length })).sort((a, b) => b.s - a.s || a.r.naam.localeCompare(b.r.naam)).map(x => x.r);
+  return allowedRecipes().map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) })).sort((a, b) => b.s - a.s || a.r.naam.localeCompare(b.r.naam)).map(x => x.r);
 }
 function swap(i) {
   const p = plan();
   const cur = p[i];
   const others = new Set(p.filter((_, j) => j !== i).map(r => r.id));
-  const list = ranked().filter(r => !others.has(r.id));
+  let list = ranked().filter(r => !others.has(r.id));
+  if (list.length < 2) list = ranked();
   const next = list[(list.indexOf(cur) + 1) % list.length];
   overrides[iso(weekDates[i])] = next.id;
   // oude overrides opruimen
@@ -840,7 +979,7 @@ function priceBtn(k) {
   const b = k && best(k);
   if (!b) return '';
   const n = where(k).length;
-  return `<button class="price" data-cmp="${k}" aria-label="Vergelijk winkels voor ${esc(CAT[k].n)}"><b>${esc(b.winkel)}</b> ${esc(priceLabel(b))}${n > 1 ? ` <span class="more">+${n - 1}</span>` : ''}</button>`;
+  return `<button class="price" data-cmp="${k}" aria-label="Vergelijk winkels voor ${esc(CAT[k].n)}">${storeLogo(b.winkel, 'sm')}<b>${esc(b.winkel)}</b> ${esc(priceLabel(b))}${n > 1 ? ` <span class="more">+${n - 1}</span>` : ''}</button>`;
 }
 const offerTag = (k, big) => `<button class="tag${big ? ' big' : ''}" data-cmp="${k}">${esc(CAT[k].n)}</button>`;
 
@@ -873,8 +1012,10 @@ function recipeBody(r, dayIndex) {
       <li><span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}</span>
         <span class="marks">${priceBtn(i.k)}${GRAIN.has(i.k) ? '<span class="pill no">niet voor Julièn</span>' : ''}${i.baby ? '<span class="pill baby">Julièn</span>' : ''}</span></li>`).join('')}
     </ul>
+    ${recipeAllergens(r).length ? `<p class="small muted" style="margin:10px 0 0">Bevat: ${recipeAllergens(r).map(a => esc(a.naam.toLowerCase())).join(', ')}</p>` : ''}
     ${budgetBlock(r)}
     <div class="actions">
+      <button class="btn fav${isFav(r) ? ' on' : ''}" data-fav="${r.id}" aria-pressed="${isFav(r)}">${isFav(r) ? '♥ Favoriet' : '♡ Bewaar als favoriet'}</button>
       ${onList(r) ? '<button class="btn" data-go="lijst">Staat op je lijst · bekijk</button>' : `<button class="btn primary" data-addrecipe="${r.id}">Op boodschappenlijst</button>`}
     </div>
     ${(swaps[r.id] || []).length ? '<p class="small muted" style="margin:10px 0 0">Aangepast met goedkopere ingrediënten. De bereiding blijft hetzelfde.</p>' : ''}
@@ -904,6 +1045,7 @@ function viewToday() {
   const h = hits(r);
   const snack = pickSnack();
   return `
+  ${filtersOn() ? `<p class="small muted" style="margin:0">Filters staan aan: ${esc(filterSummary())}. <a href="#recepten" data-go="recepten">Aanpassen</a></p>` : ''}
   ${isExample() ? `<div class="banner"><strong>Voorbeeldaanbiedingen.</strong> De folders worden geladen. Tot die binnen zijn zie je een voorbeeld.</div>` : ''}
   <article class="card hero">
     <div class="eyebrow">Recept van vandaag · ${esc(r.soort)}</div>
@@ -921,7 +1063,9 @@ function viewToday() {
 }
 function pickSnack() {
   const s = offerSet();
-  const scored = SNACKS.map((x, i) => ({ x, s: x.keys.filter(k => s.has(k)).length, i }));
+  const bad = ALLERGENS.filter(a => allergieen.includes(a.id));
+  const ok = SNACKS.filter(x => !bad.some(a => hasAllergen(x.keys.map(k => ({ k, n: '' })), a)));
+  const scored = (ok.length ? ok : SNACKS).map((x, i) => ({ x, s: x.keys.filter(k => s.has(k)).length, i }));
   const max = Math.max(...scored.map(o => o.s));
   const pool = scored.filter(o => o.s === max && max > 0);
   const list = pool.length ? pool : scored;
@@ -958,6 +1102,72 @@ function viewWeek() {
       </div>
     </details>`).join('')}
   </div>`;
+}
+
+/* ---------- Recepten, favorieten en filters ---------- */
+function filterSummary() {
+  const parts = [];
+  if (allergieen.length) parts.push('zonder ' + ALLERGENS.filter(a => allergieen.includes(a.id)).map(a => a.naam.toLowerCase()).join(', '));
+  const niet = SOORTEN.filter(x => voorkeur(x) === 'niet'), vaker = SOORTEN.filter(x => voorkeur(x) === 'vaker');
+  if (niet.length) parts.push('geen ' + niet.join(', ').toLowerCase());
+  if (vaker.length) parts.push('vaker ' + vaker.join(', ').toLowerCase());
+  if (voorkeuren.includes('snel')) parts.push('vaker snel');
+  return parts.join(' · ');
+}
+function recipeRow(r) {
+  return `
+    <details class="day rrow">
+      <summary>
+        <span class="rname">${esc(r.naam)}</span>
+        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${isFav(r) ? '<span class="heart" aria-label="Favoriet">♥</span>' : ''}</span>
+        <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span>
+      </summary>
+      <div class="inner">${recipeBody(r, null)}</div>
+    </details>`;
+}
+function viewRecipes() {
+  const favs = RECIPES.filter(r => isFav(r) && allowed(r));
+  const favBlocked = RECIPES.filter(r => isFav(r) && !allowed(r));
+  const list = RECIPES.filter(allowed).sort((a, b) => a.naam.localeCompare(b.naam));
+  const none = !RECIPES.some(allowed);
+  return `
+  <section>
+    <div class="eyebrow">Kookboek</div>
+    <h2 style="font-size:28px;margin-top:4px">Recepten</h2>
+  </section>
+
+  <section class="favs">
+    <h3 class="section-title" style="margin-top:0">Favorieten</h3>
+    ${favs.length ? `<div style="display:grid;gap:10px">${favs.map(recipeRow).join('')}</div>`
+      : '<article class="card"><p style="margin:0" class="muted">Nog geen favorieten. Tik bij een recept op <b>♡ Bewaar als favoriet</b>. Favorieten komen vaker in je weekmenu.</p></article>'}
+    ${favBlocked.length ? `<p class="small muted" style="margin:8px 0 0">${favBlocked.length} favoriet${favBlocked.length > 1 ? 'en vallen' : ' valt'} weg door je filters.</p>` : ''}
+  </section>
+
+  <details class="card filters"${filtersOn() ? '' : ' open'}>
+    <summary><span>Filters</span><span class="small muted">${filtersOn() ? esc(filterSummary()) : 'Geen filters'}</span></summary>
+    <div class="fgroup">
+      <h4>Allergieën</h4>
+      <p class="small muted" style="margin:0 0 8px">Recepten met deze allergenen komen niet meer in je weekmenu.</p>
+      <div class="chips">${ALLERGENS.map(a => `<button class="chip" data-allergy="${a.id}" aria-pressed="${allergieen.includes(a.id)}">${esc(a.naam)}</button>`).join('')}</div>
+    </div>
+    <div class="fgroup">
+      <h4>Voorkeuren</h4>
+      <div class="prefs">${SOORTEN.map(x => `
+        <div class="pref"><span>${esc(x)}</span>
+          <div class="seg" role="group" aria-label="${esc(x)}">${['niet', 'normaal', 'vaker'].map(v => `<button data-pref="${esc(x)}:${v}" aria-pressed="${voorkeur(x) === v}">${v === 'niet' ? 'Niet' : v === 'normaal' ? 'Normaal' : 'Vaker'}</button>`).join('')}</div>
+        </div>`).join('')}
+      </div>
+      <label class="snel"><input type="checkbox" id="pref-snel" ${voorkeuren.includes('snel') ? 'checked' : ''}> Vaker snelle gerechten (30 minuten of minder)</label>
+    </div>
+    ${filtersOn() ? '<button class="btn" data-resetfilters>Filters wissen</button>' : ''}
+    <p class="small muted" style="margin:10px 0 0">Controleer bij een ernstige allergie altijd zelf het etiket. Kant-en-klare producten zoals bouillon en currypasta kunnen per merk verschillen.</p>
+  </details>
+
+  <section>
+    <h3 class="section-title">Alle recepten <span class="small muted" style="font-family:var(--body);font-weight:400">${none ? '' : `${list.length} van ${RECIPES.length}`}</span></h3>
+    ${none ? '<article class="card"><p style="margin:0">Geen enkel recept past bij deze filters. Het weekmenu negeert de filters tot je er een uitzet.</p></article>'
+      : `<div style="display:grid;gap:10px">${list.map(recipeRow).join('')}</div>`}
+  </section>`;
 }
 
 /* ---------- Boodschappenlijst ---------- */
@@ -1003,7 +1213,7 @@ function viewList() {
   </form>
   ${order.map(w => { const items = groups.get(w).slice().sort((a, b) => a.gekocht - b.gekocht); return `
     <article class="card shopgroup">
-      <div class="ghead"><h3>${w ? esc(w) : 'Overige boodschappen'}</h3><span class="geur">≈ ${fmtEur(sum(items.filter(i => !i.gekocht)))}</span></div>
+      <div class="ghead"><h3>${w ? storeLogo(w) + esc(w) : 'Overige boodschappen'}</h3><span class="geur">≈ ${fmtEur(sum(items.filter(i => !i.gekocht)))}</span></div>
       ${w ? '<p class="small muted" style="margin:2px 0 6px">In de aanbieding bij deze winkel</p>' : `<div class="row small" style="margin:2px 0 6px;align-items:center"><label for="stdwinkel" class="muted">Geen actie; haal ik bij</label>
         <select id="stdwinkel">${ALL_STORES.map(x => `<option ${x === rest ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>`}
       <ul class="ingr shop">${items.map(i => { const c = cost(i); const b = w && i.k ? best(i.k) : null; return `
@@ -1066,7 +1276,7 @@ function viewOffers() {
 }
 function priceBtnInner(k) {
   const b = best(k); const n = where(k).length;
-  return b ? `<span class="obest"><b>${esc(b.winkel)}</b> ${esc(priceLabel(b))}${n > 1 ? ` <span class="more">+${n - 1}</span>` : ''}</span>` : '';
+  return b ? `<span class="obest">${storeLogo(b.winkel, 'sm')}<b>${esc(b.winkel)}</b> ${esc(priceLabel(b))}${n > 1 ? ` <span class="more">+${n - 1}</span>` : ''}</span>` : '';
 }
 
 /* ---------- Vergelijking (onderblad) ---------- */
@@ -1080,7 +1290,7 @@ function openCompare(k) {
     <h2 id="sheet-title" style="font-size:26px;margin:4px 0 14px">${esc(CAT[k].n)}</h2>
     ${list.length ? `<ul class="cmp">${list.map(o => { const mine = mijnWinkels.includes(o.winkel) || o.winkel === 'Voorbeeld'; return `
       <li class="${mine ? '' : 'other'}">
-        <div class="cstore"><b>${esc(o.winkel)}</b>${o === cheapest ? ' <span class="tag">Goedkoopst</span>' : ''}${mine ? '' : ' <span class="small muted">niet in jouw winkels</span>'}</div>
+        <div class="cstore">${storeLogo(o.winkel)}<b>${esc(o.winkel)}</b>${o === cheapest ? ' <span class="tag">Goedkoopst</span>' : ''}${mine ? '' : ' <span class="small muted">niet in jouw winkels</span>'}</div>
         <div class="cprice">${esc(priceLabel(o))}</div>
         <div class="cdesc small muted">${esc(o.titel)}${o.eenheid ? ' · ' + esc(o.eenheid) : ''}${o.prijs != null && o.actie && o.actie !== priceLabel(o) ? ' · ' + esc(o.actie.replace(priceLabel(o), '').replace(/^\s*\((.*)\)\s*$/, '$1').trim()) : ''}</div>
         <div class="ckg small muted">${o.perKg != null && o.prijs != null ? euro(o.perKg) + ' per kg' : ''}</div>
@@ -1094,9 +1304,22 @@ function closeCompare() { document.getElementById('sheet').hidden = true; }
 
 /* ---------- Winkelkeuze ---------- */
 const ALL_STORES = ['Jumbo', 'Dirk', 'Aldi', 'Vomar', 'DekaMarkt', 'Albert Heijn', 'Lidl', 'Plus'];
+// Herkenbare badges in de kleur van de winkel (geen officiële logo's: die zijn beschermd en de app laadt geen externe afbeeldingen)
+const STORE_LOOK = {
+  'Albert Heijn': ['AH', '#00A0E2', '#FFFFFF'], 'Jumbo': ['J', '#FFC800', '#1A1A1A'], 'Dirk': ['D', '#D0021B', '#FFFFFF'],
+  'Aldi': ['A', '#1C3C8C', '#FFFFFF'], 'Lidl': ['L', '#0050AA', '#FFE500'], 'Plus': ['P', '#6AB023', '#FFFFFF'],
+  'Vomar': ['V', '#E1001A', '#FFD400'], 'DekaMarkt': ['DM', '#0B7A3B', '#FFFFFF'], 'Kruidvat': ['K', '#E4002B', '#FFFFFF'],
+  'Etos': ['E', '#00587C', '#FFFFFF'],
+};
+function storeLogo(w, size = '') {
+  const l = STORE_LOOK[w];
+  if (!l) return '';
+  return `<span class="slogo${size ? ' ' + size : ''}" style="background:${l[1]};color:${l[2]}" aria-hidden="true">${l[0]}</span>`;
+}
+const cardStore = type => Object.keys(STORE_LOOK).find(w => type.startsWith(w));
 function renderStoreBar() {
   document.getElementById('storebar').innerHTML = ALL_STORES.map(w =>
-    `<button class="schip" data-store="${esc(w)}" aria-pressed="${mijnWinkels.includes(w)}">${esc(w)}</button>`).join('');
+    `<button class="schip" data-store="${esc(w)}" aria-pressed="${mijnWinkels.includes(w)}">${storeLogo(w)}${esc(w)}</button>`).join('');
 }
 
 function viewBaby() {
@@ -1183,8 +1406,8 @@ function viewCards() {
     ? 'Veilig bewaard bij je account. Alleen jij ziet je kaarten, ook als je de app deelt.'
     : 'Alleen op dit apparaat bewaard. Open de app via claude.ai om je kaarten bij je account te bewaren.'}</div>
   ${kaarten.length ? `<div class="cards">${kaarten.map((c, i) => `
-    <button class="lcard s${i % 4}" data-card="${esc(c.id)}">
-      <span class="cname">${esc(c.naam || c.type)}</span>
+    <button class="lcard" data-card="${esc(c.id)}" style="--sc:${(STORE_LOOK[cardStore(c.type)] || [0, 'var(--green)'])[1]}">
+      <span class="chead">${storeLogo(cardStore(c.type), 'lg')}<span class="cname">${esc(c.naam || c.type)}</span></span>
       <span class="copen">Toon code</span>
       <span class="ctype">${c.naam ? esc(c.type) : ''}</span>
       <span class="cnum">${esc(groupNum(c.nummer))}</span>
@@ -1214,6 +1437,7 @@ function openCard(id) {
   const c = kaarten.find(x => x.id === id); if (!c) return;
   const scan = document.getElementById('scan');
   scan.innerHTML = `
+    ${storeLogo(cardStore(c.type), 'lg')}
     <h2 id="scan-title">${esc(c.naam || c.type)}</h2>
     ${c.naam ? `<div class="ctype">${esc(c.type)}</div>` : ''}
     <svg class="bc" id="bc" role="img" aria-label="Streepjescode ${esc(c.nummer)}"></svg>
@@ -1252,15 +1476,26 @@ document.getElementById('scan').addEventListener('click', e => {
 /* ---------- Render en events ---------- */
 const app = document.getElementById('app');
 document.getElementById('today-label').textContent = fmtDate(today);
+(() => { const h = new Date().getHours(); document.getElementById('greeting').textContent = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'; })();
 
 function render() {
-  const views = { vandaag: viewToday, week: viewWeek, lijst: viewList, aanbiedingen: viewOffers, julien: viewBaby, kaarten: viewCards };
+  const views = { vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, julien: viewBaby, kaarten: viewCards };
   renderStoreBar();
   document.querySelector('.storebar-wrap').hidden = !['vandaag', 'week', 'lijst', 'aanbiedingen'].includes(tab);
+  const openRows = [...app.querySelectorAll('details.rrow[open]')].map(d => d.querySelector('.rname').textContent);
   app.innerHTML = `<div class="view">${views[tab]()}</div>`;
+  app.querySelectorAll('details.rrow').forEach(d => { if (openRows.includes(d.querySelector('.rname').textContent)) d.open = true; });
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
 }
 function go(t) { tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
+function openFilters() { const d = document.querySelector('details.filters'); if (d) d.open = true; }
+// Details die de gebruiker open had, blijven open na opnieuw tekenen
+function persistPrefs() {
+  store.set('favorieten', favorieten); store.set('allergieen', allergieen); store.set('voorkeuren', voorkeuren);
+  if (saveFav) saveFav(favorieten).catch(() => {});
+  if (saveAll) saveAll(allergieen).catch(() => {});
+  if (saveVk) saveVk(voorkeuren).catch(() => {});
+}
 function addMine(w) { if (!mijnWinkels.includes(w)) { mijnWinkels = [...mijnWinkels, w]; store.set('mijnWinkels', mijnWinkels); } }
 function openManual() { const d = document.querySelector('details.manual'); if (d) d.open = true; }
 function saveOffers(items, extra = {}) { offers = { ...offers, items, voorbeeld: false, ...extra }; store.set('offers', offers); }
@@ -1279,9 +1514,25 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCompa
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) go(b.dataset.tab); });
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
-  if (t.dataset.card) openCard(t.dataset.card);
+  if (t.dataset.fav) {
+    const id = t.dataset.fav;
+    favorieten = favorieten.includes(id) ? favorieten.filter(x => x !== id) : [...favorieten, id];
+    persistPrefs(); render();
+  }
+  else if (t.dataset.allergy) {
+    const id = t.dataset.allergy;
+    allergieen = allergieen.includes(id) ? allergieen.filter(x => x !== id) : [...allergieen, id];
+    persistPrefs(); render(); openFilters();
+  }
+  else if (t.dataset.pref) {
+    const [soort] = t.dataset.pref.split(':');
+    voorkeuren = [...voorkeuren.filter(v => !v.startsWith(soort + ':')), ...(t.dataset.pref.endsWith(':normaal') ? [] : [t.dataset.pref])];
+    persistPrefs(); render(); openFilters();
+  }
+  else if (t.hasAttribute('data-resetfilters')) { allergieen = []; voorkeuren = []; persistPrefs(); render(); openFilters(); }
+  else if (t.dataset.card) openCard(t.dataset.card);
   else if (t.dataset.addrecipe) { const r = RMAP[t.dataset.addrecipe]; addToList(effIngr(r), r.naam); render(); }
   else if (t.hasAttribute('data-addweek')) {
     plan().forEach(r => { if (!onList(r)) addToList(effIngr(r), r.naam); });
@@ -1331,6 +1582,10 @@ app.addEventListener('change', e => {
   else if (t.dataset.lcheck) {
     const i = lijst.find(x => x.id === t.dataset.lcheck); if (i) i.gekocht = t.checked;
     persistList(); render();
+  }
+  else if (t.id === 'pref-snel') {
+    voorkeuren = t.checked ? [...voorkeuren.filter(v => v !== 'snel'), 'snel'] : voorkeuren.filter(v => v !== 'snel');
+    persistPrefs(); render(); openFilters();
   }
   else if (t.id === 'stdwinkel') { standaardWinkel = t.value; store.set('standaardWinkel', t.value); }
   else if (t.hasAttribute('data-budget')) {
@@ -1416,7 +1671,7 @@ function bindPrivate(db, uid, cfg) {
       cfg.set(remote);
     }
     cfg.synced(true);
-    if (tab === cfg.tab && document.getElementById('scan').hidden && !typing()) render();
+    if ((cfg.tab === '*' || tab === cfg.tab) && document.getElementById('scan').hidden && !typing()) render();
   }, () => { cfg.synced(false); if (tab === cfg.tab) render(); });
   return save;
 }
@@ -1432,6 +1687,12 @@ async function connectCards(db) {
     doc: 'boodschappen', flag: 'lijstAccount', tab: 'lijst', same: (a, b) => a.id === b.id,
     get: () => lijst, set: v => { lijst = v; store.set('boodschappen', v); }, synced: ok => { lijstSync = ok ? 'account' : 'lokaal'; },
   });
+  const pref = (doc, key, get, set) => bindPrivate(db, uid, {
+    doc, flag: key + 'Account', tab: '*', same: (a, b) => a === b, get, set: v => { set(v); store.set(key, v); }, synced: () => {},
+  });
+  saveFav = pref('favorieten', 'favorieten', () => favorieten, v => { favorieten = v; });
+  saveAll = pref('allergieen', 'allergieen', () => allergieen, v => { allergieen = v; });
+  saveVk = pref('voorkeuren', 'voorkeuren', () => voorkeuren, v => { voorkeuren = v; });
 }
 </script>
 <!--wrapper-->
