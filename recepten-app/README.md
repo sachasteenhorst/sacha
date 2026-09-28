@@ -25,6 +25,17 @@ kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
 - **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
   per leeftijd en een teller voor nitraatrijke groente.
+- **Lijst**: je boodschappenlijst. Met één tik zet je een gerecht of het hele
+  weekmenu erop. De lijst is gegroepeerd per winkel (waar het product in de
+  aanbieding is, met de actie erbij) en toont per product en per winkel wat het
+  ongeveer kost. Losse producten voeg je zelf toe. De lijst wordt net als de
+  kaarten bij je account bewaard.
+- **Kosten per gerecht**: onder de ingrediënten staat wat het gerecht ongeveer
+  kost, per ingrediënt uitgesplitst. Stel een budget per maaltijd in en kies
+  goedkopere alternatieven (koolvis in plaats van zalm, de helft van het gehakt
+  vervangen door linzen, kaas weglaten, enzovoort), of laat de app het gerecht
+  zelf aanpassen tot het binnen je budget valt. Prijzen zijn de actieprijs per
+  kilo waar die bekend is, en anders een richtprijs (`EST` in `index.html`).
 - **Kaarten**: je spaarkaarten (Bonuskaart, Extra's en andere) met een grote
   streepjescode om bij de kassa te laten scannen. De kaarten staan in je
   privédeel van de app-opslag (`data/users/<jouw id>/kaarten`): alleen jij ziet
