@@ -564,6 +564,7 @@ def ignore_invoice(
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
     invoice.status = MatchStatus.IGNORED
+    invoice.manually_ignored = True
     session.commit()
     return _dashboard_redirect(q, maand)
 

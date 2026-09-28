@@ -31,7 +31,7 @@ from app.email_client import _extract_fields, invoice_dedup_key
 from app.models import DocumentKind, Invoice, MatchStatus
 
 
-def _reparse_fields(session) -> tuple[int, int, int, int]:
+def _reparse_fields(session) -> tuple[int, int, int, int, int]:
     invoices = session.query(Invoice).all()
     total = len(invoices)
     print(f"{total} facturen gevonden, opnieuw verwerken...")
@@ -40,6 +40,7 @@ def _reparse_fields(session) -> tuple[int, int, int, int]:
     missing_pdf = 0
     unreadable = 0
     newly_other = 0
+    reopened = 0
 
     for inv in invoices:
         if not inv.pdf_path or not os.path.isfile(inv.pdf_path):
@@ -68,14 +69,22 @@ def _reparse_fields(session) -> tuple[int, int, int, int]:
         inv.document_kind = fields["document_kind"]
         inv.referenced_invoice_numbers = fields["referenced_invoice_numbers"]
 
-        if fields["document_kind"] == DocumentKind.OTHER.value and inv.status == MatchStatus.UNMATCHED:
-            inv.status = MatchStatus.IGNORED
-            newly_other += 1
+        if fields["document_kind"] == DocumentKind.OTHER.value:
+            if inv.status == MatchStatus.UNMATCHED:
+                inv.status = MatchStatus.IGNORED
+                newly_other += 1
+        elif inv.status == MatchStatus.IGNORED and not inv.manually_ignored:
+            # Was auto-ignored earlier (document_kind was "other" back
+            # then) -- better extraction now recognises it as a real
+            # invoice/specification, so reopen it. Never touches a document
+            # Sacha ignored by hand via the dashboard.
+            inv.status = MatchStatus.UNMATCHED
+            reopened += 1
 
         updated += 1
 
     session.commit()
-    return total, updated, missing_pdf, unreadable, newly_other
+    return total, updated, missing_pdf, unreadable, newly_other, reopened
 
 
 def _dedupe_invoices(session) -> int:
@@ -130,7 +139,7 @@ def _print_top_suppliers_without_amount(session, top_n: int = 10) -> None:
 def main() -> None:
     session = SessionLocal()
 
-    total, updated, missing_pdf, unreadable, newly_other = _reparse_fields(session)
+    total, updated, missing_pdf, unreadable, newly_other, reopened = _reparse_fields(session)
     removed = _dedupe_invoices(session)
 
     open_invoices = session.query(Invoice).filter(Invoice.status == MatchStatus.UNMATCHED)
@@ -147,6 +156,8 @@ def main() -> None:
         print(f"{unreadable} PDF's niet leesbaar (overgeslagen).")
     if newly_other:
         print(f"{newly_other} herkend als geen factuur (algemene voorwaarden e.d.) en op genegeerd gezet.")
+    if reopened:
+        print(f"{reopened} eerder ten onrechte genegeerde documenten heropend (nu wel als factuur/specificatie herkend).")
     if removed:
         print(f"{removed} dubbele facturen verwijderd (zelfde document uit meerdere mailboxen).")
     print(f"\nNog openstaand (niet genegeerd/gekoppeld): {nog_open} van {total - removed}")

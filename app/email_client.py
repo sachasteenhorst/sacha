@@ -69,11 +69,32 @@ INCOMING_LABEL_PATTERNS = [
     r"uit\s*te\s*keren(?:\s*bedrag)?",
 ]
 
+# ENRA's rekening-courant overzicht doesn't have one document-wide "total"
+# the way an invoice does -- what the corresponding bank bijschrijving
+# actually carries as its OWN description is a literal "Saldo RC <datum>
+# Agentnr. <nr>" reference, with its amount sitting right there on the same
+# line in the overzicht. Real production example:
+#   overzicht: "26-05-2026 Saldo RC 22-05-2026 Agentnr. 06343 454,78"
+#   bank omschrijving: "Saldo RC 22-05-2026 Agentnr. 06343"
+ENRA_SALDO_RC_RE = re.compile(
+    r"saldo\s*rc\s*(\d{2}-\d{2}-\d{4})\s*agentnr\.?\s*(\d+)\s*(" + AMOUNT_NUMBER + r")",
+    re.IGNORECASE,
+)
+
 # -- Invoice number --
 INVOICE_NUMBER_STRONG_LABEL_RE = re.compile(
     r"factuurnummer|factuur\s*nr\.?|invoice\s*(?:number|no)\.?", re.IGNORECASE
 )
 INVOICE_NUMBER_WEAK_LABEL_RE = re.compile(r"\bnummer\b", re.IGNORECASE)
+# A bare "nummer" right after one of these is a KvK/Chamber-of-Commerce or
+# VAT registration number, not an invoice number -- real production
+# example: Accell's boilerplate footer "... gedeponeerd bij de Kamer van
+# Koophandel onder nummer: 01054298" was extracted as the invoice number on
+# every Accell document.
+KVK_OR_VAT_CONTEXT_RE = re.compile(
+    r"kamer\s*van\s*koophandel|\bkvk\b|handelsregister|chamber\s*of\s*commerce|\bbtw\b|\bvat\b",
+    re.IGNORECASE,
+)
 # Words that show up right after an invoice-number label purely because of
 # PDF layout (columns collapsed into running text) -- never the number itself.
 INVOICE_NUMBER_STOPWORDS = {
@@ -114,13 +135,29 @@ KNOWN_SUPPLIER_DOMAINS = {
 }
 
 # -- Document classification --
-# A document matching one of these is never proof of a payment -- it
-# shouldn't count as an open invoice waiting to be matched, regardless of
-# whether an amount happens to be found on the page.
+# These never show up as one boilerplate sentence on an otherwise-real
+# invoice -- safe to search the whole document.
 NON_INVOICE_RE = re.compile(
-    r"algemene\s*voorwaarden|general\s*terms|terms\s*(and|&)\s*conditions|\bgtc\b|"
     r"wijziging.*bank.*rekening|change\s*(in|of)\s*(payment\s*)?bank\s*account|"
     r"\bubo\b.{0,10}verklaring|privacy\s*(statement|policy|verklaring)",
+    re.IGNORECASE,
+)
+# A document that genuinely IS a terms-and-conditions document announces
+# itself with one of these -- but real production example: Accell's
+# invoice/specification footer reads "... gelden onze algemene voorwaarden,
+# gedeponeerd bij de Kamer van Koophandel onder nummer: ..." on literally
+# every document they send, including real invoices. That's a reference TO
+# the terms, not the terms themselves, so it must not classify the document
+# as OTHER -- see _mentions_standalone_terms_document below, which checks
+# the text immediately before each match for that kind of "our terms
+# apply" lead-in and ignores the match if it's there.
+TERMS_HEADING_RE = re.compile(
+    r"algemene\s*voorwaarden|general\s*terms|terms\s*(and|&)\s*conditions|\bgtc\b",
+    re.IGNORECASE,
+)
+TERMS_REFERENCE_LEADIN_RE = re.compile(
+    r"(gelden|van\s*toepassing|zijn\s*van\s*toepassing|conform|volgens|onderworpen\s*aan)\s*"
+    r"(onze|de|deze|our|these)?\s*$",
     re.IGNORECASE,
 )
 # A packing slip only counts as "not an invoice" when it also has no
@@ -308,6 +345,10 @@ def _labelled_invoice_number_candidates(text: str) -> list[str]:
     for label_re in (INVOICE_NUMBER_STRONG_LABEL_RE, INVOICE_NUMBER_WEAK_LABEL_RE):
         candidates = []
         for m in label_re.finditer(text):
+            if label_re is INVOICE_NUMBER_WEAK_LABEL_RE:
+                preceding = text[max(0, m.start() - 40): m.start()]
+                if KVK_OR_VAT_CONTEXT_RE.search(preceding):
+                    continue
             token = _first_valid_number_token(text[m.end(): m.end() + 60])
             if token:
                 candidates.append(token)
@@ -355,9 +396,22 @@ def _extract_invoice_number_from_subject(subject: str) -> str:
     return ""
 
 
+def _mentions_standalone_terms_document(haystack: str) -> bool:
+    """True only when "algemene voorwaarden"/"terms and conditions"/GTC
+    shows up WITHOUT a "these apply to this transaction" lead-in right
+    before it -- i.e. the document is plausibly the terms themselves, not
+    an invoice that merely references them in a footer disclaimer."""
+    for m in TERMS_HEADING_RE.finditer(haystack):
+        preceding = haystack[max(0, m.start() - 40): m.start()]
+        if TERMS_REFERENCE_LEADIN_RE.search(preceding):
+            continue
+        return True
+    return False
+
+
 def _classify_document_kind(filename: str, subject: str, text: str, amount_cents: int | None) -> str:
     haystack = f"{filename} {subject} {text[:1500]}"
-    if NON_INVOICE_RE.search(haystack):
+    if NON_INVOICE_RE.search(haystack) or _mentions_standalone_terms_document(haystack):
         return DocumentKind.OTHER.value
     if SPECIFICATION_RE.search(haystack):
         return DocumentKind.SPECIFICATION.value
@@ -459,13 +513,26 @@ def _parse_invoice_date(text: str) -> date | None:
     return None
 
 
+def _extract_enra_saldo_reference(text: str) -> tuple[str, int] | None:
+    m = ENRA_SALDO_RC_RE.search(text)
+    if not m:
+        return None
+    date_str, agent, amount_str = m.groups()
+    reference = f"Saldo RC {date_str} Agentnr. {agent}"
+    return reference, _parse_amount_literal(amount_str)
+
+
 def _extract_fields(
     text: str, address: str, display_name: str = "", subject: str = "", filename: str = ""
 ) -> dict:
     supplier_name = _derive_supplier_name(address, display_name)
     direction = _assign_direction(supplier_name)
-    amount_cents = _parse_amount_to_cents(text, direction)
-    invoice_number = _extract_invoice_number(text, filename) or _extract_invoice_number_from_subject(subject)
+    enra_reference = _extract_enra_saldo_reference(text) if direction == Direction.INCOMING.value else None
+    if enra_reference is not None:
+        invoice_number, amount_cents = enra_reference
+    else:
+        amount_cents = _parse_amount_to_cents(text, direction)
+        invoice_number = _extract_invoice_number(text, filename) or _extract_invoice_number_from_subject(subject)
     document_kind = _classify_document_kind(filename, subject, text, amount_cents)
     if _is_own_company(address, display_name):
         # A verkoopfactuur we sent ourselves is never a purchase to pay --

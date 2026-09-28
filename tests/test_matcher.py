@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.matcher import _name_similarity, run_matching
-from app.models import Invoice, MatchStatus, Transaction
+from app.models import Direction, Invoice, MatchStatus, Transaction
 
 
 @pytest.fixture()
@@ -209,6 +209,89 @@ def test_reference_match_two_comma_separated_vfnl_numbers_with_unrelated_short_n
     assert summary.auto_matched == 1
     assert {m.invoice_id for m in tx.matches} == {inv1.id, inv2.id}
     assert unrelated_short.status == MatchStatus.UNMATCHED
+
+
+def test_reference_match_accell_incasso_uses_last_five_digits_of_invoice_number(session):
+    # Real production case: Accell's incasso description only carries the
+    # LAST 5 DIGITS of each invoice number, and a PDF-to-text line-wrap
+    # artifact inserts a stray space mid-number ("0723 3" for the invoice
+    # ending "07233").
+    tx = make_transaction(
+        description=(
+            "ID ACCELL NL42375PMTINF42375TRANS2 2967 Descr. 01123 03005 05120 "
+            "0723 3 09087 Kenmerk machtiging / incassant ID: 3458514 NL68ZZZ010542980000"
+        ),
+        counterparty_name="ACCELL NEDERLAND",
+        amount_cents=-260262,
+    )
+    invoices = [
+        make_invoice(invoice_number="251101123", amount_cents=50000, supplier_name="Accell", email_message_id="<msg-1>"),
+        make_invoice(invoice_number="251103005", amount_cents=50000, supplier_name="Accell", email_message_id="<msg-2>"),
+        make_invoice(invoice_number="251105120", amount_cents=50000, supplier_name="Accell", email_message_id="<msg-3>"),
+        make_invoice(invoice_number="251107233", amount_cents=50000, supplier_name="Accell", email_message_id="<msg-4>"),
+        make_invoice(invoice_number="251109087", amount_cents=60262, supplier_name="Accell", email_message_id="<msg-5>"),
+    ]
+    session.add(tx)
+    session.add_all(invoices)
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert {m.invoice_id for m in tx.matches} == {inv.id for inv in invoices}
+
+
+def test_reference_match_suffix_fallback_never_crosses_suppliers(session):
+    # The last-5-digits fallback is only ever safe when scoped to invoices
+    # from the same supplier -- without that, a coincidental 5-digit
+    # suffix match from an unrelated supplier could combine into a false
+    # total. Only the Accell invoice should be picked up here even though
+    # the unrelated invoice's suffix also appears in the text.
+    tx = make_transaction(
+        description="ID ACCELL NL42375 Descr. 01123 Kenmerk machtiging",
+        counterparty_name="ACCELL NEDERLAND",
+        amount_cents=-50000,
+    )
+    accell_inv = make_invoice(invoice_number="251101123", amount_cents=50000, supplier_name="Accell", email_message_id="<msg-1>")
+    unrelated_inv = make_invoice(invoice_number="999901123", amount_cents=999999, supplier_name="Onbekende Leverancier", email_message_id="<msg-2>")
+    session.add_all([tx, accell_inv, unrelated_inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert {m.invoice_id for m in tx.matches} == {accell_inv.id}
+    assert unrelated_inv.status == MatchStatus.UNMATCHED
+
+
+def test_reference_match_enra_saldo_rc(session):
+    # ENRA's rekening-courant overzicht has no single "total" -- the
+    # extracted invoice_number IS the literal "Saldo RC <datum> Agentnr.
+    # <nr>" text, which the corresponding bank bijschrijving carries
+    # verbatim as its own description.
+    tx = make_transaction(
+        description="Saldo RC 22-05-2026 Agentnr. 06343",
+        counterparty_name="ENRA",
+        amount_cents=45478,  # incoming: positive
+    )
+    inv = make_invoice(
+        invoice_number="Saldo RC 22-05-2026 Agentnr. 06343",
+        amount_cents=45478,
+        supplier_name="ENRA",
+        direction=Direction.INCOMING.value,
+    )
+    session.add_all([tx, inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert inv.status == MatchStatus.MATCHED
 
 
 def test_amount_date_match_is_suggested_not_confirmed(session):

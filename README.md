@@ -25,7 +25,18 @@ aan een bewijsstuk (factuur, creditnota of bon). Deze tool:
   kleine **betalingskorting** wordt geaccepteerd (standaard tot 3% of
   EUR 25, wat van de twee kleiner is; instelbaar via
   `PAYMENT_DISCOUNT_PERCENT`/`PAYMENT_DISCOUNT_MAX_CENTS`) en het verschil
-  wordt getoond in de kolom "Korting" bij "Recent gekoppeld".
+  wordt getoond in de kolom "Korting" bij "Recent gekoppeld". Noemt de
+  omschrijving geen enkel volledig factuurnummer (Accell's incasso's
+  bevatten bijvoorbeeld alleen de **laatste 5 cijfers** van elk
+  factuurnummer, soms met een per ongeluk ingevoegde spatie middenin door
+  een PDF-regelafbreking), dan wordt daar ook op gezocht -- maar alleen
+  binnen facturen van dezelfde leverancier als de tegenpartij, en met
+  dezelfde totaal/korting-controle, zodat een toevallige cijferovereenkomst
+  nooit een verkeerde koppeling kan maken. Voor ENRA-rekeningcourantoverzichten
+  (die geen eigen "totaalbedrag" hebben) wordt de referentie + het bedrag
+  gehaald uit de "Saldo RC &lt;datum&gt; Agentnr. &lt;nr&gt;"-regel, die
+  letterlijk ook in de omschrijving van de bijbehorende bankbijschrijving
+  staat.
 - **Bedrag komt exact overeen + datum binnen het tijdvenster** (standaard
   60 dagen) -> als "te bevestigen" suggestie in het dashboard; jij klikt op
   Klopt/Klopt niet. Bij meerdere kandidaten telt ook mee hoe goed de naam
@@ -52,14 +63,25 @@ PDF-tekstherkenning is heuristisch (regex op de geëxtraheerde tekst). Niet
 elke factuur-layout wordt goed herkend -- velden die niet gevonden worden
 blijven leeg, de factuur verschijnt dan gewoon met minder gegevens in het
 dashboard zodat je het zelf kan aanvullen of matchen. Documenten die
-duidelijk geen factuur zijn (algemene voorwaarden, een
-bankrekening-wijzigingsbericht, een pakbon zonder bedrag) worden
+duidelijk geen factuur zijn (een document dat zelf de algemene voorwaarden
+IS, een bankrekening-wijzigingsbericht, een pakbon zonder bedrag) worden
 automatisch herkend en genegeerd, zodat ze niet als "openstaande factuur"
-blijven hangen. Hetzelfde geldt voor een **verkoopfactuur die je zelf
-verstuurd hebt** (bijv. gearchiveerd of CC'd naar info@) -- die komt nooit
-als openstaande inkoopfactuur in het dashboard te staan. Herkenning gaat op
-het afzenderadres (zelfde domein als je mailbox-adres) en op de
-bedrijfsnaam uit `OWN_COMPANY_NAMES` (zie `.env.example`).
+blijven hangen -- maar een factuur die in de footer alleen even *verwijst*
+naar "onze algemene voorwaarden" (zoals Accell op praktisch elk document
+doet) telt niet mee, anders zou elke Accell-factuur ten onrechte genegeerd
+worden. Hetzelfde geldt voor een **verkoopfactuur die je zelf verstuurd
+hebt** (bijv. gearchiveerd of CC'd naar info@) -- die komt nooit als
+openstaande inkoopfactuur in het dashboard te staan. Herkenning gaat op het
+afzenderadres (zelfde domein als je mailbox-adres) en op de bedrijfsnaam
+uit `OWN_COMPANY_NAMES` (zie `.env.example`).
+
+Automatisch genegeerd is niet hetzelfde als **handmatig** genegeerd (de
+"Negeren"-knop bij een factuur): alleen dat laatste onthoudt het
+dashboard permanent. Herkent `scripts/reparse_invoices.py` een eerder
+automatisch genegeerd document later alsnog als een echte factuur/
+specificatie (bijv. na een verbetering zoals de Accell-fix hierboven), dan
+wordt het vanzelf heropend -- een document dat je zelf op "Negeren" hebt
+gezet, blijft altijd met rust.
 
 Het factuurnummer wordt ook uit de **bestandsnaam** gehaald als de tekst in
 de PDF een incassant-ID of klantnummer oplevert in plaats van het echte

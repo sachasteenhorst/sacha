@@ -167,6 +167,14 @@ class Invoice(Base):
     # from before this feature existed).
     basecone_forward_method: Mapped[str] = mapped_column(String, default="")
     basecone_forwarded_to: Mapped[str] = mapped_column(String, default="")
+    # True only when Sacha clicked "Negeren" in the dashboard -- distinct
+    # from the matcher/reparse script auto-setting IGNORED because
+    # document_kind turned out to be "other". reparse_invoices.py may
+    # revert the LATTER back to UNMATCHED if better extraction later
+    # recognises the document as a real invoice after all; it must never
+    # touch a document Sacha ignored by hand. Added after the first
+    # release -- see app/db.py's startup migration.
+    manually_ignored: Mapped[bool] = mapped_column(Boolean, default=False)
 
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 

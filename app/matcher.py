@@ -148,6 +148,43 @@ def _invoice_number_in_text(invoice_number: str, haystack: str) -> bool:
     return re.search(pattern, haystack, re.IGNORECASE) is not None
 
 
+# Some suppliers' incasso descriptions only carry the LAST FEW digits of
+# each invoice number (real production example: Accell's incasso lists
+# "01123 03005 05120 0723 3 09087" for invoices ending in those digits,
+# where "0723 3" is a stray-space PDF-layout artifact for "07233"). Only
+# trusted for invoices from the SAME supplier as the transaction's
+# counterparty (see _reference_match_group) -- a short digit suffix alone is
+# exactly the false-positive risk already fixed for Kruitbosch/Mbps.
+MIN_REFERENCE_SUFFIX_LENGTH = 5
+
+
+def _invoice_number_suffix_in_text(invoice_number: str, haystack: str) -> bool:
+    """A PDF-to-text line-wrap can insert a stray space mid-number (e.g.
+    "0723 3" for what should read "07233") -- allow optional whitespace
+    BETWEEN the suffix's own digits (not a blanket whitespace collapse of
+    the whole haystack, which would also merge the suffix into whatever
+    word follows it and break the boundary check below)."""
+    if not invoice_number or len(invoice_number) < MIN_REFERENCE_SUFFIX_LENGTH:
+        return False
+    suffix = invoice_number[-MIN_REFERENCE_SUFFIX_LENGTH:]
+    if not suffix.isdigit():
+        return False
+    spaced_pattern = r"\s*".join(re.escape(ch) for ch in suffix)
+    pattern = r"(?<![A-Za-z0-9])" + spaced_pattern + r"(?![A-Za-z0-9])"
+    return re.search(pattern, haystack) is not None
+
+
+def _finalize_reference_match(pool: list[Invoice], transaction: Transaction) -> tuple[list[Invoice], int] | None:
+    if not pool:
+        return None
+    total = sum(invoice.amount_cents for invoice in pool)
+    diff = total - abs(transaction.amount_cents)  # positive = paid less than invoiced (discount)
+    tolerance = max(settings.match_amount_tolerance_cents, _discount_tolerance_cents(total))
+    if abs(diff) > tolerance:
+        return None
+    return pool, diff
+
+
 def _reference_match_group(transaction: Transaction, invoices: list[Invoice]) -> tuple[list[Invoice], int] | None:
     """Every open invoice whose number is found verbatim (as a whole token)
     in the transaction's description/reference -- a single incasso payment
@@ -162,27 +199,33 @@ def _reference_match_group(transaction: Transaction, invoices: list[Invoice]) ->
     only falling back to the full set (all suppliers included) if that
     narrower total doesn't add up either -- so an unrelated invoice whose
     number coincidentally also appears in the text doesn't silently widen
-    (and break) an otherwise-correct match."""
+    (and break) an otherwise-correct match.
+
+    If no FULL invoice number turns up at all, falls back to matching on
+    just the last few digits (see _invoice_number_suffix_in_text) -- but
+    only among invoices from the same supplier, since that's the only thing
+    that makes a bare digit suffix a safe enough signal to act on."""
     haystack = f"{transaction.description} {transaction.reference}"
-    matches = [
+    full_matches = [
         invoice for invoice in invoices
         if invoice.amount_cents is not None
         and _is_referenceable_invoice_number(invoice.invoice_number)
         and _invoice_number_in_text(invoice.invoice_number, haystack)
     ]
-    if not matches:
-        return None
+    if full_matches:
+        same_supplier = [inv for inv in full_matches if _name_similarity(transaction.counterparty_name, inv.supplier_name) > 0]
+        for pool in (same_supplier, full_matches):
+            result = _finalize_reference_match(pool, transaction)
+            if result is not None:
+                return result
 
-    same_supplier = [inv for inv in matches if _name_similarity(transaction.counterparty_name, inv.supplier_name) > 0]
-    for pool in (same_supplier, matches):
-        if not pool:
-            continue
-        total = sum(invoice.amount_cents for invoice in pool)
-        diff = total - abs(transaction.amount_cents)  # positive = paid less than invoiced (discount)
-        tolerance = max(settings.match_amount_tolerance_cents, _discount_tolerance_cents(total))
-        if abs(diff) <= tolerance:
-            return pool, diff
-    return None
+    suffix_matches = [
+        invoice for invoice in invoices
+        if invoice.amount_cents is not None
+        and _name_similarity(transaction.counterparty_name, invoice.supplier_name) > 0
+        and _invoice_number_suffix_in_text(invoice.invoice_number, haystack)
+    ]
+    return _finalize_reference_match(suffix_matches, transaction)
 
 
 def _date_diff(transaction: Transaction, invoice: Invoice) -> int:

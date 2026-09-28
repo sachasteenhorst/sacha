@@ -36,6 +36,7 @@ _COLUMN_MIGRATIONS = {
         ("basecone_forwarded_at", "DATETIME"),
         ("basecone_forward_method", "VARCHAR DEFAULT ''"),
         ("basecone_forwarded_to", "VARCHAR DEFAULT ''"),
+        ("manually_ignored", "BOOLEAN DEFAULT 0"),
     ],
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),
@@ -72,9 +73,37 @@ def _seed_default_rules() -> None:
         session.commit()
 
 
+def _backfill_manually_ignored() -> None:
+    """The manually_ignored column is brand new -- for invoices that were
+    already IGNORED before it existed, infer which ones were a deliberate
+    manual choice: the ONLY code path that ever sets IGNORED on a document
+    NOT classified as "other" is the dashboard's manual "Negeren" button
+    (see app/main.py's ignore_invoice; app/sync.py and
+    scripts/reparse_invoices.py only ever auto-set IGNORED when
+    document_kind IS "other"). So an already-ignored invoice whose
+    document_kind isn't "other" must have been ignored by hand -- protect
+    it. One where document_kind IS "other" was almost certainly
+    auto-ignored, so it's left free for reparse's reclassify-and-reopen
+    logic to reconsider. Runs exactly once, right when the column is added
+    (see _migrate_schema) -- never again, so it can't later overwrite a
+    real manual choice made after this ran."""
+    from app.models import DocumentKind, Invoice, MatchStatus
+
+    with SessionLocal() as session:
+        rows = session.query(Invoice).filter(Invoice.status == MatchStatus.IGNORED).all()
+        for row in rows:
+            row.manually_ignored = row.document_kind != DocumentKind.OTHER.value
+        if rows:
+            session.commit()
+
+
 def _migrate_schema() -> None:
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
+
+    invoices_had_manually_ignored = True
+    if "invoices" in existing_tables:
+        invoices_had_manually_ignored = "manually_ignored" in {c["name"] for c in inspector.get_columns("invoices")}
 
     with engine.begin() as conn:
         for table, columns in _COLUMN_MIGRATIONS.items():
@@ -84,6 +113,9 @@ def _migrate_schema() -> None:
             for name, ddl_type in columns:
                 if name not in existing_columns:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl_type}"))
+
+    if "invoices" in existing_tables and not invoices_had_manually_ignored:
+        _backfill_manually_ignored()
 
 
 def _backfill_bank_code_from_raw_data() -> None:

@@ -243,6 +243,35 @@ def test_incoming_amount_label_gestort():
     assert _parse_amount_to_cents(text, direction=Direction.INCOMING.value) == 24500
 
 
+# -- ENRA "Saldo RC" reference (rekening-courant overzicht) --
+
+def test_enra_saldo_rc_reference_and_amount_extracted():
+    # Real production layout: the corresponding bank bijschrijving's own
+    # description is literally "Saldo RC <datum> Agentnr. <nr>" -- no
+    # separate "total" label exists the way an invoice has one.
+    text = (
+        "Rekening courant\n"
+        "Periode 22-05-2026 t/m 29-05-2026\n"
+        "Beginsaldo per 22 mei 2026 454,78\n"
+        "26-05-2026 Saldo RC 22-05-2026 Agentnr. 06343 454,78\n"
+    )
+    fields = _extract_fields(text, "info@enra.nl", "")
+    assert fields["direction"] == Direction.INCOMING.value
+    assert fields["invoice_number"] == "Saldo RC 22-05-2026 Agentnr. 06343"
+    assert fields["amount_cents"] == 45478
+
+
+def test_enra_saldo_rc_not_applied_to_outgoing_suppliers():
+    # The "Saldo RC" reference is only meaningful for incoming documents --
+    # an outgoing supplier whose text happens to contain similar-looking
+    # text should never have this override kick in.
+    text = "Factuurnummer: F-2026-00123\nSaldo RC 22-05-2026 Agentnr. 06343 454,78\nTotaal incl. BTW: EUR 50,00"
+    fields = _extract_fields(text, "noreply@kruitbosch.nl", "")
+    assert fields["direction"] == Direction.OUTGOING.value
+    assert fields["invoice_number"] == "F-2026-00123"
+    assert fields["amount_cents"] == 5000
+
+
 # -- Own-company detection (verkoopfacturen die wij zelf versturen) --
 
 def test_is_own_company_matches_configured_display_name(monkeypatch):
@@ -335,6 +364,40 @@ def test_packing_slip_with_amount_stays_invoice():
 def test_real_invoice_not_misclassified_as_other():
     text = "Factuurnummer: 123\nTotaal incl. BTW: EUR 50,00"
     assert _classify_document_kind("factuur.pdf", "Factuur 123", text, 5000) == DocumentKind.INVOICE.value
+
+
+# Real production bug: Accell's invoice/specification footer references
+# their own terms ("... gelden onze algemene voorwaarden ...") on every
+# document they send, including real invoices -- that's not the same as
+# the document BEING a terms-and-conditions document.
+ACCELL_FOOTER = (
+    "Accell Western Europe is een handelsnaam van Accell Nederland B.V.\n"
+    "Op alle transacties van Accell Nederland B.V. (statutair gevestigd te Heerenveen) "
+    "gelden onze algemene voorwaarden, gedeponeerd bij de Kamer van Koophandel onder "
+    "nummer: 01054298. Btw-nummer: NL 008084531B01 IBAN: NL39 ABNA 0474 3252 02"
+)
+
+
+def test_footer_terms_reference_does_not_classify_invoice_as_other():
+    text = "Factuurnummer: 251103005\nTotaal incl. BTW: EUR 204,28\n" + ACCELL_FOOTER
+    assert _classify_document_kind("251103005.pdf", "Factuur Accell NL per pakbon\xa0251103005", text, 20428) == DocumentKind.INVOICE.value
+
+
+def test_footer_terms_reference_does_not_block_specification_classification():
+    text = "Specificatie automatische incasso\n" + ACCELL_FOOTER
+    result = _classify_document_kind("3458514.pdf", "Specificatie automatische incasso\xa03458514", text, 286973)
+    assert result == DocumentKind.SPECIFICATION.value
+
+
+def test_footer_terms_reference_does_not_yield_kvk_number_as_invoice_number():
+    assert _extract_invoice_number(ACCELL_FOOTER) == ""
+
+
+def test_genuine_terms_document_still_classified_as_other():
+    # The boilerplate-reference exception must not swallow a document that
+    # really IS the terms and conditions.
+    text = "Algemene Voorwaarden\nArtikel 1. Toepasselijkheid\nDeze voorwaarden zijn van toepassing op alle overeenkomsten."
+    assert _classify_document_kind("algemene-voorwaarden.pdf", "", text, None) == DocumentKind.OTHER.value
 
 
 def test_specification_detected_and_lists_all_invoice_numbers():
