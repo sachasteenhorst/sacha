@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--/wrapper-->
+<title>Aanbiedingskeuken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+  :root {
+    --bg: #F3F6F0;
+    --surface: #FFFFFF;
+    --ink: #17221B;
+    --muted: #57675D;
+    --line: #D9E1D6;
+    --green: #2D6947;
+    --green-soft: #E3EEE5;
+    --tag: #F6C31B;
+    --tag-ink: #2A2000;
+    --baby: #3F61A6;
+    --baby-bg: #E9EFFA;
+    --warn: #A94F17;
+    --warn-bg: #FBEBDD;
+    --no: #9B2F2F;
+    --no-bg: #F8E4E2;
+    --shadow: 0 1px 2px rgba(23, 34, 27, .06), 0 6px 20px rgba(23, 34, 27, .06);
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111713; --surface: #19211C; --ink: #E4ECE6; --muted: #98A89E; --line: #2A362F;
+      --green: #74C392; --green-soft: #1E3326; --tag: #EDBB12; --tag-ink: #231B00;
+      --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
+      --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111713; --surface: #19211C; --ink: #E4ECE6; --muted: #98A89E; --line: #2A362F;
+    --green: #74C392; --green-soft: #1E3326; --tag: #EDBB12; --tag-ink: #231B00;
+    --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
+    --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    margin: 0; color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5;
+    padding-inline: 16px; padding-block: 0 calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+  a { color: var(--green); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--baby); outline-offset: 2px; }
+
+  header.top { padding-block: 20px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .brand { font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -.01em; }
+  .brand span { color: var(--green); }
+  .date { color: var(--muted); font-size: 14px; }
+
+  .view { display: flex; flex-direction: column; gap: 16px; padding-block: 8px 24px; }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 700; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+  .hero h2 { font-size: clamp(26px, 6.4vw, 36px); font-weight: 800; letter-spacing: -.02em; margin-top: 6px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 14px; margin-top: 8px; }
+  .hits { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+
+  .tag {
+    display: inline-block; background: var(--tag); color: var(--tag-ink); font-weight: 700;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .07em; padding: 3px 8px 2px;
+    border-radius: 3px; transform: rotate(-2deg); white-space: nowrap;
+  }
+  .tag.big { font-size: 12px; padding: 4px 10px 3px; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.no { background: var(--no-bg); color: var(--no); }
+  .pill.baby { background: var(--baby-bg); color: var(--baby); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.ok { background: var(--green-soft); color: var(--green); }
+
+  .section-title { font-family: var(--display); font-size: 18px; font-weight: 700; margin-top: 20px; margin-bottom: 8px; }
+  ul.ingr { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+  ul.ingr li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+  ul.ingr li:last-child { border-bottom: 0; }
+  .qty { font-variant-numeric: tabular-nums; flex: none; min-width: 64px; color: var(--muted); font-size: 15px; }
+  .iname { flex: 1 1 0; min-width: 0; }
+  ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+  ol.steps li::marker { font-family: var(--display); font-weight: 700; color: var(--green); }
+
+  .babybox { background: var(--baby-bg); border-radius: 12px; padding: 16px 18px; margin-top: 20px; }
+  .babybox h3 { color: var(--baby); font-size: 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .babybox ol.steps li::marker { color: var(--baby); }
+  .babybox .note { font-size: 14px; margin: 10px 0 0; }
+  .babybox .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .warnline { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 14px; margin-top: 10px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn {
+    border: 1px solid var(--line); background: var(--surface); padding: 9px 16px; border-radius: 999px;
+    cursor: pointer; font-weight: 700; font-size: 14px;
+  }
+  .btn:hover { border-color: var(--green); }
+  .btn.primary { background: var(--green); color: var(--bg); border-color: var(--green); }
+
+  .snack { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; }
+  .snack h3 { font-size: 18px; }
+  .snack p { margin: 0; grid-column: 1 / -1; font-size: 15px; color: var(--muted); }
+
+  /* Week */
+  .day { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  .day.today { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+  .day > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; }
+  .day > summary::-webkit-details-marker { display: none; }
+  .dname { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 700; }
+  .day.today .dname { color: var(--green); }
+  .rname { font-family: var(--display); font-weight: 700; font-size: 16px; line-height: 1.25; }
+  .day .inner { padding: 0 16px 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 460px) {
+    .day > summary { grid-template-columns: 1fr auto; }
+    .dname { grid-column: 1 / -1; }
+  }
+
+  .shop li { display: flex; gap: 10px; align-items: center; }
+  .shop label { display: flex; gap: 10px; align-items: baseline; flex: 1; cursor: pointer; min-width: 0; }
+  .shop input { width: 18px; height: 18px; accent-color: var(--green); flex: none; align-self: center; }
+  .shop li.done .iname, .shop li.done .qty { text-decoration: line-through; opacity: .55; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-weight: 700; font-size: 14px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  select, input[type="date"], input[type="number"], textarea {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  textarea { width: 100%; min-height: 110px; resize: vertical; }
+
+  /* Offers */
+  .banner { background: var(--warn-bg); color: var(--ink); border-radius: 12px; padding: 14px 16px; font-size: 15px; }
+  .banner strong { color: var(--warn); }
+  .cat { margin-top: 18px; }
+  .cat h3 { font-size: 15px; font-family: var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 6px 13px;
+    cursor: pointer; font-size: 15px; display: inline-flex; gap: 6px; align-items: center;
+  }
+  .chip[aria-pressed="true"] { background: var(--tag); color: var(--tag-ink); border-color: var(--tag); font-weight: 700; }
+  .chip .grain { font-size: 11px; color: var(--muted); }
+  .chip[aria-pressed="true"] .grain { color: var(--tag-ink); }
+  .found { font-size: 14px; color: var(--green); margin-top: 8px; min-height: 1.5em; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+
+  /* Baby */
+  .profile { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+  .avatar {
+    width: 64px; height: 64px; border-radius: 50%; background: var(--baby-bg); color: var(--baby);
+    display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 28px;
+  }
+  .age { font-family: var(--display); font-size: 30px; font-weight: 800; color: var(--baby); line-height: 1; }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .rules ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+  .rules h3 { font-size: 17px; }
+  .meter { display: flex; gap: 6px; margin-top: 8px; }
+  .meter span { width: 34px; height: 10px; border-radius: 5px; background: var(--line); }
+  .meter span.on { background: var(--warn); }
+  .disclaimer { font-size: 13px; color: var(--muted); }
+
+  /* Tab bar */
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface);
+    border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  nav.tabs .inner { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  nav.tabs button {
+    border: 0; background: none; padding: 8px 4px; border-radius: 10px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--muted);
+  }
+  nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  nav.tabs button[aria-selected="true"] { color: var(--green); background: var(--green-soft); }
+  nav.tabs button.babytab[aria-selected="true"] { color: var(--baby); background: var(--baby-bg); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .view { animation: rise .25s ease-out; }
+    @keyframes rise { from { transform: translateY(6px); } to { transform: none; } }
+  }
+</style>
+<!--wrapper-->
+</head>
+<body>
+<!--/wrapper-->
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Aanbiedings<span>keuken</span></div>
+    <div class="date" id="today-label"></div>
+  </header>
+  <main id="app"></main>
+</div>
+
+<nav class="tabs" aria-label="Onderdelen">
+  <div class="inner" role="tablist">
+    <button role="tab" data-tab="vandaag" id="tab-vandaag">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Vandaag</button>
+    <button role="tab" data-tab="week" id="tab-week">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Week</button>
+    <button role="tab" data-tab="aanbiedingen" id="tab-aanbiedingen">
+      <svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>Aanbiedingen</button>
+    <button role="tab" data-tab="julien" id="tab-julien" class="babytab">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="6"/><path d="M9.5 11.5c.8.8 4.2.8 5 0M6 20c1.5-2 3.6-3 6-3s4.5 1 6 3"/></svg>Julièn</button>
+  </div>
+</nav>
+
+<script>
+/* ---------- Opslag ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ak:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ak:' + k, JSON.stringify(v)); } catch (e) {} }
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Producten die in de aanbieding kunnen zijn ---------- */
+const CATALOG = [
+  // k, naam, categorie, zoekwoorden (folder-tekst)
+  ['broccoli', 'Broccoli', 'Groente', ['broccoli']],
+  ['bloemkool', 'Bloemkool', 'Groente', ['bloemkool']],
+  ['wortel', 'Wortel', 'Groente', ['wortel', 'wortels', 'wortelen', 'winterpeen', 'bospeen', 'peen']],
+  ['pompoen', 'Pompoen', 'Groente', ['pompoen', 'pompoenen', 'flespompoen', 'butternut']],
+  ['courgette', 'Courgette', 'Groente', ['courgette', 'courgettes']],
+  ['zoete-aardappel', 'Zoete aardappel', 'Groente', ['zoete aardappel', 'zoete aardappelen', 'zoete aardappels', 'bataat']],
+  ['aardappel', 'Aardappelen', 'Groente', ['aardappel', 'aardappelen', 'aardappels', 'krieltjes', 'kriel']],
+  ['spinazie', 'Spinazie', 'Groente', ['spinazie']],
+  ['prei', 'Prei', 'Groente', ['prei', 'preien']],
+  ['paprika', 'Paprika', 'Groente', ['paprika', "paprika's", 'paprikas']],
+  ['tomaat', 'Tomaten', 'Groente', ['tomaat', 'tomaten', 'cherrytomaten', 'trostomaten', 'snoeptomaten']],
+  ['champignons', 'Champignons', 'Groente', ['champignon', 'champignons', 'kastanjechampignons']],
+  ['sperziebonen', 'Sperziebonen', 'Groente', ['sperziebonen', 'sperzieboontjes', 'haricots verts']],
+  ['doperwten', 'Doperwten', 'Groente', ['doperwten', 'erwten', 'erwtjes']],
+  ['rode-biet', 'Rode biet', 'Groente', ['rode biet', 'rode bieten', 'bietjes', 'bieten']],
+  ['pastinaak', 'Pastinaak', 'Groente', ['pastinaak', 'pastinaken']],
+  ['ui', 'Uien', 'Groente', ['ui', 'uien', 'rode ui', 'rode uien']],
+  ['appel', 'Appels', 'Fruit', ['appel', 'appels', 'elstar', 'jonagold', 'goudrenet']],
+  ['peer', 'Peren', 'Fruit', ['peer', 'peren', 'conference', 'doyenne']],
+  ['banaan', 'Bananen', 'Fruit', ['banaan', 'bananen']],
+  ['avocado', 'Avocado', 'Fruit', ['avocado', "avocado's", 'avocados']],
+  ['blauwe-bessen', 'Blauwe bessen', 'Fruit', ['blauwe bessen', 'blauwe bes', 'bosbessen']],
+  ['mango', 'Mango', 'Fruit', ['mango', "mango's", 'mangos']],
+  ['aardbeien', 'Aardbeien', 'Fruit', ['aardbei', 'aardbeien']],
+  ['kipfilet', 'Kipfilet', 'Vlees & vis', ['kipfilet', 'kipfilets', 'kippenborst', 'kipreepjes']],
+  ['kippendij', 'Kippendijen', 'Vlees & vis', ['kippendij', 'kippendijen', 'kippendijfilet', 'dijfilet']],
+  ['kalkoen', 'Kalkoenfilet', 'Vlees & vis', ['kalkoen', 'kalkoenfilet']],
+  ['gehakt', 'Rundergehakt', 'Vlees & vis', ['gehakt', 'rundergehakt', 'half-om-half', 'half om half']],
+  ['zalm', 'Zalm', 'Vlees & vis', ['zalm', 'zalmfilet', 'zalmfilets', 'zalmmoten']],
+  ['witvis', 'Witvis (kabeljauw, koolvis)', 'Vlees & vis', ['kabeljauw', 'kabeljauwfilet', 'koolvis', 'witvis', 'pollak', 'heek', 'schelvis']],
+  ['eieren', 'Eieren', 'Zuivel & ei', ['ei', 'eieren', 'scharreleieren', 'vrije-uitloopeieren']],
+  ['yoghurt', 'Volle yoghurt', 'Zuivel & ei', ['yoghurt', 'volle yoghurt', 'griekse yoghurt']],
+  ['feta', 'Feta', 'Zuivel & ei', ['feta']],
+  ['kaas', 'Geraspte kaas', 'Zuivel & ei', ['kaas', 'geraspte kaas', 'gouda']],
+  ['kikkererwten', 'Kikkererwten', 'Peulvruchten & voorraad', ['kikkererwten']],
+  ['linzen', 'Linzen', 'Peulvruchten & voorraad', ['linzen', 'rode linzen']],
+  ['bonen', 'Bonen (kidney, zwart)', 'Peulvruchten & voorraad', ['kidneybonen', 'zwarte bonen', 'bruine bonen', 'witte bonen']],
+  ['kokosmelk', 'Kokosmelk', 'Peulvruchten & voorraad', ['kokosmelk']],
+  ['passata', 'Passata / tomatenblokjes', 'Peulvruchten & voorraad', ['passata', 'tomatenblokjes', 'gezeefde tomaten']],
+  ['pindakaas', 'Pindakaas', 'Peulvruchten & voorraad', ['pindakaas']],
+  ['pasta', 'Volkoren pasta', 'Brood & granen', ['pasta', 'spaghetti', 'penne', 'fusilli', 'lasagnebladen', 'lasagne']],
+  ['rijst', 'Zilvervliesrijst', 'Brood & granen', ['rijst', 'zilvervliesrijst', 'basmatirijst']],
+  ['wraps', 'Volkoren wraps', 'Brood & granen', ['wrap', 'wraps', 'tortilla', 'tortillas']],
+  ['brood', 'Volkoren brood', 'Brood & granen', ['brood', 'volkorenbrood', 'volkoren brood']],
+];
+const CAT = Object.fromEntries(CATALOG.map(([k, n, c, s]) => [k, { k, n, c, s }]));
+const GRAIN = new Set(['pasta', 'rijst', 'wraps', 'brood']);
+const NITRATE = new Set(['spinazie', 'rode-biet']);
+
+/* ---------- Recepten (hoeveelheden voor 2 volwassenen) ---------- */
+const I = (q, u, n, k = null, baby = false) => ({ q, u, n, k, baby });
+const RECIPES = [
+  { id: 'zalm-zoet', naam: 'Zalm uit de oven met zoete aardappel en broccoli', tijd: 35, soort: 'Vis',
+    ingr: [I(2, '', 'zalmfilets (± 250 g)', 'zalm'), I(500, 'g', 'zoete aardappel', 'zoete-aardappel'), I(400, 'g', 'broccoli', 'broccoli'),
+      I(1, 'el', 'olijfolie'), I(1, '', 'citroen'), I(null, '', 'peper en zout')],
+    stappen: ['Verwarm de oven op 200 °C. Snijd de zoete aardappel in blokjes, meng met de olie en rooster 15 minuten.',
+      'Snijd de broccoli in roosjes en leg ze erbij. Leg de zalm erop en rooster nog 12–15 minuten tot de vis gaar is.',
+      'Maak op smaak met citroensap, peper en zout.'],
+    baby: { stappen: ['Neem vóór het zouten een stukje zalm (± 1–2 eetlepels) en wat zoete aardappel en broccoli apart.',
+      'Controleer de zalm goed op graatjes. Prak alles grof met een scheutje water, moedermelk of flesvoeding.',
+      'Zachte broccoliroosjes en blokjes zoete aardappel zijn ook goed als vingervoedsel.'], allergenen: ['vis'] } },
+
+  { id: 'pompoencurry', naam: 'Pompoencurry met kip en kikkererwten', tijd: 35, soort: 'Kip',
+    ingr: [I(300, 'g', 'kippendijfilet', 'kippendij'), I(600, 'g', 'pompoen', 'pompoen'), I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'),
+      I(1, '', 'ui', 'ui'), I(200, 'ml', 'kokosmelk', 'kokosmelk'), I(1, 'el', 'milde currypasta'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(null, '', 'koriander, zout')],
+    stappen: ['Kook de rijst volgens de verpakking. Snipper de ui en fruit hem in een beetje olie.',
+      'Voeg de kip in stukjes en de pompoen in blokjes toe, bak 3 minuten. Schenk de kokosmelk en een scheut water erbij en laat 15 minuten zacht koken.',
+      'Voeg de uitgelekte kikkererwten toe. Schep nu de portie van Julièn eruit.',
+      'Roer de currypasta en wat zout door de rest en laat nog 5 minuten pruttelen. Serveer met rijst en koriander.'],
+    baby: { stappen: ['Schep de portie eruit vóór de currypasta en het zout (stap 3).',
+      'Haal de velletjes van de kikkererwten, snijd de kip heel fijn en prak alles met de pompoen tot een grove puree.',
+      'Geen rijst: geef wat extra pompoen of een gekookte aardappel.'], allergenen: [] } },
+
+  { id: 'linzenstoof', naam: 'Linzenstoof met wortel en tomaat', tijd: 40, soort: 'Vega',
+    ingr: [I(150, 'g', 'rode linzen', 'linzen'), I(300, 'g', 'wortel', 'wortel'), I(1, '', 'ui', 'ui'), I(400, 'g', 'tomatenblokjes', 'passata'),
+      I(500, 'g', 'aardappelen', 'aardappel'), I(1, 'tl', 'komijn'), I(1, '', 'groentebouillonblokje'), I(null, '', 'peterselie')],
+    stappen: ['Snipper de ui en fruit hem met de komijn. Voeg wortel in plakjes, linzen, tomatenblokjes en 400 ml water toe.',
+      'Kook de aardappelen apart gaar. Laat de linzen 20 minuten zacht koken tot ze uit elkaar vallen.',
+      'Schep de portie van Julièn eruit. Los het bouillonblokje op in de rest en maak af met peterselie.'],
+    baby: { stappen: ['Neem de portie vóór de bouillon (die bevat veel zout).',
+      'Prak de linzenstoof met een aardappel tot een smeuïge puree. Rode linzen zijn na lang koken vanzelf zacht.'], allergenen: [] } },
+
+  { id: 'frittata', naam: 'Frittata met courgette en paprika', tijd: 25, soort: 'Ei',
+    ingr: [I(6, '', 'eieren', 'eieren'), I(1, '', 'courgette', 'courgette'), I(1, '', 'rode paprika', 'paprika'), I(50, 'g', 'feta', 'feta'),
+      I(400, 'g', 'krieltjes', 'aardappel'), I(null, '', 'peterselie, peper, zout')],
+    stappen: ['Kook de krieltjes 10 minuten en snijd ze door. Snijd courgette en paprika in blokjes.',
+      'Bak de groente en krieltjes 5 minuten in een ovenvaste pan. Klop de eieren los met peper.',
+      'Houd wat groente en ei apart voor Julièn. Giet de rest van het ei in de pan, verkruimel de feta erover en laat 10 minuten gaar worden in een oven van 180 °C.'],
+    baby: { stappen: ['Bak een klein eigen omeletje of frittata (bijvoorbeeld in een muffinvorm) zonder feta en zout.',
+      'Laat het ei helemaal stollen, zonder zacht of lopend eigeel.',
+      'Snijd het in reepjes als vingervoedsel en geef er zachte stukjes krieltje en courgette bij.'], allergenen: ['ei'] } },
+
+  { id: 'kabeljauw-prei', naam: 'Kabeljauw met preipuree', tijd: 30, soort: 'Vis',
+    ingr: [I(300, 'g', 'kabeljauw- of koolvisfilet', 'witvis'), I(700, 'g', 'kruimige aardappelen', 'aardappel'), I(2, '', 'preien', 'prei'),
+      I(100, 'ml', 'melk'), I(1, 'el', 'roomboter'), I(1, '', 'citroen'), I(null, '', 'nootmuskaat, peper, zout')],
+    stappen: ['Kook de aardappelen gaar. Snijd de prei in ringen en smoor hem 8 minuten in de boter.',
+      'Stoom of pocheer de vis 6–8 minuten in een laagje water met een schijfje citroen.',
+      'Stamp de aardappelen met melk, roer de prei erdoor. Houd de portie van Julièn apart en breng de rest op smaak met nootmuskaat, peper en zout.'],
+    baby: { stappen: ['Neem de puree vóór het zout.',
+      'Controleer de vis goed op graatjes en prak hem door de preipuree. Gebruik een scheutje water als het te dik is.'], allergenen: ['vis', 'melk'] } },
+
+  { id: 'gehaktballetjes', naam: 'Gehaktballetjes in tomatensaus met volkoren spaghetti', tijd: 35, soort: 'Vlees',
+    ingr: [I(300, 'g', 'rundergehakt', 'gehakt'), I(1, '', 'ei', 'eieren'), I(1, '', 'kleine courgette (geraspt)', 'courgette'), I(500, 'g', 'passata', 'passata'),
+      I(1, '', 'ui', 'ui'), I(1, '', 'teen knoflook'), I(160, 'g', 'volkoren spaghetti', 'pasta'), I(1, '', 'pastinaak (voor Julièn)', 'pastinaak', true), I(null, '', 'basilicum, zout, peper')],
+    stappen: ['Meng het gehakt met het ei en de uitgeknepen geraspte courgette. Draai er kleine balletjes van; er gaat geen paneermeel in.',
+      'Fruit ui en knoflook, voeg passata toe en laat de balletjes er 15 minuten in garen.',
+      'Kook de spaghetti en de pastinaak in blokjes. Schep de portie van Julièn eruit en breng de saus daarna op smaak.'],
+    baby: { stappen: ['Neem een paar balletjes met saus vóór het zout. Er zit geen paneermeel in, dus ze zijn graanvrij.',
+      'Geen spaghetti: prak de balletjes met de gekookte pastinaak en wat tomatensaus.',
+      'Draai voor vingervoedsel een paar extra kleine, zachte balletjes.'], allergenen: ['ei'] } },
+
+  { id: 'bloemkool-ovenschotel', naam: 'Bloemkool-broccoli-ovenschotel met kip', tijd: 40, soort: 'Kip',
+    ingr: [I(0.5, '', 'bloemkool', 'bloemkool'), I(300, 'g', 'broccoli', 'broccoli'), I(300, 'g', 'kipfilet', 'kipfilet'), I(500, 'g', 'aardappelen', 'aardappel'),
+      I(2, '', 'eieren', 'eieren'), I(150, 'ml', 'melk'), I(50, 'g', 'geraspte kaas', 'kaas'), I(null, '', 'nootmuskaat, peper, zout')],
+    stappen: ['Kook aardappelen in plakjes, bloemkool en broccoli 6 minuten voor. Bak de kip in blokjes gaar.',
+      'Houd de portie van Julièn apart. Doe de rest in een ovenschaal.',
+      'Klop eieren, melk, nootmuskaat, peper en zout los, giet erover, bestrooi met kaas en bak 20 minuten op 200 °C.'],
+    baby: { stappen: ['Neem kip, bloemkool, broccoli en aardappel apart vóór het ei-melkmengsel en de kaas (kaas is zout).',
+      'Snijd de kip heel fijn en prak alles met een klontje ongezouten boter of wat kookvocht.'], allergenen: [] } },
+
+  { id: 'spinaziestoof', naam: 'Zoete-aardappelstoof met spinazie en kikkererwten', tijd: 30, soort: 'Vega',
+    ingr: [I(500, 'g', 'zoete aardappel', 'zoete-aardappel'), I(300, 'g', 'spinazie', 'spinazie'), I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'),
+      I(1, '', 'ui', 'ui'), I(400, 'g', 'tomatenblokjes', 'passata'), I(1, 'tl', 'komijn en paprikapoeder'), I(4, 'el', 'volle yoghurt', 'yoghurt'), I(null, '', 'zout')],
+    stappen: ['Fruit de ui met de specerijen. Voeg zoete aardappel in blokjes, tomatenblokjes en een scheut water toe en laat 15 minuten koken.',
+      'Voeg de kikkererwten toe en roer de spinazie erdoor tot hij geslonken is.',
+      'Schep de portie van Julièn eruit, breng de rest op smaak met zout en serveer met een lepel yoghurt.'],
+    baby: { stappen: ['Neem de portie vóór het zout. Haal de velletjes van de kikkererwten en prak alles fijn.',
+      'Geef het meteen en warm het niet op. Bewaar geen restjes met spinazie voor Julièn.'], allergenen: ['melk (yoghurt)'] } },
+
+  { id: 'kalkoen-sperzie', naam: 'Kalkoenfilet met sperziebonen en krieltjes', tijd: 30, soort: 'Kip',
+    ingr: [I(300, 'g', 'kalkoenfilet', 'kalkoen'), I(400, 'g', 'sperziebonen', 'sperziebonen'), I(500, 'g', 'krieltjes', 'aardappel'),
+      I(1, '', 'ui', 'ui'), I(1, 'el', 'olijfolie'), I(null, '', 'tijm, peper, zout')],
+    stappen: ['Kook de krieltjes en de sperziebonen (8–10 minuten, lekker zacht).',
+      'Bak de kalkoen met ui en tijm in de olie in 8 minuten gaar. Houd een stukje apart voor Julièn.',
+      'Bak de krieltjes nog kort mee en breng op smaak met peper en zout.'],
+    baby: { stappen: ['Snijd of hak de kalkoen heel fijn. Hij wordt snel droog, dus meng hem met aardappel en een scheutje kookvocht.',
+      'Laat zachte sperziebonen heel als vingervoedsel of prak ze door de puree.'], allergenen: [] } },
+
+  { id: 'bietenstamppot', naam: 'Bietenstamppot met appel en kippendij', tijd: 40, soort: 'Kip',
+    ingr: [I(500, 'g', 'gekookte rode biet', 'rode-biet'), I(2, '', 'appels', 'appel'), I(700, 'g', 'aardappelen', 'aardappel'), I(300, 'g', 'kippendijfilet', 'kippendij'),
+      I(1, '', 'ui', 'ui'), I(100, 'ml', 'melk'), I(null, '', 'peper, zout')],
+    stappen: ['Kook de aardappelen. Snijd biet en appel in blokjes. Bak de kippendij met de ui in 10 minuten gaar.',
+      'Stamp de aardappelen met melk en roer biet en appel erdoor.',
+      'Houd de portie van Julièn apart en breng de rest op smaak.'],
+    baby: { stappen: ['Neem stamppot en kip vóór het zout. Snijd de kip fijn en prak alles.',
+      'Rode biet kleurt poepluiers rood; dat is onschuldig. Warm het niet op en geef het de dag erna niet opnieuw.'], allergenen: ['melk'] } },
+
+  { id: 'wraps-kip', naam: 'Volkoren wraps met kip, avocado en paprika', tijd: 20, soort: 'Kip',
+    ingr: [I(4, '', 'volkoren wraps', 'wraps'), I(300, 'g', 'kipfilet', 'kipfilet'), I(1, '', 'avocado', 'avocado'), I(2, '', 'paprika', 'paprika'),
+      I(200, 'g', 'cherrytomaten', 'tomaat'), I(100, 'g', 'volle yoghurt', 'yoghurt'), I(1, 'tl', 'paprikapoeder')],
+    stappen: ['Snijd kip en paprika in reepjes. Houd voor Julièn wat kip en paprika apart zonder kruiden.',
+      'Bak de rest met paprikapoeder in 6–8 minuten gaar.',
+      'Prak de avocado, besmeer de wraps en vul ze met kip, paprika, tomaat en yoghurt.'],
+    baby: { stappen: ['Geen wrap. Gaar de kip zonder kruiden en snijd hem in dunne, zachte reepjes.',
+      'Stoom de paprikareepjes zacht en geef er een partje of wat prak van rijpe avocado bij.'], allergenen: [] } },
+
+  { id: 'pompoensoep', naam: 'Pompoensoep met rode linzen', tijd: 35, soort: 'Vega',
+    ingr: [I(800, 'g', 'pompoen', 'pompoen'), I(100, 'g', 'rode linzen', 'linzen'), I(1, '', 'ui', 'ui'), I(2, '', 'wortels', 'wortel'),
+      I(100, 'ml', 'kokosmelk', 'kokosmelk'), I(1, '', 'groentebouillonblokje'), I(4, '', 'sneetjes volkoren brood', 'brood')],
+    stappen: ['Fruit de ui. Voeg pompoen, wortel, linzen en 900 ml water toe en kook 20 minuten.',
+      'Pureer de soep met de kokosmelk. Schep de portie van Julièn eruit.',
+      'Los de bouillon op in de rest. Serveer met volkoren brood.'],
+    baby: { stappen: ['Neem de soep vóór de bouillon en laat hem dikker. Een lepel is hier handiger dan een beker.',
+      'Geen brood: geef er zachte stukjes gekookte wortel of pompoen bij.'], allergenen: [] } },
+
+  { id: 'shakshuka', naam: 'Shakshuka met kikkererwten', tijd: 30, soort: 'Ei',
+    ingr: [I(4, '', 'eieren', 'eieren'), I(2, '', 'paprika', 'paprika'), I(1, '', 'ui', 'ui'), I(500, 'g', 'passata', 'passata'),
+      I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'), I(1, 'tl', 'komijn'), I(1, '', 'aardappel (voor Julièn)', 'aardappel', true), I(2, '', 'sneetjes volkoren brood', 'brood'), I(null, '', 'chilivlokken, peterselie, zout')],
+    stappen: ['Fruit ui en paprika 5 minuten met komijn. Voeg passata en kikkererwten toe en laat 10 minuten inkoken.',
+      'Schep de portie van Julièn eruit. Voeg chilivlokken en zout toe aan de rest.',
+      'Maak kuiltjes, breek de eieren erin en laat ze met deksel 6–8 minuten garen. Serveer met brood.'],
+    baby: { stappen: ['Neem de tomaten-paprikasaus met kikkererwten vóór chili en zout. Haal de velletjes van de kikkererwten.',
+      'Kook een ei hard (10 minuten) en prak het erdoor of geef het in partjes.',
+      'Geen brood: serveer met een gekookte aardappel.'], allergenen: ['ei'] } },
+
+  { id: 'kip-traybake', naam: 'Kip uit de oven met pastinaak, wortel en rode ui', tijd: 45, soort: 'Kip',
+    ingr: [I(400, 'g', 'kippendijfilet', 'kippendij'), I(2, '', 'pastinaken', 'pastinaak'), I(4, '', 'wortels', 'wortel'), I(2, '', 'rode uien', 'ui'),
+      I(300, 'g', 'krieltjes', 'aardappel'), I(1, 'el', 'olijfolie'), I(null, '', 'rozemarijn, peper, zout')],
+    stappen: ['Verwarm de oven op 200 °C. Snijd pastinaak en wortel in staafjes en de uien in partjes.',
+      'Meng alles met de kip, krieltjes, olie en rozemarijn op een bakplaat. Houd een hoekje voor Julièn zonder zout en peper.',
+      'Rooster 35 minuten tot alles zacht en goudbruin is.'],
+    baby: { stappen: ['Rooster het hoekje van Julièn zonder zout en peper.',
+      'De pastinaak- en wortelstaafjes zijn na 35 minuten zacht genoeg om als vingervoedsel te geven. Druk er even op om het te testen.',
+      'Trek de kip in draadjes of snijd hem fijn.'], allergenen: [] } },
+
+  { id: 'chili', naam: 'Chili sin carne met zoete aardappel en bonen', tijd: 40, soort: 'Vega',
+    ingr: [I(2, 'blik', 'kidney- of zwarte bonen', 'bonen'), I(400, 'g', 'zoete aardappel', 'zoete-aardappel'), I(2, '', 'paprika', 'paprika'), I(1, '', 'ui', 'ui'),
+      I(500, 'g', 'passata', 'passata'), I(1, 'tl', 'komijn'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(4, 'el', 'volle yoghurt', 'yoghurt'), I(null, '', 'chilipoeder, zout')],
+    stappen: ['Kook de rijst. Fruit ui en paprika met komijn, voeg zoete aardappel in blokjes en passata toe.',
+      'Laat 20 minuten zacht koken, voeg de uitgelekte bonen toe en warm ze 5 minuten mee.',
+      'Schep de portie van Julièn eruit. Kruid de rest met chili en zout en serveer met rijst en yoghurt.'],
+    baby: { stappen: ['Neem de portie vóór chili en zout.',
+      'Prak de bonen goed of haal de velletjes eraf. Meng met de zoete aardappel tot een grove puree.',
+      'Geen rijst: de zoete aardappel geeft al genoeg vulling.'], allergenen: [] } },
+
+  { id: 'hutspot', naam: 'Hutspot met gehaktballetjes', tijd: 40, soort: 'Vlees',
+    ingr: [I(700, 'g', 'aardappelen', 'aardappel'), I(500, 'g', 'winterpeen', 'wortel'), I(3, '', 'uien', 'ui'), I(250, 'g', 'rundergehakt', 'gehakt'),
+      I(100, 'ml', 'melk'), I(null, '', 'nootmuskaat, peper, zout')],
+    stappen: ['Kook aardappelen, winterpeen en uien samen in 20 minuten gaar.',
+      'Draai van het gehakt kleine balletjes zonder zout en bak ze in 10 minuten gaar. Houd er een paar apart voor Julièn.',
+      'Stamp de groenten met melk. Houd de portie van Julièn apart en breng de rest op smaak.'],
+    baby: { stappen: ['Neem de hutspot en een paar balletjes vóór het zout. Prak ze fijn of geef ze als zacht vingervoedsel.',
+      'Maak de hutspot eventueel smeuïger met wat kookvocht.'], allergenen: ['melk'] } },
+
+  { id: 'lasagne', naam: 'Lasagne met courgette, champignons en gehakt', tijd: 50, soort: 'Vlees',
+    ingr: [I(250, 'g', 'rundergehakt', 'gehakt'), I(2, '', 'courgettes', 'courgette'), I(250, 'g', 'champignons', 'champignons'), I(500, 'g', 'passata', 'passata'),
+      I(1, '', 'ui', 'ui'), I(6, '', 'volkoren lasagnebladen', 'pasta'), I(75, 'g', 'geraspte kaas', 'kaas'), I(1, '', 'zoete aardappel (voor Julièn)', 'zoete-aardappel', true), I(null, '', 'oregano, zout, peper')],
+    stappen: ['Rul het gehakt met de ui. Voeg champignons en courgette in blokjes toe en daarna de passata. Laat 10 minuten pruttelen.',
+      'Schep de portie van Julièn eruit. Breng de saus op smaak.',
+      'Maak laagjes van saus en lasagnebladen, eindig met kaas en bak 30 minuten op 190 °C. Rooster de zoete aardappel ernaast.'],
+    baby: { stappen: ['Neem de gehakt-groentesaus vóór zout en oregano.',
+      'Geen lasagnebladen en geen kaas: prak de saus door de geroosterde zoete aardappel.'], allergenen: [] } },
+
+  { id: 'witvis-erwten', naam: 'Witvis met doperwten-muntpuree', tijd: 25, soort: 'Vis',
+    ingr: [I(300, 'g', 'koolvis of kabeljauw', 'witvis'), I(400, 'g', 'doperwten (diepvries)', 'doperwten'), I(600, 'g', 'aardappelen', 'aardappel'),
+      I(1, 'el', 'roomboter'), I(1, '', 'citroen'), I(null, '', 'verse munt, peper, zout')],
+    stappen: ['Kook de aardappelen. Kook de doperwten de laatste 4 minuten mee.',
+      'Bak of stoom de vis 6–8 minuten.',
+      'Stamp aardappel en doperwten met boter en munt. Houd de portie van Julièn apart en maak de rest af met citroen, peper en zout.'],
+    baby: { stappen: ['Neem de puree vóór het zout. De velletjes van doperwten kunnen draderig zijn, dus prak goed of wrijf even door een zeef.',
+      'Controleer de vis op graten en prak hem erdoor.'], allergenen: ['vis', 'melk (boter)'] } },
+
+  { id: 'kip-pinda', naam: 'Kip met pindasaus, sperziebonen en rijst', tijd: 30, soort: 'Kip',
+    ingr: [I(300, 'g', 'kipfilet', 'kipfilet'), I(400, 'g', 'sperziebonen', 'sperziebonen'), I(3, 'el', 'pindakaas (100% pinda)', 'pindakaas'),
+      I(100, 'ml', 'kokosmelk', 'kokosmelk'), I(1, 'el', 'ketjap'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(1, '', 'aardappel (voor Julièn)', 'aardappel', true), I(1, '', 'teen knoflook')],
+    stappen: ['Kook rijst en sperziebonen. Kook voor Julièn een aardappel mee.',
+      'Bak de kip in blokjes gaar. Verwarm pindakaas met kokosmelk en een scheut water tot een saus.',
+      'Schep wat saus apart voor Julièn. Roer knoflook en ketjap door de rest.'],
+    baby: { stappen: ['Neem de saus vóór de ketjap: ketjap is zout en bevat tarwe.',
+      'Snijd de kip fijn en prak met de aardappel, sperziebonen en een lepel pindasaus.',
+      'Is pinda nog nieuw voor Julièn? Geef het dan overdag, als je hem een paar uur kunt observeren.'], allergenen: ['pinda'] } },
+
+  { id: 'bloemkoolcurry', naam: 'Bloemkool-linzencurry', tijd: 35, soort: 'Vega',
+    ingr: [I(0.5, '', 'bloemkool', 'bloemkool'), I(150, 'g', 'rode linzen', 'linzen'), I(1, '', 'ui', 'ui'), I(200, 'ml', 'kokosmelk', 'kokosmelk'),
+      I(400, 'g', 'tomatenblokjes', 'passata'), I(1, 'el', 'milde currypasta'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(null, '', 'koriander, zout')],
+    stappen: ['Kook de rijst. Fruit de ui, voeg bloemkoolroosjes, linzen, tomaat, kokosmelk en 300 ml water toe.',
+      'Laat 20 minuten zacht koken tot de linzen zacht zijn. Schep de portie van Julièn eruit.',
+      'Roer currypasta en zout door de rest en laat nog 5 minuten koken.'],
+    baby: { stappen: ['Neem de portie vóór currypasta en zout.',
+      'Prak de bloemkool en linzen tot een grove puree. Geen rijst: geef er een stukje gekookte aardappel of pompoen bij.'], allergenen: [] } },
+];
+const RMAP = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+
+/* ---------- Tussendoortjes voor Julièn (graanvrij) ---------- */
+const SNACKS = [
+  { naam: 'Peer-appelmoes', keys: ['peer', 'appel'], tekst: 'Schil een peer en een appel, stoof ze in stukjes 10 minuten in een bodem water en prak ze grof. Er hoeft geen suiker bij.' },
+  { naam: 'Banaan-avocadoprak', keys: ['banaan', 'avocado'], tekst: 'Prak een halve rijpe banaan met een kwart avocado. Dat levert goede vetten en vraagt geen kookwerk.' },
+  { naam: 'Yoghurt met geplette blauwe bessen', keys: ['blauwe-bessen', 'yoghurt'], tekst: 'Druk de bessen plat, want hele bessen zijn te glad en te rond. Roer ze door een paar lepels volle yoghurt zonder suiker.' },
+  { naam: 'Zachte mangoreepjes', keys: ['mango'], tekst: 'Snijd rijpe mango in dikke reepjes die Julièn zelf vast kan houden. Een ribbelmesje maakt ze minder glibberig.' },
+  { naam: 'Gestoomde peerpartjes', keys: ['peer'], tekst: 'Stoom partjes peer 5 minuten tot ze zacht maar niet papperig zijn. Ze zijn een goed vingervoedsel.' },
+  { naam: 'Aardbeien met yoghurt', keys: ['aardbeien', 'yoghurt'], tekst: 'Prak een paar aardbeien door volle yoghurt. Geef het de eerste keer los van andere nieuwe producten.' },
+  { naam: 'Zoete-aardappelfrietjes', keys: ['zoete-aardappel'], tekst: 'Snijd zoete aardappel in dikke staafjes en rooster ze 25 minuten op 200 °C met een klein beetje olie, zonder zout.' },
+  { naam: 'Banaan-eipannenkoekjes zonder meel', keys: ['banaan', 'eieren'], tekst: 'Prak 1 banaan met 1 ei en bak er kleine pannenkoekjes van. Laat ze helemaal gaar worden. Ze zijn graanvrij.' },
+  { naam: 'Kikkererwtenprak met wortelstaafjes', keys: ['kikkererwten', 'wortel'], tekst: 'Prak kikkererwten zonder velletjes met een scheutje olijfolie en water, zonder zout. Geef er zacht gekookte wortelstaafjes bij om te dippen.' },
+  { naam: 'Appelpartjes uit de oven', keys: ['appel'], tekst: 'Rooster dikke appelpartjes met een snufje kaneel 20 minuten op 180 °C tot ze zacht zijn.' },
+];
+
+const DEFAULT_OFFERS = ['pompoen', 'broccoli', 'zalm', 'kippendij', 'peer', 'champignons', 'gehakt', 'eieren', 'courgette', 'blauwe-bessen', 'kikkererwten', 'zoete-aardappel'];
+const STORES = {
+  'Albert Heijn': 'https://www.ah.nl/bonus', 'Jumbo': 'https://www.jumbo.com/aanbiedingen/nu', 'Lidl': 'https://www.lidl.nl',
+  'Aldi': 'https://www.aldi.nl', 'Plus': 'https://www.plus.nl/aanbiedingen', 'Dirk': 'https://www.dirk.nl/aanbiedingen', 'Anders': ''
+};
+
+/* ---------- Toestand ---------- */
+let offers = store.get('offers', { winkel: 'Albert Heijn', items: DEFAULT_OFFERS, voorbeeld: true });
+let personen = store.get('personen', 2);
+let geboorte = store.get('geboorte', '2026-01-28');
+let overrides = store.get('overrides', {});
+let tab = store.get('tab', 'vandaag');
+if (['vandaag', 'week', 'aanbiedingen', 'julien'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
+
+/* ---------- Datum ---------- */
+const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
+const MONTHS = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = new Date(); today.setHours(12, 0, 0, 0);
+const dayIdx = (today.getDay() + 6) % 7;
+const monday = new Date(today); monday.setDate(today.getDate() - dayIdx);
+const weekDates = [...Array(7)].map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
+const fmtDate = d => `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+
+/* ---------- Planning ---------- */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const offerSet = () => new Set(offers.items);
+const hits = r => { const s = offerSet(); return [...new Set(r.ingr.filter(i => i.k && s.has(i.k)).map(i => i.k))]; };
+const isNitrate = r => r.ingr.some(i => NITRATE.has(i.k));
+
+function basePlan() {
+  const seed = Number(iso(monday).replace(/-/g, '')) + offers.items.join().length * 7919;
+  const rand = rng(seed);
+  const scored = RECIPES.map(r => ({ r, s: hits(r).length * 10 + rand() * 7 }));
+  const plan = [];
+  let nitr = 0, fish = 0;
+  for (let d = 0; d < 7; d++) {
+    const prev = plan[d - 1];
+    let best = null, bestS = -1e9;
+    for (const { r, s } of scored) {
+      if (plan.includes(r)) continue;
+      if (isNitrate(r) && (nitr >= 2 || (prev && isNitrate(prev)))) continue;
+      let adj = s;
+      if (prev && prev.soort === r.soort) adj -= 9;
+      if (r.soort === 'Vis' && fish >= 2) adj -= 12;
+      if (d >= 4 && fish === 0 && r.soort === 'Vis') adj += 8;
+      if (adj > bestS) { bestS = adj; best = r; }
+    }
+    plan.push(best);
+    if (isNitrate(best)) nitr++;
+    if (best.soort === 'Vis') fish++;
+  }
+  return plan;
+}
+function plan() {
+  const b = basePlan();
+  return b.map((r, i) => RMAP[overrides[iso(weekDates[i])]] || r);
+}
+function ranked() {
+  return RECIPES.map(r => ({ r, s: hits(r).length })).sort((a, b) => b.s - a.s || a.r.naam.localeCompare(b.r.naam)).map(x => x.r);
+}
+function swap(i) {
+  const p = plan();
+  const cur = p[i];
+  const others = new Set(p.filter((_, j) => j !== i).map(r => r.id));
+  const list = ranked().filter(r => !others.has(r.id));
+  const next = list[(list.indexOf(cur) + 1) % list.length];
+  overrides[iso(weekDates[i])] = next.id;
+  // oude overrides opruimen
+  const keep = new Set(weekDates.map(iso));
+  for (const k of Object.keys(overrides)) if (!keep.has(k)) delete overrides[k];
+  store.set('overrides', overrides);
+  render();
+}
+function resetDay(i) { delete overrides[iso(weekDates[i])]; store.set('overrides', overrides); render(); }
+
+/* ---------- Julièn ---------- */
+function ageMonths() {
+  const b = new Date(geboorte + 'T12:00:00');
+  if (isNaN(b)) return null;
+  let m = (today.getFullYear() - b.getFullYear()) * 12 + today.getMonth() - b.getMonth();
+  if (today.getDate() < b.getDate()) m--;
+  return Math.max(0, m);
+}
+function texture(m) {
+  if (m == null) return '';
+  if (m < 7) return 'Glad gepureerd en daarna steeds fijner geprakt.';
+  if (m < 10) return 'Grof geprakt met zachte stukjes erin. Geef ook zacht vingervoedsel zoals gestoomde groentestaafjes, omeletreepjes en zachte fruitpartjes.';
+  if (m < 12) return 'Kleine zachte stukjes. Julièn kan steeds meer met de pot mee-eten, zonder zout.';
+  return 'Julièn kan mee-eten met de pot. Gebruik nog steeds weinig zout.';
+}
+
+/* ---------- Hulp ---------- */
+function fmtQ(i) {
+  if (i.q == null) return '';
+  let v = i.baby ? i.q : i.q * personen / 2;
+  if (i.u === 'g' || i.u === 'ml') v = v >= 100 ? Math.round(v / 10) * 10 : Math.round(v / 5) * 5;
+  else v = Math.round(v * 2) / 2;
+  const whole = Math.floor(v), half = v - whole >= .5;
+  const n = (whole ? whole : '') + (half ? '½' : '') || '0';
+  return `${n}${i.u ? ' ' + i.u : ''}`;
+}
+const offerTag = (k, big) => `<span class="tag${big ? ' big' : ''}">${esc(CAT[k].n)}</span>`;
+
+function recipeBody(r, dayIndex) {
+  const s = offerSet();
+  const m = ageMonths();
+  const grains = [...new Set(r.ingr.filter(i => GRAIN.has(i.k)).map(i => CAT[i.k].n.toLowerCase()))];
+  return `
+    <div class="section-title">Ingrediënten</div>
+    <ul class="ingr">${r.ingr.map(i => `
+      <li><span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}</span>
+        ${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}
+        ${GRAIN.has(i.k) ? '<span class="pill no">niet voor Julièn</span>' : ''}
+        ${i.baby ? '<span class="pill baby">Julièn</span>' : ''}</li>`).join('')}
+    </ul>
+    <div class="section-title">Bereiding</div>
+    <ol class="steps">${r.stappen.map(t => `<li>${esc(t)}</li>`).join('')}</ol>
+    <section class="babybox">
+      <h3>Voor Julièn ${m != null ? `<span class="pill baby">${m} mnd</span>` : ''}</h3>
+      <ol class="steps" style="margin-top:10px">${r.baby.stappen.map(t => `<li>${esc(t)}</li>`).join('')}</ol>
+      <div class="pills">
+        <span class="pill ok">Zonder zout en suiker</span>
+        ${grains.length ? `<span class="pill no">Zonder ${esc(grains.join(' en '))}</span>` : '<span class="pill ok">Hele gerecht is graanvrij</span>'}
+        ${r.baby.allergenen.map(a => `<span class="pill warn">Allergeen: ${esc(a)}</span>`).join('')}
+      </div>
+      ${isNitrate(r) ? '<div class="warnline">Dit gerecht bevat nitraatrijke groente. Geef dat Julièn hooguit 1 à 2 keer per week, warm het niet op en combineer het niet met vis op dezelfde dag.</div>' : ''}
+      <p class="note muted">Structuur: ${esc(texture(m))}</p>
+    </section>
+    ${dayIndex != null ? `<div class="actions">
+      <button class="btn" data-swap="${dayIndex}">Ander recept</button>
+      ${overrides[iso(weekDates[dayIndex])] ? `<button class="btn" data-reset="${dayIndex}">Terug naar voorstel</button>` : ''}
+    </div>` : ''}`;
+}
+
+/* ---------- Weergaven ---------- */
+function viewToday() {
+  const p = plan();
+  const r = p[dayIdx];
+  const h = hits(r);
+  const snack = pickSnack();
+  return `
+  ${offers.voorbeeld ? `<div class="banner"><strong>Voorbeeldaanbiedingen.</strong> Zet onder <a href="#aanbiedingen" data-go="aanbiedingen">Aanbiedingen</a> aan wat er deze week in de folder staat. De recepten passen zich direct aan.</div>` : ''}
+  <article class="card hero">
+    <div class="eyebrow">Recept van vandaag · ${esc(r.soort)}</div>
+    <h2>${esc(r.naam)}</h2>
+    <div class="meta"><span>${r.tijd} minuten</span><span>${personen} volwassene${personen > 1 ? 'n' : ''} + Julièn</span><span>${esc(offers.winkel)}</span></div>
+    <div class="hits">${h.length ? h.map(k => offerTag(k, true)).join('') : '<span class="muted small">Geen producten uit de aanbieding. Dit recept is gekozen voor de afwisseling.</span>'}</div>
+    ${recipeBody(r, dayIdx)}
+  </article>
+  <article class="card snack">
+    <div class="eyebrow" style="grid-column:1/-1">Tussendoortje voor Julièn</div>
+    <h3>${esc(snack.naam)}</h3>
+    <div class="hits" style="margin:0">${snack.keys.filter(k => offerSet().has(k)).map(k => offerTag(k)).join('')}</div>
+    <p>${esc(snack.tekst)}</p>
+  </article>`;
+}
+function pickSnack() {
+  const s = offerSet();
+  const scored = SNACKS.map((x, i) => ({ x, s: x.keys.filter(k => s.has(k)).length, i }));
+  const max = Math.max(...scored.map(o => o.s));
+  const pool = scored.filter(o => o.s === max && max > 0);
+  const list = pool.length ? pool : scored;
+  const n = Math.floor(today.getTime() / 864e5);
+  return list[n % list.length].x;
+}
+
+function viewWeek() {
+  const p = plan();
+  const checked = store.get('lijst-' + iso(monday), {});
+  const s = offerSet();
+  // boodschappenlijst
+  const agg = new Map(), pantry = new Set();
+  p.forEach(r => r.ingr.forEach(i => {
+    if (i.q == null || i.u === 'el' || i.u === 'tl') { pantry.add(i.n); return; }
+    const key = i.n + '|' + i.u;
+    const cur = agg.get(key) || { ...i, q: 0, baby: i.baby };
+    cur.q += i.q; agg.set(key, cur);
+  }));
+  const items = [...agg.values()].sort((a, b) => (s.has(b.k) - s.has(a.k)) || a.n.localeCompare(b.n));
+  return `
+  <section>
+    <div class="eyebrow">Week van ${monday.getDate()} ${MONTHS[monday.getMonth()]}</div>
+    <h2 style="font-size:28px;margin-top:4px">Weekmenu</h2>
+    <p class="muted small" style="margin:6px 0 0">Gerechten met de meeste aanbiedingen staan bovenaan de selectie. Er komt niet twee dagen achter elkaar hetzelfde soort gerecht, minstens één keer vis en hooguit twee keer nitraatrijke groente.</p>
+  </section>
+  <div style="display:grid;gap:10px">
+  ${p.map((r, i) => `
+    <details class="day${i === dayIdx ? ' today' : ''}"${i === dayIdx ? ' open' : ''}>
+      <summary>
+        <span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]}</span>
+        <span class="rname">${esc(r.naam)}</span>
+        <span class="badges">${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
+      </summary>
+      <div class="inner">
+        <div class="meta" style="margin-top:0"><span>${r.tijd} minuten</span><span>${esc(r.soort)}</span></div>
+        ${recipeBody(r, i)}
+      </div>
+    </details>`).join('')}
+  </div>
+  <article class="card shop">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="font-size:22px">Boodschappenlijst</h2>
+      <div class="field"><label for="personen">Volwassenen</label>
+        <input type="number" id="personen" min="1" max="8" value="${personen}" style="width:80px"></div>
+    </div>
+    <p class="muted small" style="margin:6px 0 12px">Voor de hele week, met een portie voor Julièn inbegrepen. Producten in de aanbieding staan bovenaan.</p>
+    <ul class="ingr">${items.map(i => { const id = 'c-' + i.n + i.u; return `
+      <li class="${checked[id] ? 'done' : ''}"><label><input type="checkbox" data-check="${esc(id)}" ${checked[id] ? 'checked' : ''}>
+        <span class="qty">${esc(fmtQ(i))}</span><span class="iname">${esc(i.n)}</span>
+        ${i.k && s.has(i.k) ? '<span class="tag">Aanbieding</span>' : ''}</label></li>`; }).join('')}
+    </ul>
+    <div class="section-title" style="font-size:15px">Voorraadkast (even checken)</div>
+    <p class="small muted" style="margin:0">${esc([...pantry].sort().join(' · '))}</p>
+  </article>`;
+}
+
+function viewOffers() {
+  const s = offerSet();
+  const cats = [...new Set(CATALOG.map(c => c[2]))];
+  return `
+  <section>
+    <div class="eyebrow">Deze week</div>
+    <h2 style="font-size:28px;margin-top:4px">Wat is er in de aanbieding?</h2>
+    <p class="muted small" style="margin:6px 0 0">Tik de producten aan die deze week in de folder staan, of plak de tekst van de online folder hieronder.</p>
+  </section>
+  ${offers.voorbeeld ? '<div class="banner"><strong>Dit is een voorbeeldweek.</strong> Pas de selectie aan naar de folder van jouw supermarkt.</div>' : ''}
+  <article class="card">
+    <div class="row">
+      <div class="field"><label for="winkel">Supermarkt</label>
+        <select id="winkel">${Object.keys(STORES).map(w => `<option ${w === offers.winkel ? 'selected' : ''}>${w}</option>`).join('')}</select></div>
+      ${STORES[offers.winkel] ? `<a class="btn" href="${STORES[offers.winkel]}" target="_blank" rel="noopener" style="text-decoration:none">Open de folder van ${esc(offers.winkel)}</a>` : ''}
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label for="plak">Folder-tekst plakken</label>
+      <textarea id="plak" placeholder="Bijvoorbeeld: Zalmfilet 2e halve prijs, Broccoli 1+1 gratis, Hollandse peren 1 kilo…"></textarea>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn primary" id="zoek">Producten herkennen</button>
+      <button class="btn" id="wis">Alles uitzetten</button>
+      <button class="btn" id="voorbeeld">Voorbeeldweek terugzetten</button>
+    </div>
+    <div class="found" id="found" aria-live="polite"></div>
+  </article>
+  <article class="card">
+    <div class="row" style="justify-content:space-between;align-items:baseline">
+      <h2 style="font-size:20px">Producten</h2><span class="tag big">${s.size} in actie</span>
+    </div>
+    ${cats.map(c => `
+      <div class="cat"><h3>${esc(c)}</h3>
+        <div class="chips">${CATALOG.filter(x => x[2] === c).map(([k, n]) => `
+          <button class="chip" data-offer="${k}" aria-pressed="${s.has(k)}">${esc(n)}${GRAIN.has(k) ? '<span class="grain">alleen volwassenen</span>' : ''}</button>`).join('')}
+        </div></div>`).join('')}
+  </article>`;
+}
+
+function viewBaby() {
+  const m = ageMonths();
+  const p = plan();
+  const nitr = p.filter(isNitrate).length;
+  return `
+  <article class="card">
+    <div class="profile">
+      <div class="avatar" aria-hidden="true">J</div>
+      <div>
+        <div class="eyebrow">Julièn</div>
+        <div class="age">${m != null ? m + ' maanden' : '–'}</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <div class="field"><label for="geboorte">Geboortedatum</label><input type="date" id="geboorte" value="${esc(geboorte)}"></div>
+    </div>
+    <p class="small muted" style="margin:8px 0 0">De leeftijd bepaalt het structuuradvies bij elk recept. Pas de geboortedatum aan als die niet klopt.</p>
+  </article>
+
+  <div class="rules">
+    <article class="card">
+      <h3 style="color:var(--no)">Mag niet</h3>
+      <ul>
+        <li><strong>Brood</strong>, ook niet als stukje korst</li>
+        <li><strong>Granen</strong>: pasta, rijst, couscous, havermout, bulgur, quinoa, maïs, crackers en koekjes</li>
+        <li>Ketjap, sojasaus en currypasta (vaak zout, soms tarwe)</li>
+        <li>Zout, bouillon en suiker</li>
+        <li>Honing (tot 1 jaar)</li>
+        <li>Hele noten en hele druiven of bessen</li>
+        <li>Rauw of zacht ei, rauwe vis en rauw vlees</li>
+      </ul>
+    </article>
+    <article class="card">
+      <h3 style="color:var(--green)">Graanvrije vervangers</h3>
+      <ul>
+        <li>Aardappel en zoete aardappel</li>
+        <li>Pastinaak, pompoen en wortel</li>
+        <li>Linzen, kikkererwten en bonen, goed geprakt</li>
+        <li>Goed gestold ei en omeletreepjes</li>
+        <li>Banaan-eipannenkoekjes zonder meel</li>
+        <li>Avocado en rijp fruit</li>
+      </ul>
+    </article>
+  </div>
+
+  <article class="card">
+    <h3>Nitraatrijke groente deze week</h3>
+    <p class="small muted" style="margin:6px 0 0">Spinazie en rode biet, maar ook andijvie, boerenkool, venkel en selderij. Hooguit 1 à 2 keer per week, niet opwarmen en niet op dezelfde dag als vis.</p>
+    <div class="meter" aria-label="${nitr} van 2">${[0, 1].map(i => `<span class="${i < nitr ? 'on' : ''}"></span>`).join('')}</div>
+    <p class="small" style="margin:6px 0 0">${nitr} van maximaal 2 in het weekmenu${nitr > 2 ? '. Dat is te veel, wissel een gerecht.' : '.'}</p>
+  </article>
+
+  <article class="card">
+    <h3>Structuur bij ${m != null ? m + ' maanden' : 'deze leeftijd'}</h3>
+    <p style="margin:6px 0 0">${esc(texture(m))}</p>
+    <p class="small muted" style="margin:10px 0 0">Richtlijn voor de warme maaltijd: vooral groente en aardappel, met 1 à 2 eetlepels vlees, vis, ei of peulvruchten. Introduceer nieuwe allergenen zoals ei, pinda en vis één voor één en overdag.</p>
+  </article>
+
+  <p class="disclaimer">De adviezen zijn algemeen en gebaseerd op de Nederlandse richtlijnen voor babyvoeding. Het advies van het consultatiebureau, de huisarts of de diëtist van Julièn gaat altijd voor, zeker omdat hij geen brood en granen mag.</p>`;
+}
+
+/* ---------- Render en events ---------- */
+const app = document.getElementById('app');
+document.getElementById('today-label').textContent = fmtDate(today);
+
+function render() {
+  const views = { vandaag: viewToday, week: viewWeek, aanbiedingen: viewOffers, julien: viewBaby };
+  app.innerHTML = `<div class="view">${views[tab]()}</div>`;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+}
+function go(t) { tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
+function saveOffers(items, extra = {}) { offers = { ...offers, items, voorbeeld: false, ...extra }; store.set('offers', offers); }
+
+document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) go(b.dataset.tab); });
+
+app.addEventListener('click', e => {
+  const t = e.target.closest('[data-go],[data-swap],[data-reset],[data-offer],#zoek,#wis,#voorbeeld');
+  if (!t) return;
+  if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
+  else if (t.dataset.swap) swap(+t.dataset.swap);
+  else if (t.dataset.reset) resetDay(+t.dataset.reset);
+  else if (t.dataset.offer) {
+    const s = offerSet(); s.has(t.dataset.offer) ? s.delete(t.dataset.offer) : s.add(t.dataset.offer);
+    saveOffers([...s]); render();
+  } else if (t.id === 'zoek') {
+    const text = document.getElementById('plak').value.toLowerCase();
+    const found = CATALOG.filter(([k, n, c, syn]) => syn.some(w =>
+      new RegExp('(^|[^a-zà-ÿ])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-zà-ÿ])').test(text))).map(c => c[0]);
+    const s = offerSet(); found.forEach(k => s.add(k));
+    saveOffers([...s]); render();
+    document.getElementById('found').textContent = found.length
+      ? 'Herkend en aangezet: ' + found.map(k => CAT[k].n).join(', ') + '.'
+      : 'Geen bekende producten gevonden. Zet ze hieronder met de hand aan.';
+  } else if (t.id === 'wis') { saveOffers([]); render(); }
+  else if (t.id === 'voorbeeld') { offers = { winkel: offers.winkel, items: DEFAULT_OFFERS, voorbeeld: true }; store.set('offers', offers); render(); }
+});
+
+app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'winkel') { offers = { ...offers, winkel: t.value }; store.set('offers', offers); render(); }
+  else if (t.id === 'personen') { personen = Math.min(8, Math.max(1, +t.value || 2)); store.set('personen', personen); render(); }
+  else if (t.id === 'geboorte') { geboorte = t.value; store.set('geboorte', geboorte); render(); }
+  else if (t.dataset.check) {
+    const k = 'lijst-' + iso(monday); const c = store.get(k, {});
+    c[t.dataset.check] = t.checked; store.set(k, c);
+    t.closest('li').classList.toggle('done', t.checked);
+  }
+});
+
+render();
+</script>
+<!--wrapper-->
+</body>
+</html>
+<!--/wrapper-->
