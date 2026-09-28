@@ -110,3 +110,32 @@ def test_dedupe_leaves_genuinely_different_invoices_alone(session):
 
     assert removed == 0
     assert session.query(Invoice).count() == 2
+
+
+def test_top_suppliers_without_amount_reports_biggest_group_first(session, capsys):
+    session.add_all([
+        make_invoice(email_message_id="<msg-1>", supplier_name="Tenways", amount_cents=None),
+        make_invoice(email_message_id="<msg-2>", supplier_name="Tenways", amount_cents=None),
+        make_invoice(email_message_id="<msg-3>", supplier_name="Tenways", amount_cents=None),
+        make_invoice(email_message_id="<msg-4>", supplier_name="ENRA", amount_cents=None),
+        # Not counted: has an amount, or already matched.
+        make_invoice(email_message_id="<msg-5>", supplier_name="Tenways", amount_cents=1000),
+        make_invoice(email_message_id="<msg-6>", supplier_name="Tenways", amount_cents=None, status=MatchStatus.MATCHED),
+    ])
+    session.commit()
+
+    reparse_invoices._print_top_suppliers_without_amount(session)
+
+    out = capsys.readouterr().out
+    assert "Tenways" in out
+    assert "ENRA" in out
+    assert out.index("Tenways") < out.index("ENRA")  # Tenways (3) reported before ENRA (1)
+
+
+def test_top_suppliers_without_amount_silent_when_none(session, capsys):
+    session.add(make_invoice(email_message_id="<msg-1>", amount_cents=1000))
+    session.commit()
+
+    reparse_invoices._print_top_suppliers_without_amount(session)
+
+    assert capsys.readouterr().out == ""

@@ -108,6 +108,25 @@ def _dedupe_invoices(session) -> int:
     return removed
 
 
+def _print_top_suppliers_without_amount(session, top_n: int = 10) -> None:
+    """Which leveranciers are worth fixing next -- amount-less documents
+    grouped by supplier, biggest group first. A supplier only shows up here
+    because its PDF layout isn't recognised yet, so this is the punch list
+    for the next round of extraction fixes."""
+    open_invoices = session.query(Invoice).filter(
+        Invoice.status == MatchStatus.UNMATCHED, Invoice.amount_cents.is_(None)
+    )
+    counts: dict[str, int] = defaultdict(int)
+    for (supplier_name,) in open_invoices.with_entities(Invoice.supplier_name):
+        counts[supplier_name or "(onbekend)"] += 1
+
+    if not counts:
+        return
+    print(f"\nTop {top_n} leveranciers met openstaande documenten zonder bedrag:")
+    for supplier_name, count in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:top_n]:
+        print(f"  {count:>4}  {supplier_name}")
+
+
 def main() -> None:
     session = SessionLocal()
 
@@ -133,6 +152,8 @@ def main() -> None:
     print(f"\nNog openstaand (niet genegeerd/gekoppeld): {nog_open} van {total - removed}")
     print(f"Daarvan zonder bedrag:        {zonder_bedrag}")
     print(f"Daarvan zonder factuurnummer: {zonder_nummer}")
+
+    _print_top_suppliers_without_amount(session)
 
 
 if __name__ == "__main__":

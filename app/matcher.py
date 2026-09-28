@@ -69,15 +69,48 @@ def _same_direction_invoices(transaction: Transaction, invoices: list[Invoice]) 
     return [inv for inv in invoices if (inv.direction or Direction.OUTGOING.value) == direction]
 
 
+# Rabobank truncates the counterparty name field, so the same supplier's
+# name arrives in several different clipped/abbreviated forms across
+# transactions (real example: "Tenways Technovation Europe B.",
+# "Tenways Technovation Europe BV", "Tenways Technovation Europe Ke...") --
+# stripping a trailing legal-entity suffix (and a trailing partial/truncated
+# word) before comparing lets these all read as the same company.
+_LEGAL_ENTITY_SUFFIXES = {
+    "bv", "b.v", "nv", "n.v", "ltd", "inc", "gmbh", "corp", "co", "llc", "plc",
+}
+
+
+def _normalize_company_name(name: str) -> str:
+    name = (name or "").strip().lower().rstrip(".")
+    tokens = [t.rstrip(".") for t in name.split()]
+    if tokens and tokens[-1] in _LEGAL_ENTITY_SUFFIXES:
+        tokens.pop()
+    return " ".join(tokens)
+
+
 def _name_similarity(a: str, b: str) -> float:
-    a, b = (a or "").lower().strip(), (b or "").lower().strip()
-    if not a or not b:
+    a_norm, b_norm = _normalize_company_name(a), _normalize_company_name(b)
+    if not a_norm or not b_norm:
         return 0.0
-    if a == b:
+    if a_norm == b_norm:
         return 1.0
-    if a in b or b in a:
-        return 0.8
-    if set(a.split()) & set(b.split()):
+    if a_norm in b_norm or b_norm in a_norm:
+        return 0.9
+
+    a_tokens, b_tokens = a_norm.split(), b_norm.split()
+    common_prefix = 0
+    for token_a, token_b in zip(a_tokens, b_tokens):
+        if token_a != token_b:
+            break
+        common_prefix += 1
+    shorter_len = min(len(a_tokens), len(b_tokens))
+    if shorter_len >= 2 and common_prefix >= shorter_len - 1:
+        # Every token but (at most) one trailing one matches -- the mismatch
+        # is almost certainly a truncated/abbreviated tail, not a different
+        # company.
+        return 0.9
+
+    if set(a_tokens) & set(b_tokens):
         return 0.5
     return 0.0
 

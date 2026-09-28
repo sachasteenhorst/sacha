@@ -39,13 +39,23 @@ def _format_amount(cents: int) -> str:
     return f"€{abs(cents) / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _recurring_counterparties(transactions: list[Transaction]) -> set[str]:
-    counts: dict[str, int] = {}
-    for t in transactions:
-        key = (t.counterparty_name or "").strip().lower()
-        if key:
-            counts[key] = counts.get(key, 0) + 1
-    return {key for key, count in counts.items() if count >= 2}
+def _recurring_transaction_ids(transactions: list[Transaction]) -> set[int]:
+    """Which transactions have at least one OTHER transaction from what's
+    plausibly the same supplier. Uses _name_similarity rather than exact (or
+    even normalized-exact) string equality: Rabobank truncates the
+    counterparty field differently per transaction, so the same supplier's
+    name can show up as several distinct clipped variants (real example:
+    "Tenways Technovation Europe B.", "... BV", "... Ke...") that never
+    match each other by plain string equality, even after stripping a legal
+    suffix off just one of them."""
+    named = [t for t in transactions if (t.counterparty_name or "").strip()]
+    recurring: set[int] = set()
+    for i, t in enumerate(named):
+        for other in named[i + 1:]:
+            if _name_similarity(t.counterparty_name, other.counterparty_name) >= 0.9:
+                recurring.add(t.id)
+                recurring.add(other.id)
+    return recurring
 
 
 def _mailto_for_request(transaction: Transaction) -> str:
@@ -63,7 +73,7 @@ def _mailto_for_request(transaction: Transaction) -> str:
 
 
 def _suggest_for_unmatched(
-    transaction: Transaction, same_direction_invoices: list[Invoice], recurring_counterparties: set[str]
+    transaction: Transaction, same_direction_invoices: list[Invoice], recurring_transaction_ids: set[int]
 ) -> tuple[str, str, Invoice | None, str | None]:
     direction = _transaction_direction(transaction)
     candidates = [
@@ -74,8 +84,7 @@ def _suggest_for_unmatched(
     if candidates:
         return "controleren", "Mogelijke factuur (zelfde leverancier, bedrag wijkt af) -- controleren", candidates[0], None
 
-    key = (transaction.counterparty_name or "").strip().lower()
-    if key and key in recurring_counterparties:
+    if transaction.id in recurring_transaction_ids:
         return "regel", "Terugkerende betaling zonder factuur -- regel maken", None, None
 
     if abs(transaction.amount_cents) <= SMALL_EXPENSE_CENTS:
@@ -90,7 +99,7 @@ def build_vraagposten(session: Session) -> list[Vraagpost]:
     open_invoices = list(
         session.scalars(select(Invoice).where(Invoice.status.in_([MatchStatus.UNMATCHED, MatchStatus.SUGGESTED])))
     )
-    recurring = _recurring_counterparties(unmatched)
+    recurring = _recurring_transaction_ids(unmatched)
     today = date.today()
 
     items: list[Vraagpost] = []

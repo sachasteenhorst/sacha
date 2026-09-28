@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.matcher import run_matching
+from app.matcher import _name_similarity, run_matching
 from app.models import Invoice, MatchStatus, Transaction
 
 
@@ -48,6 +48,27 @@ def make_invoice(**kwargs):
     )
     defaults.update(kwargs)
     return Invoice(**defaults)
+
+
+# -- Name similarity: Rabobank truncates the counterparty name field, so
+# the same supplier's name arrives clipped/abbreviated differently across
+# transactions (real example: three Tenways variants). --
+
+def test_name_similarity_treats_truncated_legal_suffix_variants_as_same_company():
+    a = "Tenways Technovation Europe B."
+    b = "Tenways Technovation Europe BV"
+    c = "Tenways Technovation Europe Ke..."
+    assert _name_similarity(a, b) >= 0.9
+    assert _name_similarity(a, c) >= 0.9
+    assert _name_similarity(b, c) >= 0.9
+
+
+def test_name_similarity_matches_known_supplier_name_against_full_legal_name():
+    assert _name_similarity("Tenways Technovation Europe B.V.", "Tenways") >= 0.9
+
+
+def test_name_similarity_unrelated_companies_score_low():
+    assert _name_similarity("Tenways Technovation Europe BV", "Kruitbosch") == 0.0
 
 
 def test_reference_match_is_auto_confirmed(session):

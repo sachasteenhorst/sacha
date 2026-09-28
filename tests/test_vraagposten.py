@@ -79,6 +79,21 @@ def test_recurring_counterparty_suggests_regel(session):
     assert all(i.kind == "regel" for i in items)
 
 
+def test_truncated_name_variants_are_recognized_as_one_recurring_supplier(session):
+    # Real production case: Rabobank truncates the counterparty field
+    # differently across transactions from the same supplier.
+    tx1 = make_transaction(external_ref="tx-1", counterparty_name="Tenways Technovation Europe B.", booking_date=date(2026, 1, 1))
+    tx2 = make_transaction(external_ref="tx-2", counterparty_name="Tenways Technovation Europe BV", booking_date=date(2026, 2, 1))
+    tx3 = make_transaction(external_ref="tx-3", counterparty_name="Tenways Technovation Europe Ke...", booking_date=date(2026, 3, 1))
+    session.add_all([tx1, tx2, tx3])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert len(items) == 3
+    assert all(i.kind == "regel" for i in items)
+
+
 def test_small_one_off_amount_suggests_bon(session):
     tx = make_transaction(counterparty_name="Parkeergarage", amount_cents=-1500)
     session.add(tx)
