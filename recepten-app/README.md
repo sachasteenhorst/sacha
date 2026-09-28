@@ -9,6 +9,25 @@ je een aparte babyportie maakt.
 Open `index.html` in een browser. Er is geen server of installatie nodig.
 Alles wat je instelt, blijft bewaard in de browser.
 
+## Op je telefoon installeren
+
+De app is een installeerbare web-app (PWA): `manifest.webmanifest` geeft naam,
+kleuren en iconen, `sw.js` zorgt dat de app ook zonder bereik opent. De app
+staat online via GitHub Pages:
+
+**https://sachasteenhorst.github.io/sacha/recepten-app/**
+
+(eenmalig aanzetten: GitHub → Settings → Pages → *Deploy from a branch* →
+branch `claude/intelligent-wozniak-1j5v2q`, map `/ (root)` → Save.)
+
+- **iPhone (Safari):** open de link → deelknop → *Zet op beginscherm*.
+- **Android (Chrome):** open de link → menu ⋮ → *App installeren* (of de
+  melding onderin).
+
+In de geïnstalleerde app worden boodschappenlijst, kaarten, gezin en filters op
+het apparaat zelf bewaard. De folders komen uit `aanbiedingen.json`; de
+wekelijkse taak werkt dat bestand bij en pusht het naar deze branch.
+
 ## Onderdelen
 
 - **Vandaag**: het recept van de dag, de producten uit de aanbieding die erin

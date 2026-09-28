@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1E7A4C">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Keuken">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!--/wrapper-->
 <title>Aanbiedingskeuken</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1507,7 +1515,7 @@ function viewCards() {
   </section>
   <div class="syncnote ${kaartenSync === 'account' ? '' : 'local'}"><span class="dot"></span>${kaartenSync === 'account'
     ? 'Veilig bewaard bij je account. Alleen jij ziet je kaarten, ook als je de app deelt.'
-    : 'Alleen op dit apparaat bewaard. Open de app via claude.ai om je kaarten bij je account te bewaren.'}</div>
+    : 'Bewaard op dit apparaat.'}</div>
   ${kaarten.length ? `<div class="cards">${kaarten.map((c, i) => `
     <button class="lcard" data-card="${esc(c.id)}" style="--sc:${(STORE_LOOK[cardStore(c.type)] || [0, 'var(--green)'])[1]}">
       <span class="chead">${storeLogo(cardStore(c.type), 'lg')}<span class="cname">${esc(c.naam || c.type)}</span></span>
@@ -1757,6 +1765,11 @@ app.addEventListener('submit', e => {
 });
 
 render();
+
+/* Als geïnstalleerde app (buiten claude.ai): offline-laag registreren */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !(window.claude && window.claude.use)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 
 /* Folders laden: eerst uit de gedeelde opslag van de app, anders uit aanbiedingen.json ernaast */
 function setLive(d) {

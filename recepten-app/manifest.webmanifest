@@ -1,0 +1,17 @@
+{
+  "name": "Aanbiedingskeuken",
+  "short_name": "Keuken",
+  "description": "Elke dag een gezond recept op basis van de aanbiedingen in jouw supermarkten, met boodschappenlijst, spaarkaarten en babyporties.",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F6F0",
+  "theme_color": "#1E7A4C",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
