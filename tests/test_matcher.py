@@ -117,6 +117,79 @@ def test_reference_match_rejects_difference_beyond_discount_tolerance(session):
     assert inv.status == MatchStatus.UNMATCHED
 
 
+def test_reference_match_ignores_unrelated_invoices_with_coincidental_short_number_substrings(session):
+    # Exact production bug: an incasso description containing the incassant
+    # ID/date text "306228C" and "21-08-2026" also happens to contain "28"
+    # and "08" as literal substrings. Two entirely unrelated Mbps invoices
+    # were numbered "28" and "08", so a naive "in haystack" substring check
+    # pulled them into the match too, breaking the amount total (and so
+    # matching nothing at all).
+    tx = make_transaction(
+        description="Kenmerk machtiging / incassant ID: 306228C NL75ZZZ050142120000 VFNL002280953",
+        counterparty_name="Kruitbosch",
+        booking_date=date(2026, 8, 21),
+        amount_cents=-58766,
+    )
+    kruitbosch_inv = make_invoice(invoice_number="VFNL002280953", amount_cents=59010, supplier_name="Kruitbosch")
+    mbps_inv1 = make_invoice(invoice_number="28", amount_cents=5885, supplier_name="Mbps", email_message_id="<msg-mbps-1>")
+    mbps_inv2 = make_invoice(invoice_number="08", amount_cents=2771, supplier_name="Mbps", email_message_id="<msg-mbps-2>")
+    session.add_all([tx, kruitbosch_inv, mbps_inv1, mbps_inv2])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert {m.invoice_id for m in tx.matches} == {kruitbosch_inv.id}
+    assert tx.matches[0].discount_cents == 244
+    assert mbps_inv1.status == MatchStatus.UNMATCHED
+    assert mbps_inv2.status == MatchStatus.UNMATCHED
+
+
+def test_reference_match_falls_back_to_all_suppliers_when_same_supplier_total_is_wrong(session):
+    # Two invoice numbers turn up in the text; only the pair together (one
+    # from a different supplier) adds up to the transaction amount, so the
+    # same-supplier-only attempt must fail over to the full set.
+    tx = make_transaction(
+        description="Betaling ref ABCD1234 en WXYZ9999",
+        counterparty_name="Kruitbosch",
+        amount_cents=-(10000 + 500),
+    )
+    same_supplier_inv = make_invoice(invoice_number="ABCD1234", amount_cents=10000, supplier_name="Kruitbosch", email_message_id="<msg-a>")
+    other_supplier_inv = make_invoice(invoice_number="WXYZ9999", amount_cents=500, supplier_name="Bpost", email_message_id="<msg-b>")
+    session.add_all([tx, same_supplier_inv, other_supplier_inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert {m.invoice_id for m in tx.matches} == {same_supplier_inv.id, other_supplier_inv.id}
+
+
+def test_reference_match_two_comma_separated_vfnl_numbers_with_unrelated_short_number_nearby(session):
+    # Combines the multi-invoice-in-one-incasso case with a coincidental
+    # short-number substring elsewhere in the same description.
+    tx = make_transaction(
+        description="Incasso factuur VFNL002275878,VFNL002277060 dd 12-2026",
+        counterparty_name="Kruitbosch",
+        amount_cents=-(12345 + 6000),
+    )
+    inv1 = make_invoice(invoice_number="VFNL002275878", amount_cents=12345, supplier_name="Kruitbosch", email_message_id="<msg-1>")
+    inv2 = make_invoice(invoice_number="VFNL002277060", amount_cents=6000, supplier_name="Kruitbosch", email_message_id="<msg-2>")
+    unrelated_short = make_invoice(invoice_number="12", amount_cents=999999, supplier_name="Onbekend", email_message_id="<msg-3>")
+    session.add_all([tx, inv1, inv2, unrelated_short])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert {m.invoice_id for m in tx.matches} == {inv1.id, inv2.id}
+    assert unrelated_short.status == MatchStatus.UNMATCHED
+
+
 def test_amount_date_match_is_suggested_not_confirmed(session):
     tx = make_transaction(description="Overboeking", booking_date=date(2024, 3, 15))
     inv = make_invoice(invoice_number="", invoice_date=date(2024, 3, 1))

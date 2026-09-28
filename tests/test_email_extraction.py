@@ -122,6 +122,20 @@ def test_invoice_number_empty_when_nothing_found():
     assert _extract_invoice_number(text) == ""
 
 
+def test_invoice_number_rejects_short_token_like_internet_speed():
+    # Real production bug: an Mbps invoice's "Nummer: 28" got accepted as
+    # the invoice number -- far too short/generic to trust, and exactly the
+    # kind of value that later turns up as a coincidental substring
+    # elsewhere (matcher.py enforces the same minimum length).
+    text = "Mbps\nNummer: 28\nAbonnement internet"
+    assert _extract_invoice_number(text) == ""
+
+
+def test_invoice_number_prefers_longer_number_over_short_one():
+    text = "Nummer: 08\nFactuurnummer: 2026-445566"
+    assert _extract_invoice_number(text) == "2026-445566"
+
+
 def test_invoice_number_prefers_filename_over_incassant_id():
     # Real Kruitbosch failure mode: PDF-layout column collapse puts the
     # incassant ID right after the "Factuurnummer" label instead of the real

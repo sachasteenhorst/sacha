@@ -28,6 +28,7 @@ you want to resolve before your accountant asks about them.
 from __future__ import annotations
 
 import itertools
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -90,28 +91,65 @@ def _discount_tolerance_cents(amount_cents: int) -> int:
     return min(percent_based, settings.payment_discount_max_cents)
 
 
+# A factuurnummer shorter than this, or with no digit in it at all, is too
+# generic to trust for reference matching -- real production example:
+# separate Mbps invoices numbered "28" and "08" happened to also appear as
+# plain substrings inside an unrelated incasso's date/ID text ("21-08-2026",
+# "306228C"), producing a false combined match. Never used for extraction
+# either (see email_client.py's _first_valid_number_token).
+MIN_REFERENCEABLE_INVOICE_NUMBER_LENGTH = 4
+
+
+def _is_referenceable_invoice_number(invoice_number: str) -> bool:
+    return (
+        bool(invoice_number)
+        and len(invoice_number) >= MIN_REFERENCEABLE_INVOICE_NUMBER_LENGTH
+        and any(ch.isdigit() for ch in invoice_number)
+    )
+
+
+def _invoice_number_in_text(invoice_number: str, haystack: str) -> bool:
+    """Whole-token match only -- "28" must never match inside "306228C" or
+    "21-08-2026" just because the digits happen to appear in sequence."""
+    pattern = r"(?<![A-Za-z0-9])" + re.escape(invoice_number) + r"(?![A-Za-z0-9])"
+    return re.search(pattern, haystack, re.IGNORECASE) is not None
+
+
 def _reference_match_group(transaction: Transaction, invoices: list[Invoice]) -> tuple[list[Invoice], int] | None:
-    """Every open invoice whose number is found verbatim in the transaction's
-    description/reference -- a single incasso payment often settles several
-    invoices at once (e.g. Kruitbosch/Accell direct debits listing multiple
-    comma-separated invoice numbers). Accepts the combined total being
-    slightly less than the sum invoiced (see _discount_tolerance_cents);
-    returns the matched invoices plus the (positive = discount) difference."""
-    haystack = f"{transaction.description} {transaction.reference}".lower()
+    """Every open invoice whose number is found verbatim (as a whole token)
+    in the transaction's description/reference -- a single incasso payment
+    often settles several invoices at once (e.g. Kruitbosch/Accell direct
+    debits listing multiple comma-separated invoice numbers). Accepts the
+    combined total being slightly less than the sum invoiced (see
+    _discount_tolerance_cents); returns the matched invoices plus the
+    (positive = discount) difference.
+
+    When several invoices' numbers all turn up in the text, invoices from
+    the same supplier as the transaction's counterparty are tried FIRST --
+    only falling back to the full set (all suppliers included) if that
+    narrower total doesn't add up either -- so an unrelated invoice whose
+    number coincidentally also appears in the text doesn't silently widen
+    (and break) an otherwise-correct match."""
+    haystack = f"{transaction.description} {transaction.reference}"
     matches = [
         invoice for invoice in invoices
         if invoice.amount_cents is not None
-        and invoice.invoice_number
-        and invoice.invoice_number.lower() in haystack
+        and _is_referenceable_invoice_number(invoice.invoice_number)
+        and _invoice_number_in_text(invoice.invoice_number, haystack)
     ]
     if not matches:
         return None
-    total = sum(invoice.amount_cents for invoice in matches)
-    diff = total - abs(transaction.amount_cents)  # positive = paid less than invoiced (discount)
-    tolerance = max(settings.match_amount_tolerance_cents, _discount_tolerance_cents(total))
-    if abs(diff) > tolerance:
-        return None
-    return matches, diff
+
+    same_supplier = [inv for inv in matches if _name_similarity(transaction.counterparty_name, inv.supplier_name) > 0]
+    for pool in (same_supplier, matches):
+        if not pool:
+            continue
+        total = sum(invoice.amount_cents for invoice in pool)
+        diff = total - abs(transaction.amount_cents)  # positive = paid less than invoiced (discount)
+        tolerance = max(settings.match_amount_tolerance_cents, _discount_tolerance_cents(total))
+        if abs(diff) <= tolerance:
+            return pool, diff
+    return None
 
 
 def _date_diff(transaction: Transaction, invoice: Invoice) -> int:

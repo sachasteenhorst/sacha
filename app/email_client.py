@@ -241,12 +241,23 @@ def _parse_amount_to_cents(text: str, direction: str = Direction.OUTGOING.value)
     return max(candidates) if candidates else None
 
 
+# Real invoice numbers are practically always longer than this -- a short
+# token like "28" or "08" is almost certainly something else entirely (seen
+# in production: an internet-speed figure on an Mbps invoice), and a short
+# number is also exactly the kind of thing that coincidentally turns up
+# as a substring inside an unrelated bank description later (matcher.py's
+# reference matching enforces the same floor for the same reason).
+MIN_INVOICE_NUMBER_LENGTH = 4
+
+
 def _first_valid_number_token(window: str) -> str:
     for token_match in INVOICE_NUMBER_TOKEN_RE.finditer(window):
         token = token_match.group(0).strip(".-/")
         if not token or token.lower() in INVOICE_NUMBER_STOPWORDS:
             continue
         if not any(ch.isdigit() for ch in token):
+            continue
+        if len(token) < MIN_INVOICE_NUMBER_LENGTH:
             continue
         return token
     return ""
