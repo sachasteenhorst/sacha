@@ -1,31 +1,44 @@
 """Matches bank transactions to invoices.
 
-Two matching methods, in order of confidence:
+Matching methods, tried in order for each transaction:
 
 1. REFERENCE (high confidence, auto-confirmed): the invoice number is found
-   verbatim in the transaction's description/reference text. This is
-   reliable enough to mark both sides as MATCHED without manual review.
+   verbatim in the transaction's description/reference text.
 
-2. AMOUNT_DATE (medium confidence, needs confirmation): the absolute amount
-   matches within tolerance and the invoice date falls within the
-   configured window before/after the booking date. Recorded as a
-   SUGGESTED match for you to confirm or reject in the dashboard, since
-   amount coincidences do happen (e.g. two invoices for the same round
-   amount).
+2. AMOUNT_DATE (medium confidence, needs confirmation): the amount matches
+   within tolerance and the invoice date falls within the configured
+   window, scored against how well the counterparty name matches the
+   supplier name when more than one candidate ties on amount+date.
+
+3. Combination match (medium confidence, needs confirmation): when no
+   single document matches, a SET of open documents from the same
+   supplier within the date window whose amounts sum exactly to the
+   transaction -- e.g. one bank payment settling several invoices at once.
+
+A transaction only ever matches documents moving money the same direction
+it does (a deposit never matches a bill you owe, and vice versa). A
+SPECIFICATION document (e.g. Accell's "Specificatie automatische incasso")
+that matches also pulls in every other open invoice it mentions by number,
+all sharing one Match.group_id so the dashboard can show -- and
+confirm/reject -- them as one payment covering several documents.
 
 Anything left over stays UNMATCHED -- these are exactly the "vraagposten"
 you want to resolve before your accountant asks about them.
 """
 from __future__ import annotations
 
+import itertools
+import uuid
 from dataclasses import dataclass
-from datetime import timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Invoice, Match, MatchMethod, MatchStatus, Transaction
+from app.models import Direction, DocumentKind, Invoice, Match, MatchMethod, MatchStatus, Transaction
+
+MAX_COMBINATION_CANDIDATES = 12
+MAX_COMBINATION_SIZE = 5
 
 
 @dataclass
@@ -44,6 +57,28 @@ def _candidate_invoices(session: Session) -> list[Invoice]:
 def _candidate_transactions(session: Session) -> list[Transaction]:
     stmt = select(Transaction).where(Transaction.status.in_([MatchStatus.UNMATCHED, MatchStatus.SUGGESTED]))
     return list(session.scalars(stmt))
+
+
+def _transaction_direction(transaction: Transaction) -> str:
+    return Direction.INCOMING.value if transaction.amount_cents > 0 else Direction.OUTGOING.value
+
+
+def _same_direction_invoices(transaction: Transaction, invoices: list[Invoice]) -> list[Invoice]:
+    direction = _transaction_direction(transaction)
+    return [inv for inv in invoices if (inv.direction or Direction.OUTGOING.value) == direction]
+
+
+def _name_similarity(a: str, b: str) -> float:
+    a, b = (a or "").lower().strip(), (b or "").lower().strip()
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if a in b or b in a:
+        return 0.8
+    if set(a.split()) & set(b.split()):
+        return 0.5
+    return 0.0
 
 
 def _reference_match(transaction: Transaction, invoices: list[Invoice]) -> Invoice | None:
@@ -68,7 +103,7 @@ def _date_diff(transaction: Transaction, invoice: Invoice) -> int:
 
 def _amount_date_match(transaction: Transaction, invoices: list[Invoice]) -> Invoice | None:
     best: Invoice | None = None
-    best_diff = None
+    best_score: float | None = None
     for invoice in invoices:
         if invoice.amount_cents is None:
             continue
@@ -80,15 +115,83 @@ def _amount_date_match(transaction: Transaction, invoices: list[Invoice]) -> Inv
                 continue
         else:
             diff = settings.match_date_window_days  # no date on invoice: accept but as a weak candidate
-        if best_diff is None or diff < best_diff:
-            best, best_diff = invoice, diff
+        # A good counterparty-name match can outweigh a slightly worse date
+        # difference when several candidates tie on amount alone.
+        score = diff - (_name_similarity(transaction.counterparty_name, invoice.supplier_name) * 5)
+        if best_score is None or score < best_score:
+            best, best_score = invoice, score
     return best
+
+
+def _combination_match(transaction: Transaction, invoices: list[Invoice]) -> list[Invoice] | None:
+    """No single document matches -- look for a SET of open documents from
+    the same supplier, within the date window, whose amounts sum exactly to
+    the transaction. Bounded in both candidate pool size and combination
+    size so it can't blow up on a supplier with many open invoices."""
+    target = abs(transaction.amount_cents)
+    pool = [
+        inv for inv in invoices
+        if inv.amount_cents is not None
+        and _name_similarity(transaction.counterparty_name, inv.supplier_name) > 0
+        and _date_diff(transaction, inv) <= settings.match_date_window_days
+    ]
+    if len(pool) < 2:
+        return None
+    pool.sort(key=lambda inv: _date_diff(transaction, inv))
+    pool = pool[:MAX_COMBINATION_CANDIDATES]
+
+    for size in range(2, min(MAX_COMBINATION_SIZE, len(pool)) + 1):
+        for combo in itertools.combinations(pool, size):
+            if sum(inv.amount_cents for inv in combo) == target:
+                return list(combo)
+    return None
+
+
+def _linked_specification_invoices(spec_invoice: Invoice, all_candidates: list[Invoice]) -> list[Invoice]:
+    """A SPECIFICATION document (e.g. Accell's incasso specification) lists
+    invoice numbers settled by the same payment -- pull in any of those
+    that exist as their own open Invoice record too, so confirming the
+    specification also resolves them."""
+    if spec_invoice.document_kind != DocumentKind.SPECIFICATION.value:
+        return []
+    referenced = {n.lower() for n in (spec_invoice.referenced_invoice_numbers or [])}
+    if not referenced:
+        return []
+    return [
+        inv for inv in all_candidates
+        if inv.id != spec_invoice.id and inv.invoice_number and inv.invoice_number.lower() in referenced
+    ]
 
 
 def _clear_unconfirmed_suggestions(session: Session, transaction: Transaction) -> None:
     for match in list(transaction.matches):
         if not match.confirmed:
+            match.invoice.status = MatchStatus.UNMATCHED
             session.delete(match)
+
+
+def _create_match_group(
+    session: Session,
+    transaction: Transaction,
+    invoices: list[Invoice],
+    method: MatchMethod,
+    confidence: str,
+    confirmed: bool,
+) -> None:
+    group_id = uuid.uuid4().hex[:12]
+    for invoice in invoices:
+        session.add(
+            Match(
+                transaction_id=transaction.id,
+                invoice_id=invoice.id,
+                method=method,
+                confidence=confidence,
+                confirmed=confirmed,
+                group_id=group_id,
+            )
+        )
+        invoice.status = MatchStatus.MATCHED if confirmed else MatchStatus.SUGGESTED
+    transaction.status = MatchStatus.MATCHED if confirmed else MatchStatus.SUGGESTED
 
 
 def run_matching(session: Session) -> MatchingSummary:
@@ -100,37 +203,29 @@ def run_matching(session: Session) -> MatchingSummary:
     transactions = _candidate_transactions(session)
 
     for transaction in transactions:
-        invoices = _candidate_invoices(session)  # re-fetch: earlier iterations may have consumed one
+        all_candidates = _candidate_invoices(session)  # re-fetch: earlier iterations may have consumed one
+        invoices = _same_direction_invoices(transaction, all_candidates)
 
         reference_hit = _reference_match(transaction, invoices)
         if reference_hit is not None:
             _clear_unconfirmed_suggestions(session, transaction)
-            match = Match(
-                transaction_id=transaction.id,
-                invoice_id=reference_hit.id,
-                method=MatchMethod.REFERENCE,
-                confidence="high",
-                confirmed=True,
-            )
-            session.add(match)
-            transaction.status = MatchStatus.MATCHED
-            reference_hit.status = MatchStatus.MATCHED
+            linked = _linked_specification_invoices(reference_hit, all_candidates)
+            _create_match_group(session, transaction, [reference_hit, *linked], MatchMethod.REFERENCE, "high", confirmed=True)
             summary.auto_matched += 1
             continue
 
         amount_date_hit = _amount_date_match(transaction, invoices)
         if amount_date_hit is not None:
             _clear_unconfirmed_suggestions(session, transaction)
-            match = Match(
-                transaction_id=transaction.id,
-                invoice_id=amount_date_hit.id,
-                method=MatchMethod.AMOUNT_DATE,
-                confidence="medium",
-                confirmed=False,
-            )
-            session.add(match)
-            transaction.status = MatchStatus.SUGGESTED
-            amount_date_hit.status = MatchStatus.SUGGESTED
+            linked = _linked_specification_invoices(amount_date_hit, all_candidates)
+            _create_match_group(session, transaction, [amount_date_hit, *linked], MatchMethod.AMOUNT_DATE, "medium", confirmed=False)
+            summary.suggested += 1
+            continue
+
+        combo_hit = _combination_match(transaction, invoices)
+        if combo_hit is not None:
+            _clear_unconfirmed_suggestions(session, transaction)
+            _create_match_group(session, transaction, combo_hit, MatchMethod.AMOUNT_DATE, "medium", confirmed=False)
             summary.suggested += 1
             continue
 

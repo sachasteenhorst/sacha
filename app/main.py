@@ -1,23 +1,25 @@
 """FastAPI dashboard: shows which bank transactions do/don't have a
-matching invoice yet, and lets you confirm suggested matches, create
-manual matches, or mark a transaction/invoice as "no invoice needed"
-(e.g. bank costs, private expense).
+matching invoice (or receipt) yet, lets you confirm suggested matches
+(possibly covering several documents at once), upload bank statement
+exports, and mark items resolved in ways other than a straight match.
 """
 from __future__ import annotations
 
 import os
 import re
 import secrets
+import uuid
+from collections import OrderedDict
 from datetime import date, datetime
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
@@ -26,7 +28,7 @@ from app.db import get_session, init_db
 from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE
 from app.models import Invoice, Match, MatchMethod, MatchStatus, Transaction
 from app.scheduler import start_scheduler
-from app.sync import run_sync
+from app.sync import import_bank_file, run_sync
 
 app = FastAPI(title="Fietsenwinkel administratie")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -92,8 +94,8 @@ templates.env.filters["dutch_date"] = _dutch_date
 templates.env.filters["method_label"] = _method_label
 
 
-def _dashboard_redirect(q: str = "", maand: str = "") -> RedirectResponse:
-    params = {k: v for k, v in {"q": q, "maand": maand}.items() if v}
+def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:
+    params = {k: v for k, v in {"q": q, "maand": maand, **extra}.items() if v}
     url = "/dashboard" + (f"?{urlencode(params)}" if params else "")
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -152,17 +154,32 @@ def _filter_invoices(items: list[Invoice], q: str, maand: str) -> list[Invoice]:
     return out
 
 
-def _filter_matches(items: list[Match], q: str, maand: str) -> list[Match]:
-    out = items
-    if maand:
-        out = [m for m in out if _transaction_month(m.transaction) == maand or _invoice_month(m.invoice) == maand]
-    if q:
-        out = [
-            m for m in out
-            if _matches_query(q, texts=[m.transaction.counterparty_name, m.transaction.description, m.transaction.reference], amount_cents=m.transaction.amount_cents)
-            or _matches_query(q, texts=[m.invoice.supplier_name, m.invoice.email_subject, m.invoice.invoice_number], amount_cents=m.invoice.amount_cents)
-        ]
-    return out
+def _match_matches_query(m: Match, q: str) -> bool:
+    return _matches_query(
+        q,
+        texts=[m.transaction.counterparty_name, m.transaction.description, m.transaction.reference],
+        amount_cents=m.transaction.amount_cents,
+    ) or _matches_query(
+        q, texts=[m.invoice.supplier_name, m.invoice.email_subject, m.invoice.invoice_number], amount_cents=m.invoice.amount_cents
+    )
+
+
+def _group_and_filter_matches(matches: list[Match], q: str, maand: str) -> list[list[Match]]:
+    """Groups Match rows by group_id (one payment can cover several
+    documents) and keeps a group if ANY of its rows satisfy the filter --
+    a group is one decision, so it's never shown half-filtered."""
+    grouped: "OrderedDict[str, list[Match]]" = OrderedDict()
+    for m in matches:
+        grouped.setdefault(m.group_id, []).append(m)
+
+    result = []
+    for group in grouped.values():
+        if maand and not any(_transaction_month(m.transaction) == maand or _invoice_month(m.invoice) == maand for m in group):
+            continue
+        if q and not any(_match_matches_query(m, q) for m in group):
+            continue
+        result.append(group)
+    return result
 
 
 def _dot_status(configured: bool, error: str | None) -> str:
@@ -182,6 +199,9 @@ def index(user: str = Depends(require_auth)):
 def dashboard(request: Request, user: str = Depends(require_auth), session: Session = Depends(get_session)):
     q = request.query_params.get("q", "").strip()
     maand = request.query_params.get("maand", "").strip()
+    upload_new = request.query_params.get("upload_new")
+    upload_skipped = request.query_params.get("upload_skipped")
+    upload_error = request.query_params.get("upload_error")
 
     unmatched_transactions_all = list(
         session.scalars(
@@ -203,7 +223,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             select(Match)
             .where(Match.confirmed.is_(True))
             .order_by(Match.created_at.desc())
-            .limit(25)
+            .limit(60)
         )
     )
 
@@ -227,7 +247,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     matched_this_month = sum(1 for dt in confirmed_dates if dt.year == now_ams.year and dt.month == now_ams.month)
 
     counters = {
-        "te_controleren": len(suggested_matches_all),
+        "te_controleren": len({m.group_id for m in suggested_matches_all}),
         "betalingen_zonder_factuur": len(unmatched_transactions_all),
         "facturen_niet_betaald": len(unmatched_invoices_all),
         "gekoppeld_deze_maand": matched_this_month,
@@ -239,20 +259,26 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         settings.graph_tenant_id and settings.graph_client_id and settings.graph_mailbox
         and os.path.exists(REFRESH_TOKEN_FILE)
     )
-    bank_configured = bool(
-        settings.basecone_client_id and settings.basecone_client_secret and settings.basecone_administration_id
-    )
     last = sync_state.get()
     last_sync_label = None
     if last.ran_at:
         last_sync_label = last.ran_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
 
+    transaction_count = session.scalar(select(func.count()).select_from(Transaction)) or 0
+    last_upload_at = session.scalar(select(func.max(Transaction.created_at)))
+    latest_statement_date = session.scalar(select(func.max(Transaction.booking_date)))
+    bank_error = last.basecone_error if settings.basecone_enabled else None
+
     status_bar = {
         "email_status": _dot_status(email_configured, last.email_error),
-        "bank_status": _dot_status(bank_configured, last.basecone_error),
         "last_sync_label": last_sync_label,
         "last_sync_new_invoices": last.new_invoices,
-        "last_sync_new_transactions": last.new_transactions,
+        "bank_status": _dot_status(transaction_count > 0, bank_error),
+        "last_upload_label": (
+            last_upload_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
+            if last_upload_at else None
+        ),
+        "latest_statement_label": _dutch_date(latest_statement_date) if latest_statement_date else None,
     }
 
     # -- Month dropdown options --
@@ -274,13 +300,16 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "request": request,
             "q": q,
             "maand": maand,
+            "upload_new": upload_new,
+            "upload_skipped": upload_skipped,
+            "upload_error": upload_error,
             "month_options": month_options,
             "counters": counters,
             "status_bar": status_bar,
             "unmatched_transactions": _filter_transactions(unmatched_transactions_all, q, maand),
             "unmatched_invoices": _filter_invoices(unmatched_invoices_all, q, maand),
-            "suggested_matches": _filter_matches(suggested_matches_all, q, maand),
-            "recent_matches": _filter_matches(recent_matches_all, q, maand),
+            "suggested_groups": _group_and_filter_matches(suggested_matches_all, q, maand),
+            "recent_groups": _group_and_filter_matches(recent_matches_all, q, maand),
             "all_open_invoices": all_open_invoices,
             "oldest_unmatched_days": oldest_unmatched_days,
         },
@@ -318,39 +347,56 @@ def trigger_sync(
     return _dashboard_redirect(q, maand)
 
 
-@app.post("/matches/{match_id}/confirm")
-def confirm_match(
-    match_id: int,
+@app.post("/bank/upload")
+async def upload_bank_file(
+    file: UploadFile,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
     session: Session = Depends(get_session),
 ):
-    match = session.get(Match, match_id)
-    if match is None:
+    content = await file.read()
+    result = import_bank_file(session, file.filename or "upload", content)
+    if result.errors:
+        return _dashboard_redirect(q, maand, upload_error=result.errors[0])
+    return _dashboard_redirect(q, maand, upload_new=str(result.new_transactions), upload_skipped=str(result.skipped))
+
+
+@app.post("/match-groups/{group_id}/confirm")
+def confirm_match_group(
+    group_id: str,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    matches = list(session.scalars(select(Match).where(Match.group_id == group_id)))
+    if not matches:
         raise HTTPException(404, "Match niet gevonden")
-    match.confirmed = True
-    match.transaction.status = MatchStatus.MATCHED
-    match.invoice.status = MatchStatus.MATCHED
+    for m in matches:
+        m.confirmed = True
+        m.invoice.status = MatchStatus.MATCHED
+    matches[0].transaction.status = MatchStatus.MATCHED
     session.commit()
     return _dashboard_redirect(q, maand)
 
 
-@app.post("/matches/{match_id}/reject")
-def reject_match(
-    match_id: int,
+@app.post("/match-groups/{group_id}/reject")
+def reject_match_group(
+    group_id: str,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
     session: Session = Depends(get_session),
 ):
-    match = session.get(Match, match_id)
-    if match is None:
+    matches = list(session.scalars(select(Match).where(Match.group_id == group_id)))
+    if not matches:
         raise HTTPException(404, "Match niet gevonden")
-    transaction, invoice = match.transaction, match.invoice
-    session.delete(match)
+    transaction = matches[0].transaction
+    for m in matches:
+        m.invoice.status = MatchStatus.UNMATCHED
+        session.delete(m)
     transaction.status = MatchStatus.UNMATCHED
-    invoice.status = MatchStatus.UNMATCHED
     session.commit()
     return _dashboard_redirect(q, maand)
 
@@ -358,31 +404,38 @@ def reject_match(
 @app.post("/transactions/{transaction_id}/match")
 def manual_match(
     transaction_id: int,
-    invoice_id: int = Form(...),
+    invoice_ids: list[int] = Form(...),
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
     session: Session = Depends(get_session),
 ):
     transaction = session.get(Transaction, transaction_id)
-    invoice = session.get(Invoice, invoice_id)
-    if transaction is None or invoice is None:
-        raise HTTPException(404, "Transactie of factuur niet gevonden")
+    if transaction is None:
+        raise HTTPException(404, "Transactie niet gevonden")
+    invoices = [session.get(Invoice, invoice_id) for invoice_id in invoice_ids]
+    if not invoices or any(inv is None for inv in invoices):
+        raise HTTPException(404, "Factuur niet gevonden")
 
     for m in list(transaction.matches):
         if not m.confirmed:
+            m.invoice.status = MatchStatus.UNMATCHED
             session.delete(m)
 
-    match = Match(
-        transaction_id=transaction.id,
-        invoice_id=invoice.id,
-        method=MatchMethod.MANUAL,
-        confidence="high",
-        confirmed=True,
-    )
-    session.add(match)
+    group_id = uuid.uuid4().hex[:12]
+    for invoice in invoices:
+        session.add(
+            Match(
+                transaction_id=transaction.id,
+                invoice_id=invoice.id,
+                method=MatchMethod.MANUAL,
+                confidence="high",
+                confirmed=True,
+                group_id=group_id,
+            )
+        )
+        invoice.status = MatchStatus.MATCHED
     transaction.status = MatchStatus.MATCHED
-    invoice.status = MatchStatus.MATCHED
     session.commit()
     return _dashboard_redirect(q, maand)
 
@@ -399,6 +452,22 @@ def ignore_transaction(
     if transaction is None:
         raise HTTPException(404, "Transactie niet gevonden")
     transaction.status = MatchStatus.IGNORED
+    session.commit()
+    return _dashboard_redirect(q, maand)
+
+
+@app.post("/transactions/{transaction_id}/receipt-in-basecone")
+def receipt_in_basecone(
+    transaction_id: int,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    transaction = session.get(Transaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(404, "Transactie niet gevonden")
+    transaction.status = MatchStatus.RECEIPT_ELSEWHERE
     session.commit()
     return _dashboard_redirect(q, maand)
 

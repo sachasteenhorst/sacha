@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
-"""Re-extracts invoice_number/invoice_date/amount_cents/supplier_name for
-every invoice already in the database, straight from its stored PDF
-(pdf_path). Doesn't touch status or matches -- run this after improving
-the parsing rules in app/email_client.py so existing invoices benefit
-without needing a fresh mail sync.
+"""Re-extracts invoice_number/invoice_date/amount_cents/supplier_name,
+richting (direction) and documentsoort (document_kind) for every invoice
+already in the database, straight from its stored PDF (pdf_path). Run this
+after improving the parsing rules in app/email_client.py so existing
+invoices benefit without needing a fresh mail sync.
+
+Never touches a document you (or the matcher) already made a real decision
+about -- MATCHED, manually IGNORED, SUGGESTED or RECEIPT_ELSEWHERE stay
+exactly as they are. A document still sitting as UNMATCHED and newly
+recognised as "other" (general terms, a bank-account change notice, an
+amount-less packing slip, ...) gets set to IGNORED, since that's the
+classification this script exists to (re)apply -- not a status you set by
+hand.
 """
 import os
 import sys
@@ -14,7 +22,7 @@ import pdfplumber
 
 from app.db import SessionLocal
 from app.email_client import _extract_fields
-from app.models import Invoice
+from app.models import DocumentKind, Invoice, MatchStatus
 
 
 def main() -> None:
@@ -26,6 +34,7 @@ def main() -> None:
     updated = 0
     missing_pdf = 0
     unreadable = 0
+    newly_other = 0
 
     for inv in invoices:
         if not inv.pdf_path or not os.path.isfile(inv.pdf_path):
@@ -40,28 +49,41 @@ def main() -> None:
             unreadable += 1
             continue
 
-        fields = _extract_fields(text, inv.email_from)
+        fields = _extract_fields(text, inv.email_from, "", inv.email_subject, inv.attachment_filename)
         inv.extracted_text = text
         inv.invoice_number = fields["invoice_number"]
         inv.invoice_date = fields["invoice_date"]
         inv.amount_cents = fields["amount_cents"]
         inv.supplier_name = fields["supplier_name"]
+        inv.direction = fields["direction"]
+        inv.document_kind = fields["document_kind"]
+        inv.referenced_invoice_numbers = fields["referenced_invoice_numbers"]
+
+        if fields["document_kind"] == DocumentKind.OTHER.value and inv.status == MatchStatus.UNMATCHED:
+            inv.status = MatchStatus.IGNORED
+            newly_other += 1
+
         updated += 1
 
     session.commit()
 
-    zonder_bedrag = session.query(Invoice).filter(Invoice.amount_cents.is_(None)).count()
-    zonder_nummer = session.query(Invoice).filter(
+    open_invoices = session.query(Invoice).filter(Invoice.status == MatchStatus.UNMATCHED)
+    zonder_bedrag = open_invoices.filter(Invoice.amount_cents.is_(None)).count()
+    zonder_nummer = open_invoices.filter(
         (Invoice.invoice_number.is_(None)) | (Invoice.invoice_number == "")
     ).count()
+    nog_open = open_invoices.count()
 
     print(f"\n{updated} facturen bijgewerkt.")
     if missing_pdf:
         print(f"{missing_pdf} zonder vindbaar PDF-bestand (overgeslagen).")
     if unreadable:
         print(f"{unreadable} PDF's niet leesbaar (overgeslagen).")
-    print(f"\nNog zonder bedrag:        {zonder_bedrag} van {total}")
-    print(f"Nog zonder factuurnummer: {zonder_nummer} van {total}")
+    if newly_other:
+        print(f"{newly_other} herkend als geen factuur (algemene voorwaarden e.d.) en op genegeerd gezet.")
+    print(f"\nNog openstaand (niet genegeerd/gekoppeld): {nog_open} van {total}")
+    print(f"Daarvan zonder bedrag:        {zonder_bedrag}")
+    print(f"Daarvan zonder factuurnummer: {zonder_nummer}")
 
 
 if __name__ == "__main__":

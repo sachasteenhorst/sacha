@@ -27,6 +27,7 @@ import pdfplumber
 import requests
 
 from app.config import settings
+from app.models import Direction, DocumentKind
 
 INVOICE_DIR = "./data/invoices"
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
@@ -56,6 +57,15 @@ TOTAL_LABEL_PATTERNS = [
     r"eindtotaal",
     r"invoice\s*total",
     r"\btotal\b",
+]
+# For INCOMING documents (money paid onto the account, e.g. an ENRA
+# rekening-courant overzicht) the meaningful label is what's being paid
+# out to you, not a "total due" -- tried before the outgoing-style labels.
+INCOMING_LABEL_PATTERNS = [
+    r"te\s*storten(?:e)?(?:\s*bedrag)?",
+    r"gestort(?:e)?(?:\s*bedrag)?",
+    r"over\s*te\s*maken(?:\s*bedrag)?",
+    r"uit\s*te\s*keren(?:\s*bedrag)?",
 ]
 
 # -- Invoice number --
@@ -102,6 +112,31 @@ KNOWN_SUPPLIER_DOMAINS = {
     "giant-europe.com": "Giant",
 }
 
+# -- Document classification --
+# A document matching one of these is never proof of a payment -- it
+# shouldn't count as an open invoice waiting to be matched, regardless of
+# whether an amount happens to be found on the page.
+NON_INVOICE_RE = re.compile(
+    r"algemene\s*voorwaarden|general\s*terms|terms\s*(and|&)\s*conditions|\bgtc\b|"
+    r"wijziging.*bank.*rekening|change\s*(in|of)\s*(payment\s*)?bank\s*account|"
+    r"\bubo\b.{0,10}verklaring|privacy\s*(statement|policy|verklaring)",
+    re.IGNORECASE,
+)
+# A packing slip only counts as "not an invoice" when it also has no
+# amount -- some suppliers put pricing on theirs.
+PACKING_SLIP_RE = re.compile(r"pakbon|paklijst|packing\s*slip", re.IGNORECASE)
+# One document listing several invoices settled by a single bank payment
+# (e.g. Accell's "Specificatie automatische incasso").
+SPECIFICATION_RE = re.compile(
+    r"specificatie.{0,20}incasso|automatische\s*incasso.{0,20}specificatie", re.IGNORECASE
+)
+# A document that plausibly proves a purchase, for the stricter filter
+# applied to attachments from a mailbox that isn't invoice-dedicated (see
+# fetch_invoice_attachments).
+INVOICE_LIKE_RE = re.compile(
+    r"factuur|invoice|creditnota|credit\s*note|specificatie|rekening|\bnota\b", re.IGNORECASE
+)
+
 
 class GraphAuthError(RuntimeError):
     pass
@@ -125,6 +160,13 @@ class InvoiceAttachment:
     supplier_name: str = ""
     amount_cents: int | None = None
     currency: str = "EUR"
+    direction: str = Direction.OUTGOING.value
+    document_kind: str = DocumentKind.INVOICE.value
+    referenced_invoice_numbers: list = None
+
+    def __post_init__(self):
+        if self.referenced_invoice_numbers is None:
+            self.referenced_invoice_numbers = []
 
 
 def _parse_amount_literal(raw: str) -> int:
@@ -161,8 +203,11 @@ def _find_amount_near_label(text: str, label_pattern: str) -> int | None:
     return None
 
 
-def _parse_amount_to_cents(text: str) -> int | None:
-    for pattern in TOTAL_LABEL_PATTERNS:
+def _parse_amount_to_cents(text: str, direction: str = Direction.OUTGOING.value) -> int | None:
+    patterns = TOTAL_LABEL_PATTERNS
+    if direction == Direction.INCOMING.value:
+        patterns = INCOMING_LABEL_PATTERNS + TOTAL_LABEL_PATTERNS
+    for pattern in patterns:
         cents = _find_amount_near_label(text, pattern)
         if cents is not None:
             return cents
@@ -199,6 +244,51 @@ def _extract_invoice_number(text: str) -> str:
             if token:
                 return token
     return ""
+
+
+def _extract_all_invoice_numbers(text: str) -> list[str]:
+    """For a SPECIFICATION document: every invoice number mentioned, not
+    just the first (e.g. Accell's "Specificatie automatische incasso"
+    listing several invoices settled by one direct debit)."""
+    found: list[str] = []
+    for label_re in (INVOICE_NUMBER_STRONG_LABEL_RE, INVOICE_NUMBER_WEAK_LABEL_RE):
+        for m in label_re.finditer(text):
+            token = _first_valid_number_token(text[m.end(): m.end() + 60])
+            if token and token not in found:
+                found.append(token)
+    return found
+
+
+SUBJECT_INVOICE_REF_RE = re.compile(r"\(Ref[:\s]+([A-Za-z0-9/\-]+)\)", re.IGNORECASE)
+
+
+def _extract_invoice_number_from_subject(subject: str) -> str:
+    """Fallback when the PDF text yields nothing: some suppliers (Tenways)
+    put the invoice reference in the e-mail subject instead, e.g.
+    "... Invoice (Ref INV/2026/23162)"."""
+    m = SUBJECT_INVOICE_REF_RE.search(subject or "")
+    if m and any(ch.isdigit() for ch in m.group(1)):
+        return m.group(1)
+    return ""
+
+
+def _classify_document_kind(filename: str, subject: str, text: str, amount_cents: int | None) -> str:
+    haystack = f"{filename} {subject} {text[:1500]}"
+    if NON_INVOICE_RE.search(haystack):
+        return DocumentKind.OTHER.value
+    if SPECIFICATION_RE.search(haystack):
+        return DocumentKind.SPECIFICATION.value
+    if amount_cents is None and PACKING_SLIP_RE.search(haystack):
+        return DocumentKind.OTHER.value
+    return DocumentKind.INVOICE.value
+
+
+def _assign_direction(supplier_name: str) -> str:
+    name_lower = (supplier_name or "").lower()
+    for incoming_name in settings.incoming_supplier_names:
+        if incoming_name and (incoming_name in name_lower or name_lower in incoming_name):
+            return Direction.INCOMING.value
+    return Direction.OUTGOING.value
 
 
 def _base_domain(domain: str) -> str:
@@ -256,12 +346,25 @@ def _parse_invoice_date(text: str) -> date | None:
     return None
 
 
-def _extract_fields(text: str, address: str, display_name: str = "") -> dict:
+def _extract_fields(
+    text: str, address: str, display_name: str = "", subject: str = "", filename: str = ""
+) -> dict:
+    supplier_name = _derive_supplier_name(address, display_name)
+    direction = _assign_direction(supplier_name)
+    amount_cents = _parse_amount_to_cents(text, direction)
+    invoice_number = _extract_invoice_number(text) or _extract_invoice_number_from_subject(subject)
+    document_kind = _classify_document_kind(filename, subject, text, amount_cents)
+    referenced_invoice_numbers = (
+        _extract_all_invoice_numbers(text) if document_kind == DocumentKind.SPECIFICATION.value else []
+    )
     return {
-        "invoice_number": _extract_invoice_number(text),
+        "invoice_number": invoice_number,
         "invoice_date": _parse_invoice_date(text),
-        "amount_cents": _parse_amount_to_cents(text),
-        "supplier_name": _derive_supplier_name(address, display_name),
+        "amount_cents": amount_cents,
+        "supplier_name": supplier_name,
+        "direction": direction,
+        "document_kind": document_kind,
+        "referenced_invoice_numbers": referenced_invoice_numbers,
     }
 
 
@@ -355,21 +458,12 @@ def _graph_get(url: str, params: dict | None = None) -> dict:
     return response.json()
 
 
-def _list_messages_since(since: date) -> list[dict]:
-    if not settings.graph_mailbox:
-        raise GraphAuthError(
-            "GRAPH_MAILBOX is niet ingesteld -- dit is het mailadres van de "
-            "mailbox waar facturen binnenkomen."
-        )
-
+def _list_messages_since(mailbox: str, since: date) -> list[dict]:
     since_iso = f"{since.isoformat()}T00:00:00Z"
-    url = (
-        f"{GRAPH_BASE_URL}/users/{settings.graph_mailbox}/mailFolders/"
-        f"{settings.graph_mail_folder}/messages"
-    )
+    url = f"{GRAPH_BASE_URL}/users/{mailbox}/mailFolders/{settings.graph_mail_folder}/messages"
     params = {
         "$filter": f"receivedDateTime ge {since_iso} and hasAttachments eq true",
-        "$select": "id,subject,from,receivedDateTime,hasAttachments",
+        "$select": "id,internetMessageId,subject,from,receivedDateTime,hasAttachments",
         "$top": "50",
     }
 
@@ -382,8 +476,8 @@ def _list_messages_since(since: date) -> list[dict]:
     return messages
 
 
-def _list_pdf_attachments(message_id: str) -> list[dict]:
-    url = f"{GRAPH_BASE_URL}/users/{settings.graph_mailbox}/messages/{message_id}/attachments"
+def _list_pdf_attachments(mailbox: str, message_id: str) -> list[dict]:
+    url = f"{GRAPH_BASE_URL}/users/{mailbox}/messages/{message_id}/attachments"
     payload = _graph_get(url)
     attachments = []
     for att in payload.get("value", []):
@@ -396,49 +490,77 @@ def _list_pdf_attachments(message_id: str) -> list[dict]:
 def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
     os.makedirs(INVOICE_DIR, exist_ok=True)
 
+    mailboxes = settings.graph_mailboxes
+    if not mailboxes:
+        raise GraphAuthError(
+            "GRAPH_MAILBOX is niet ingesteld -- dit is het mailadres (of een "
+            "kommagescheiden lijst van mailadressen) waar facturen binnenkomen."
+        )
+
     results: list[InvoiceAttachment] = []
-    messages = _list_messages_since(since)
+    # The same e-mail can land in more than one configured mailbox (e.g. CC'd
+    # to both facturen@ and info@) -- dedup on the message's real
+    # Internet Message-ID + attachment filename within this run, on top of
+    # the DB-level uniqueness check the caller (sync.py) does across runs.
+    seen_keys: set[tuple[str, str]] = set()
 
-    for message in messages:
-        message_id = message["id"]
-        subject = message.get("subject", "")
-        from_info = (message.get("from") or {}).get("emailAddress", {})
-        from_addr = from_info.get("address", "") or ""
-        from_name = from_info.get("name", "") or ""
-        received_raw = message.get("receivedDateTime")
-        try:
-            received_at = datetime.fromisoformat(received_raw.replace("Z", "+00:00"))
-        except (TypeError, ValueError, AttributeError):
-            received_at = datetime.utcnow()
+    for mailbox_index, mailbox in enumerate(mailboxes):
+        # Only the first configured mailbox is treated as invoice-dedicated;
+        # any others (e.g. a general info@ inbox) get every PDF attachment
+        # checked against INVOICE_LIKE_RE first, so newsletters and other
+        # unrelated mail don't turn into fake "open invoices".
+        is_primary = mailbox_index == 0
 
-        for attachment in _list_pdf_attachments(message_id):
-            filename = attachment.get("name", "attachment.pdf")
-            safe_name = re.sub(r"[^A-Za-z0-9_.\-]", "_", filename)
-            pdf_path = os.path.join(INVOICE_DIR, f"{message_id}_{safe_name}")
-
-            with open(pdf_path, "wb") as fh:
-                fh.write(b64decode(attachment["contentBytes"]))
-
-            extracted_text = ""
+        for message in _list_messages_since(mailbox, since):
+            message_id = message["id"]
+            internet_message_id = message.get("internetMessageId") or message_id
+            subject = message.get("subject", "")
+            from_info = (message.get("from") or {}).get("emailAddress", {})
+            from_addr = from_info.get("address", "") or ""
+            from_name = from_info.get("name", "") or ""
+            received_raw = message.get("receivedDateTime")
             try:
-                with pdfplumber.open(pdf_path) as pdf:
-                    extracted_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-            except Exception:
-                # Corrupt/unreadable PDF -- keep the file, leave fields empty.
-                extracted_text = ""
+                received_at = datetime.fromisoformat(received_raw.replace("Z", "+00:00"))
+            except (TypeError, ValueError, AttributeError):
+                received_at = datetime.utcnow()
 
-            fields = _extract_fields(extracted_text, from_addr, from_name)
-            results.append(
-                InvoiceAttachment(
-                    email_message_id=message_id,
-                    attachment_filename=filename,
-                    email_subject=subject,
-                    email_from=from_addr,
-                    received_at=received_at,
-                    pdf_path=pdf_path,
-                    extracted_text=extracted_text,
-                    **fields,
+            for attachment in _list_pdf_attachments(mailbox, message_id):
+                filename = attachment.get("name", "attachment.pdf")
+
+                if not is_primary and not INVOICE_LIKE_RE.search(f"{filename} {subject}"):
+                    continue
+
+                key = (internet_message_id, filename)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+
+                safe_name = re.sub(r"[^A-Za-z0-9_.\-]", "_", filename)
+                pdf_path = os.path.join(INVOICE_DIR, f"{message_id}_{safe_name}")
+
+                with open(pdf_path, "wb") as fh:
+                    fh.write(b64decode(attachment["contentBytes"]))
+
+                extracted_text = ""
+                try:
+                    with pdfplumber.open(pdf_path) as pdf:
+                        extracted_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+                except Exception:
+                    # Corrupt/unreadable PDF -- keep the file, leave fields empty.
+                    extracted_text = ""
+
+                fields = _extract_fields(extracted_text, from_addr, from_name, subject, filename)
+                results.append(
+                    InvoiceAttachment(
+                        email_message_id=internet_message_id,
+                        attachment_filename=filename,
+                        email_subject=subject,
+                        email_from=from_addr,
+                        received_at=received_at,
+                        pdf_path=pdf_path,
+                        extracted_text=extracted_text,
+                        **fields,
+                    )
                 )
-            )
 
     return results

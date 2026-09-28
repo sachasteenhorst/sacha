@@ -23,19 +23,32 @@
 <section class="status-bar">
   <span class="status-chip">
     <span class="status-dot status-{{ status_bar.email_status }}"></span> E-mail
-  </span>
-  <span class="status-chip">
-    <span class="status-dot status-{{ status_bar.bank_status }}"></span> Bank (Basecone)
-  </span>
-  <span class="status-lastsync">
     {% if status_bar.last_sync_label %}
-      Laatst opgehaald: {{ status_bar.last_sync_label }} &middot;
-      {{ status_bar.last_sync_new_invoices }} nieuwe factu(u)r(en),
-      {{ status_bar.last_sync_new_transactions }} nieuwe afschrift(en)
-    {% else %}
-      Nog niet opgehaald sinds het opstarten.
+      &mdash; laatst opgehaald {{ status_bar.last_sync_label }}
     {% endif %}
   </span>
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.bank_status }}"></span> Bank
+    {% if status_bar.last_upload_label %}
+      &mdash; laatste upload {{ status_bar.last_upload_label }}, afschriften t/m {{ status_bar.latest_statement_label }}
+    {% else %}
+      &mdash; nog geen afschrift geüpload
+    {% endif %}
+  </span>
+</section>
+
+<section class="upload-box">
+  {% if upload_error %}
+  <div class="banner banner-error">⚠️ Upload mislukt: {{ upload_error }}</div>
+  {% elif upload_new is not none %}
+  <div class="banner banner-ok">✅ {{ upload_new }} nieuwe afschriftregel(s) toegevoegd, {{ upload_skipped }} overgeslagen (al bekend).</div>
+  {% endif %}
+  <form method="post" action="/bank/upload" enctype="multipart/form-data" class="filter-form">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+    <input type="file" name="file" accept=".csv,.xml,.swi,.940,.sta" required>
+    <button type="submit" class="btn btn-primary">Bankafschrift uploaden</button>
+    <span class="hint" style="margin:0;">Rabobank CSV, CAMT.053 (.xml) of MT940 Structured (.swi)</span>
+  </form>
 </section>
 
 {% if oldest_unmatched_days and oldest_unmatched_days > 30 %}
@@ -59,31 +72,35 @@
 </form>
 
 <section id="te-controleren">
-  <h2>Te controleren ({{ suggested_matches|length }})</h2>
-  <p class="hint">Bedrag en datum komen overeen, maar dit is niet 100% zeker &mdash; controleer even.</p>
-  {% if suggested_matches %}
+  <h2>Te controleren ({{ suggested_groups|length }})</h2>
+  <p class="hint">Bedrag en datum komen overeen, maar dit is niet 100% zeker &mdash; controleer even. Eén betaling kan meerdere documenten dekken.</p>
+  {% if suggested_groups %}
   <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Factuur</th><th>Leverancier</th><th>Actie</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Document(en)</th><th>Actie</th></tr>
     </thead>
     <tbody>
-      {% for m in suggested_matches %}
+      {% for group in suggested_groups %}
+      {% set tx = group[0].transaction %}
       <tr>
-        <td>{{ m.transaction.booking_date|dutch_date }}</td>
-        <td class="amount">{{ m.transaction.amount_cents|euros }}</td>
+        <td>{{ tx.booking_date|dutch_date }}</td>
+        <td class="amount">{{ tx.amount_cents|euros }}</td>
         <td>
-          <strong>{{ m.transaction.counterparty_name or "?" }}</strong>
-          {% if m.transaction.description %}<br><small class="muted-text">{{ m.transaction.description }}</small>{% endif %}
+          <strong>{{ tx.counterparty_name or "?" }}</strong>
+          {% if tx.description %}<br><small class="muted-text">{{ tx.description }}</small>{% endif %}
         </td>
-        <td>{{ m.invoice.invoice_number or "-" }} ({{ m.invoice.amount_cents|euros }})</td>
-        <td>{{ m.invoice.supplier_name }}</td>
+        <td>
+          {% for m in group %}
+          <div>{{ m.invoice.supplier_name }} &ndash; {{ m.invoice.invoice_number or "geen nr" }} ({{ m.invoice.amount_cents|euros }})</div>
+          {% endfor %}
+        </td>
         <td class="actions">
-          <form method="post" action="/matches/{{ m.id }}/confirm">
+          <form method="post" action="/match-groups/{{ group[0].group_id }}/confirm">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-confirm">Klopt</button>
           </form>
-          <form method="post" action="/matches/{{ m.id }}/reject">
+          <form method="post" action="/match-groups/{{ group[0].group_id }}/reject">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-reject">Klopt niet</button>
           </form>
@@ -104,7 +121,7 @@
   <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Koppel handmatig aan factuur</th><th>Actie</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Koppel handmatig aan factu(u)r(en)</th><th>Actie</th></tr>
     </thead>
     <tbody>
       {% for t in unmatched_transactions %}
@@ -118,7 +135,7 @@
         <td>
           <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
-            <select name="invoice_id">
+            <select name="invoice_ids" multiple size="3">
               {% for inv in all_open_invoices %}
               <option value="{{ inv.id }}">{{ inv.supplier_name }} &ndash; {{ inv.invoice_number or "geen nr" }} ({{ inv.amount_cents|euros }})</option>
               {% endfor %}
@@ -130,6 +147,10 @@
           <form method="post" action="/transactions/{{ t.id }}/ignore">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-ignore">Geen factuur nodig</button>
+          </form>
+          <form method="post" action="/transactions/{{ t.id }}/receipt-in-basecone">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-ignore">Bon staat in Basecone</button>
           </form>
         </td>
       </tr>
@@ -185,19 +206,20 @@
 
 <section id="recent-gekoppeld">
   <h2>Recent gekoppeld</h2>
-  {% if recent_matches %}
+  {% if recent_groups %}
   <div class="table-scroll">
   <table class="muted">
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Factuur</th><th>Methode</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Document(en)</th><th>Methode</th></tr>
     </thead>
     <tbody>
-      {% for m in recent_matches %}
+      {% for group in recent_groups %}
+      {% set tx = group[0].transaction %}
       <tr>
-        <td>{{ m.transaction.booking_date|dutch_date }}</td>
-        <td class="amount">{{ m.transaction.amount_cents|euros }}</td>
-        <td>{{ m.invoice.invoice_number or m.invoice.attachment_filename }}</td>
-        <td>{{ m.method|method_label }}</td>
+        <td>{{ tx.booking_date|dutch_date }}</td>
+        <td class="amount">{{ tx.amount_cents|euros }}</td>
+        <td>{{ group|map(attribute="invoice")|map(attribute="invoice_number")|select|join(", ") or group[0].invoice.attachment_filename }}</td>
+        <td>{{ group[0].method|method_label }}{% if group|length > 1 %} ({{ group|length }} documenten){% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

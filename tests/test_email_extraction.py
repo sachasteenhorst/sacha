@@ -1,11 +1,16 @@
 from app.email_client import (
+    _assign_direction,
+    _classify_document_kind,
     _derive_supplier_name,
     _domain_to_supplier_name,
+    _extract_all_invoice_numbers,
     _extract_fields,
     _extract_invoice_number,
+    _extract_invoice_number_from_subject,
     _parse_amount_literal,
     _parse_amount_to_cents,
 )
+from app.models import Direction, DocumentKind
 
 
 # -- Amount parsing --
@@ -171,3 +176,79 @@ def test_extract_fields_realistic_invoice_text():
     assert fields["supplier_name"] == "Kruitbosch"
     assert fields["invoice_number"] == "2026-778899"
     assert fields["amount_cents"] == 12100
+    assert fields["direction"] == Direction.OUTGOING.value
+    assert fields["document_kind"] == DocumentKind.INVOICE.value
+
+
+# -- Direction --
+
+def test_direction_defaults_to_outgoing():
+    assert _assign_direction("Kruitbosch") == Direction.OUTGOING.value
+
+
+def test_direction_incoming_for_configured_suppliers():
+    assert _assign_direction("ENRA") == Direction.INCOMING.value
+    assert _assign_direction("HelloRider") == Direction.INCOMING.value
+
+
+def test_incoming_amount_label_gestort():
+    text = "Rekening-courant overzicht\nSaldo vorige periode: 100,00\nGestort bedrag: EUR 245,00"
+    assert _parse_amount_to_cents(text, direction=Direction.INCOMING.value) == 24500
+
+
+# -- Document classification --
+
+def test_general_terms_classified_as_other():
+    text = "General Terms and Conditions of Sale\nTenways Technovation Europe B.V."
+    assert _classify_document_kind("GTC B2B 2026.v1.pdf", "Terms", text, None) == DocumentKind.OTHER.value
+
+
+def test_ubo_declaration_classified_as_other():
+    text = "Uiteindelijk belanghebbende (UBO) verklaring\nWaarom dit formulier?"
+    assert _classify_document_kind("ENRA - UBO verklaring.pdf", "", text, None) == DocumentKind.OTHER.value
+
+
+def test_bank_account_change_notice_classified_as_other():
+    text = "We are writing to inform you of a change in our payment bank account details."
+    assert _classify_document_kind("Change in Payment Bank Account.pdf", "", text, None) == DocumentKind.OTHER.value
+
+
+def test_packing_slip_without_amount_classified_as_other():
+    text = "Pakbon\nAantal geleverde stuks: 4\nGeen bedragen op dit document."
+    assert _classify_document_kind("pakbon.pdf", "", text, None) == DocumentKind.OTHER.value
+
+
+def test_packing_slip_with_amount_stays_invoice():
+    text = "Pakbon met factuurgegevens\nTotaal incl. BTW: EUR 50,00"
+    assert _classify_document_kind("pakbon.pdf", "", text, 5000) == DocumentKind.INVOICE.value
+
+
+def test_real_invoice_not_misclassified_as_other():
+    text = "Factuurnummer: 123\nTotaal incl. BTW: EUR 50,00"
+    assert _classify_document_kind("factuur.pdf", "Factuur 123", text, 5000) == DocumentKind.INVOICE.value
+
+
+def test_specification_detected_and_lists_all_invoice_numbers():
+    text = (
+        "Specificatie automatische incasso\n"
+        "Factuurnummer: F-100 Bedrag: 50,00\n"
+        "Factuurnummer: F-200 Bedrag: 75,00\n"
+        "Totaal incl. BTW: EUR 125,00"
+    )
+    kind = _classify_document_kind("specificatie.pdf", "", text, 12500)
+    assert kind == DocumentKind.SPECIFICATION.value
+    assert _extract_all_invoice_numbers(text) == ["F-100", "F-200"]
+
+
+# -- Subject fallback for invoice number (Tenways) --
+
+def test_invoice_number_from_subject_ref():
+    subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/23162)"
+    assert _extract_invoice_number_from_subject(subject) == "INV/2026/23162"
+
+
+def test_extract_fields_falls_back_to_subject_when_text_has_no_number():
+    text = "Bedankt voor uw bestelling.\nTotaal incl. BTW: EUR 40,00"
+    subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/23162)"
+    fields = _extract_fields(text, "notifications@tenways.com", "", subject, "invoice.pdf")
+    assert fields["invoice_number"] == "INV/2026/23162"

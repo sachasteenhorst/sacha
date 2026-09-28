@@ -77,6 +77,14 @@ table.muted { color: var(--muted); }
   font-size: 0.9rem;
 }
 .banner-warning { background: var(--warning-bg); color: var(--warning-text); }
+.banner-ok { background: #e7f3ec; color: var(--accent); }
+.banner-error { background: #fbeceb; color: var(--danger); }
+
+.upload-box { margin-bottom: 1.5rem; }
+.upload-box .filter-form { margin-bottom: 0; }
+.upload-box input[type="file"] { font-size: 0.85rem; }
+
+select[multiple] { min-width: 220px; }
 
 select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
 

@@ -21,7 +21,7 @@ def session():
 
 def make_transaction(**kwargs):
     defaults = dict(
-        basecone_id="tx-1",
+        external_ref="tx-1",
         booking_date=date(2024, 3, 10),
         amount_cents=-12345,
         description="Betaling factuur",
@@ -106,3 +106,99 @@ def test_amount_outside_date_window_not_matched(session):
 
     assert tx.status == MatchStatus.UNMATCHED
     assert inv.status == MatchStatus.UNMATCHED
+
+
+def test_matches_get_a_shared_group_id(session):
+    tx = make_transaction(description="Betaling factuur F-2024-001")
+    inv = make_invoice()
+    session.add_all([tx, inv])
+    session.commit()
+
+    run_matching(session)
+    session.commit()
+
+    assert tx.matches[0].group_id  # non-empty
+
+
+def test_opposite_direction_never_matches_on_amount_alone(session):
+    # Same |amount| and date, but the transaction is money coming IN while
+    # the invoice is an outgoing (normal) supplier bill -- must not match.
+    tx = make_transaction(amount_cents=12345, booking_date=date(2024, 3, 15))
+    inv = make_invoice(invoice_number="", invoice_date=date(2024, 3, 1), direction="outgoing")
+    session.add_all([tx, inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.suggested == 0
+    assert tx.status == MatchStatus.UNMATCHED
+    assert inv.status == MatchStatus.UNMATCHED
+
+
+def test_incoming_transaction_matches_incoming_invoice(session):
+    tx = make_transaction(amount_cents=25000, booking_date=date(2024, 3, 15), counterparty_name="ENRA")
+    inv = make_invoice(
+        invoice_number="", invoice_date=date(2024, 3, 1), amount_cents=25000,
+        direction="incoming", supplier_name="ENRA",
+    )
+    session.add_all([tx, inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.suggested == 1
+    assert tx.status == MatchStatus.SUGGESTED
+
+
+def test_specification_match_also_links_referenced_invoices(session):
+    tx = make_transaction(amount_cents=-12500, description="Incasso specificatie 999", counterparty_name="Accell")
+    spec = make_invoice(
+        invoice_number="", supplier_name="Accell", amount_cents=12500,
+        document_kind="specification", referenced_invoice_numbers=["F-100", "F-200"],
+        attachment_filename="specificatie.pdf",
+    )
+    inv_a = make_invoice(invoice_number="F-100", supplier_name="Accell", amount_cents=5000, attachment_filename="f100.pdf", email_message_id="<m2>")
+    inv_b = make_invoice(invoice_number="F-200", supplier_name="Accell", amount_cents=7500, attachment_filename="f200.pdf", email_message_id="<m3>")
+    session.add_all([tx, spec, inv_a, inv_b])
+    session.commit()
+
+    run_matching(session)
+    session.commit()
+
+    assert spec.status == MatchStatus.SUGGESTED
+    assert inv_a.status == MatchStatus.SUGGESTED
+    assert inv_b.status == MatchStatus.SUGGESTED
+    group_ids = {m.group_id for m in tx.matches}
+    assert len(group_ids) == 1  # all three share one match group
+    assert len(tx.matches) == 3
+
+
+def test_combination_match_finds_exact_sum(session):
+    tx = make_transaction(amount_cents=-12500, description="Verzamelbetaling", counterparty_name="Kruitbosch")
+    inv_a = make_invoice(
+        invoice_number="F-A", supplier_name="Kruitbosch", amount_cents=5000,
+        invoice_date=date(2024, 3, 5), attachment_filename="a.pdf", email_message_id="<a>",
+    )
+    inv_b = make_invoice(
+        invoice_number="F-B", supplier_name="Kruitbosch", amount_cents=7500,
+        invoice_date=date(2024, 3, 8), attachment_filename="b.pdf", email_message_id="<b>",
+    )
+    # A decoy that alone doesn't sum correctly with either -- shouldn't be pulled in.
+    inv_c = make_invoice(
+        invoice_number="F-C", supplier_name="Kruitbosch", amount_cents=999,
+        invoice_date=date(2024, 3, 6), attachment_filename="c.pdf", email_message_id="<c>",
+    )
+    session.add_all([tx, inv_a, inv_b, inv_c])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.suggested == 1
+    assert tx.status == MatchStatus.SUGGESTED
+    assert inv_a.status == MatchStatus.SUGGESTED
+    assert inv_b.status == MatchStatus.SUGGESTED
+    assert inv_c.status == MatchStatus.UNMATCHED
+    assert len(tx.matches) == 2

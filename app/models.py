@@ -30,16 +30,45 @@ class MatchStatus(str, enum.Enum):
     SUGGESTED = "suggested"
     MATCHED = "matched"
     IGNORED = "ignored"
+    # Transaction-only: the receipt for this payment has been photographed
+    # into the Basecone app separately -- handled, but distinct from
+    # IGNORED ("no receipt needed at all", e.g. bank costs).
+    RECEIPT_ELSEWHERE = "receipt_elsewhere"
+
+
+class Direction(str, enum.Enum):
+    """Which way money moves for a document. Most suppliers collect money
+    FROM the account (outgoing); a few (ENRA settlements, HelloRider) pay
+    money ONTO it (incoming). A transaction's own direction isn't stored --
+    it's just the sign of its amount_cents (positive = incoming)."""
+    INCOMING = "incoming"
+    OUTGOING = "outgoing"
+
+
+class DocumentKind(str, enum.Enum):
+    INVOICE = "invoice"
+    # A single document (e.g. Accell's "Specificatie automatische incasso")
+    # that lists several invoice numbers settled by one bank payment.
+    SPECIFICATION = "specification"
+    # General terms, a "bank account changed" notice, a packing slip with
+    # no amount -- not proof of a payment, so it shouldn't count as an open
+    # invoice waiting to be matched.
+    OTHER = "other"
 
 
 class Transaction(Base):
-    """A single bank statement line, as reported by Basecone."""
+    """A single bank statement line, imported from a Rabobank export
+    (CSV/CAMT.053/MT940)."""
 
     __tablename__ = "transactions"
     __table_args__ = (UniqueConstraint("basecone_id", name="uq_transactions_basecone_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    basecone_id: Mapped[str] = mapped_column(String, index=True)
+    # Column name kept as "basecone_id" (its original purpose) to avoid an
+    # ALTER TABLE RENAME on the production database; it's now a generic
+    # unique key for a statement line from whatever source produced it
+    # (Rabobank CSV/CAMT.053/MT940 upload).
+    external_ref: Mapped[str] = mapped_column("basecone_id", String, index=True)
     booking_date: Mapped[date] = mapped_column(Date, index=True)
     amount_cents: Mapped[int] = mapped_column(Integer)
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
@@ -79,6 +108,14 @@ class Invoice(Base):
     extracted_text: Mapped[str] = mapped_column(Text, default="")
     pdf_path: Mapped[str] = mapped_column(String, default="")
 
+    # Added after the first release -- see app/db.py's startup migration.
+    direction: Mapped[str] = mapped_column(String, default=Direction.OUTGOING.value)
+    document_kind: Mapped[str] = mapped_column(String, default=DocumentKind.INVOICE.value)
+    # For a SPECIFICATION document: the invoice numbers mentioned inside it
+    # (e.g. Accell's "Specificatie automatische incasso" listing several
+    # invoices settled by one direct debit).
+    referenced_invoice_numbers: Mapped[list] = mapped_column(JSON, default=list)
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -105,6 +142,12 @@ class Match(Base):
     method: Mapped[MatchMethod] = mapped_column(Enum(MatchMethod))
     confidence: Mapped[str] = mapped_column(String, default="medium")  # high | medium | low
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # One payment can settle several documents (an Accell direct-debit
+    # specification listing multiple invoices, or a combination-of-invoices
+    # match). Every Match row created together for one transaction shares a
+    # group_id, so confirming/rejecting acts on the whole group at once.
+    # Added after the first release -- see app/db.py's startup migration.
+    group_id: Mapped[str] = mapped_column(String, index=True, default="")
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
