@@ -34,6 +34,15 @@ class MatchStatus(str, enum.Enum):
     # into the Basecone app separately -- handled, but distinct from
     # IGNORED ("no receipt needed at all", e.g. bank costs).
     RECEIPT_ELSEWHERE = "receipt_elsewhere"
+    # Transaction-only: an automatic Rule (see Rule below) resolved this --
+    # kept separate from IGNORED/RECEIPT_ELSEWHERE so it has its own visible
+    # "Automatisch afgehandeld" section and can be undone as a batch.
+    RULE_HANDLED = "rule_handled"
+
+
+class RuleAction(str, enum.Enum):
+    NO_INVOICE_NEEDED = "no_invoice_needed"
+    REVENUE = "revenue"  # "omzet" -- income from the shop, e.g. card terminal settlements
 
 
 class Direction(str, enum.Enum):
@@ -78,12 +87,23 @@ class Transaction(Base):
     reference: Mapped[str] = mapped_column(String, default="")
     raw_data: Mapped[dict] = mapped_column(JSON, default=dict)
 
+    # Rabobank's own two-letter transaction code from the CSV "Code" column
+    # (e.g. "tb" = transfer between your own accounts, "ba" = card
+    # payment). Empty for CAMT.053/MT940 uploads, which don't carry a
+    # directly equivalent code. Added after the first release -- see
+    # app/db.py's startup migration.
+    bank_code: Mapped[str] = mapped_column(String, default="")
+    # Which Rule (if any) auto-resolved this transaction -- see Rule below.
+    # Added after the first release -- see app/db.py's startup migration.
+    applied_rule_id: Mapped[int | None] = mapped_column(ForeignKey("rules.id"), nullable=True)
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     matches: Mapped[list["Match"]] = relationship(back_populates="transaction", cascade="all, delete-orphan")
+    applied_rule: Mapped["Rule | None"] = relationship(back_populates="transactions")
 
 
 class Invoice(Base):
@@ -153,3 +173,28 @@ class Match(Base):
 
     transaction: Mapped["Transaction"] = relationship(back_populates="matches")
     invoice: Mapped["Invoice"] = relationship(back_populates="matches")
+
+
+class Rule(Base):
+    """Auto-resolves a bank transaction that will never have an invoice or
+    receipt (a bank fee, a transfer between your own accounts, a card
+    terminal settlement that's just shop revenue, ...) -- applied to every
+    still-open transaction before the matcher runs. Each criterion left
+    blank is ignored; all the ones that are set must match (AND)."""
+
+    __tablename__ = "rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    action: Mapped[str] = mapped_column(String)  # RuleAction value
+
+    counterparty_contains: Mapped[str] = mapped_column(String, default="")
+    counterparty_iban: Mapped[str] = mapped_column(String, default="")
+    description_contains: Mapped[str] = mapped_column(String, default="")
+    transaction_code: Mapped[str] = mapped_column(String, default="")  # Rabobank CSV "Code" column
+    direction: Mapped[str] = mapped_column(String, default="")  # "" = either direction
+
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    transactions: Mapped[list["Transaction"]] = relationship(back_populates="applied_rule")

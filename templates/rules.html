@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+
+<p><a href="/dashboard" class="clear-filter">&larr; Terug naar dashboard</a></p>
+
+<section id="nieuwe-regel">
+  <h2>Nieuwe regel</h2>
+  <p class="hint">Een regel handelt een betaling automatisch af (geen factuur nodig, of omzet) zonder dat je hem hoeft te koppelen. Vul minstens één kenmerk in; alleen betalingen die aan ALLE ingevulde kenmerken voldoen worden afgehandeld. Na opslaan wordt de regel meteen toegepast op alle openstaande betalingen.</p>
+  <form method="post" action="/regels" class="filter-form">
+    <input type="text" name="name" placeholder="Naam (bijv. Verzekering pand)">
+    <select name="action" required>
+      <option value="no_invoice_needed">Geen factuur nodig</option>
+      <option value="revenue">Omzet</option>
+    </select>
+    <select name="direction">
+      <option value="">Beide richtingen</option>
+      <option value="incoming"{% if prefill.direction == "incoming" %} selected{% endif %}>Inkomend (bij)</option>
+      <option value="outgoing"{% if prefill.direction == "outgoing" %} selected{% endif %}>Uitgaand (af)</option>
+    </select>
+    <input type="text" name="counterparty_contains" placeholder="Tegenpartij bevat..." value="{{ prefill.counterparty }}">
+    <input type="text" name="counterparty_iban" placeholder="IBAN (exact)" value="{{ prefill.iban }}">
+    <input type="text" name="description_contains" placeholder="Omschrijving bevat...">
+    <input type="text" name="transaction_code" placeholder="Code (db/tb/ba/ok)" value="{{ prefill.code }}" size="6">
+    <button type="submit" class="btn btn-primary">Regel opslaan</button>
+  </form>
+</section>
+
+<section id="regels">
+  <h2>Regels ({{ rules|length }})</h2>
+  {% if rules %}
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Naam</th><th>Actie</th><th>Tegenpartij</th><th>IBAN</th><th>Omschrijving</th><th>Code</th><th>Richting</th><th>Toegepast</th><th>Status</th><th>Actie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rule in rules %}
+      <tr{% if not rule.enabled %} class="muted"{% endif %}>
+        <td>{{ rule.name }}</td>
+        <td>{{ rule.action|rule_action_label }}</td>
+        <td>{{ rule.counterparty_contains or "-" }}</td>
+        <td>{{ rule.counterparty_iban or "-" }}</td>
+        <td>{{ rule.description_contains or "-" }}</td>
+        <td>{{ rule.transaction_code or "-" }}</td>
+        <td>{{ {"incoming": "bij", "outgoing": "af"}.get(rule.direction, "beide") }}</td>
+        <td>{{ rule_counts.get(rule.id, 0) }}x</td>
+        <td>{{ "aan" if rule.enabled else "uit" }}</td>
+        <td class="actions">
+          <form method="post" action="/regels/{{ rule.id }}/toggle">
+            <button class="btn btn-secondary">{{ "Zet uit" if rule.enabled else "Zet aan" }}</button>
+          </form>
+          <form method="post" action="/regels/{{ rule.id }}/delete" onsubmit="return confirm('Regel verwijderen? Betalingen die deze regel heeft afgehandeld gaan terug naar \'zonder factuur\'.');">
+            <button class="btn btn-reject">Verwijderen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Nog geen regels.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

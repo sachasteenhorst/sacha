@@ -9,6 +9,9 @@
 <body>
   <header class="topbar">
     <h1>🚲 Administratie &ndash; afschriften &amp; facturen</h1>
+    <nav class="topbar-nav">
+      <a href="/regels" class="btn btn-secondary">Regels</a>
+    </nav>
     <form method="post" action="/sync">
       <input type="hidden" name="q" value="{{ q|default('') }}">
       <input type="hidden" name="maand" value="{{ maand|default('') }}">

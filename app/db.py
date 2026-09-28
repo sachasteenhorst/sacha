@@ -33,7 +33,35 @@ _COLUMN_MIGRATIONS = {
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),
     ],
+    "transactions": [
+        ("bank_code", "VARCHAR DEFAULT ''"),
+        ("applied_rule_id", "INTEGER"),
+    ],
 }
+
+# Applied once, only if the rules table is still empty -- so deleting a
+# seed rule you don't want sticks, instead of it reappearing on restart.
+_DEFAULT_RULES = [
+    dict(name="Rabo Smart Pay omzet", action="revenue", counterparty_contains="Rabo Smart Pay", direction="incoming"),
+    dict(name="Rabobank Smart Pay omzet", action="revenue", counterparty_contains="Rabobank Smart Pay", direction="incoming"),
+    dict(name="Stichting Pay.nl clearing", action="revenue", counterparty_contains="Stichting Pay.nl", description_contains="Clearing", direction="incoming"),
+    dict(name="Rabobank kosten", action="no_invoice_needed", counterparty_contains="Rabobank", description_contains="Kosten"),
+    dict(name="Rabobank provisie", action="no_invoice_needed", counterparty_contains="Rabobank", description_contains="Provisie"),
+    dict(name="Rabobank rente", action="no_invoice_needed", counterparty_contains="Rabobank", description_contains="Rente"),
+    dict(name="Overboeking eigen rekening", action="no_invoice_needed", transaction_code="tb"),
+    dict(name="Belastingdienst", action="no_invoice_needed", counterparty_contains="Belastingdienst"),
+]
+
+
+def _seed_default_rules() -> None:
+    from app.models import Rule
+
+    with SessionLocal() as session:
+        if session.query(Rule).count() > 0:
+            return
+        for defaults in _DEFAULT_RULES:
+            session.add(Rule(**defaults))
+        session.commit()
 
 
 def _migrate_schema() -> None:
@@ -55,6 +83,7 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _migrate_schema()
+    _seed_default_rules()
 
 
 def get_session():

@@ -50,6 +50,54 @@ bankrekening-wijzigingsbericht, een pakbon zonder bedrag) worden
 automatisch herkend en genegeerd, zodat ze niet als "openstaande factuur"
 blijven hangen.
 
+## Regels: automatisch afhandelen
+
+Niet elke betaling krijgt ooit een factuur of bon -- bankkosten, een
+overboeking tussen je eigen rekeningen, een pinbetaling-afrekening die
+gewoon omzet is. Daarvoor is er de **Regels-pagina** (`/regels`, ook een
+knop bovenin het dashboard).
+
+Een regel bestaat uit kenmerken die allemaal moeten kloppen (AND): naam van
+de tegenpartij (bevat), IBAN van de tegenpartij (exact), omschrijving
+(bevat), Rabobank-transactiecode (bijv. `db`/`tb`/`ba`/`ok`, alleen bij een
+CSV-upload beschikbaar) en richting (bij/af). Een regel zonder één ingevuld
+kenmerk matcht nooit iets, zodat er geen regel per ongeluk alles pakt. Elke
+regel wijst een betaling toe aan "geen factuur nodig" of "omzet".
+
+- Regels worden toegepast **voordat** de matcher draait, bij elke upload en
+  elke sync.
+- Bij elke betaling zonder factuur staat een knop **"Maak regel"** die een
+  nieuwe regel voorinvult met de tegenpartij/IBAN/code/richting van die
+  betaling. Na opslaan wordt de regel **direct** toegepast op alle
+  openstaande betalingen die eraan voldoen.
+- Betalingen die door een regel zijn afgehandeld staan apart in het
+  dashboard onder **"Automatisch afgehandeld"**, met welke regel het deed.
+  Klopt het niet? Klik op **"Terugzetten"** om die ene betaling terug te
+  zetten naar "zonder factuur".
+- Een regel **uitzetten** (in plaats van verwijderen) laat al afgehandelde
+  betalingen met rust; een regel **verwijderen** zet alle betalingen die
+  hij had afgehandeld terug naar "zonder factuur".
+- De teller "Betalingen zonder factuur" telt alleen wat nog echt een
+  bewijsstuk nodig heeft (regel-afgehandelde betalingen tellen niet mee).
+  Onderaan het dashboard staat een tabel **"Voortgang per maand"**: per
+  maand het percentage betalingen dat is afgehandeld (gekoppeld aan een
+  factuur, door een regel afgehandeld, bon in Basecone, of genegeerd als
+  "geen factuur nodig") -- zo zie je in één oogopslag hoe ver je bent.
+
+Standaard staan er een paar regels klaar (uit/aan te zetten of te
+verwijderen op de Regels-pagina, ze komen niet terug na verwijderen):
+
+- Rabo Smart Pay / Rabobank Smart Pay (bijschrijving) -> omzet
+- Stichting Pay.nl Clearing -> omzet
+- Rabobank + "Kosten"/"Provisie"/"Rente" in de omschrijving -> geen factuur
+  nodig
+- Transactiecode `tb` (overboeking tussen eigen rekeningen) -> geen factuur
+  nodig
+- Belastingdienst -> geen factuur nodig
+
+Alles wat niet onder deze standaardregels valt (huur, verzekering, etc.)
+laat je zelf via "Maak regel" lopen, zodat je het bewust kiest.
+
 ## Bankafschriften uploaden
 
 Basecone is voor deze rekening geen bruikbare bron (zie hierboven) -- je
@@ -245,11 +293,12 @@ hostingpartij nodig heeft om dit blijvend te laten draaien:
 app/
   config.py          instellingen uit .env
   db.py               SQLAlchemy setup + startup-migratie voor nieuwe kolommen
-  models.py           Transaction / Invoice / Match, Direction, DocumentKind
+  models.py           Transaction / Invoice / Match / Rule, Direction, DocumentKind
   bank_import.py       Rabobank CSV / CAMT.053 / MT940-parsers
   basecone_client.py   optioneel: ophalen documenten/boekingen via Basecone API
   email_client.py      ophalen + parsen factuur-PDF's via Microsoft Graph
   matcher.py           matching-logica (richting, specificaties, combinaties)
+  rules.py              regels die betalingen automatisch afhandelen (voor de matcher draait)
   sync.py              orchestreert e-mailsync + bankupload, draait de matcher
   sync_state.py         laatste-sync-info in geheugen, voor de statusbalk
   scheduler.py          periodieke achtergrondtaak (e-mail)

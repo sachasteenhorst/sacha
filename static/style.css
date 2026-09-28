@@ -91,7 +91,7 @@ select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
 /* -- Stat counters -- */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.75rem;
   background: none;
   border: none;
@@ -183,6 +183,10 @@ select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
   font-weight: 600;
 }
 .pdf-link:hover { background: #eef2ee; }
+
+/* -- Rules page -- */
+tr.muted td { color: var(--muted); }
+.topbar-nav { display: flex; align-items: center; }
 
 /* -- Mobile -- */
 @media (max-width: 640px) {

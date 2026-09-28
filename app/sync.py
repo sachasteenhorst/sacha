@@ -16,6 +16,7 @@ from app.config import settings
 from app.email_client import fetch_invoice_attachments
 from app.matcher import MatchingSummary, run_matching
 from app.models import DocumentKind, Invoice, MatchStatus, Transaction
+from app.rules import apply_rules
 from app import sync_state
 
 
@@ -161,6 +162,7 @@ def import_bank_file(session: Session, filename: str, content: bytes) -> BankImp
                 counterparty_name=row.counterparty_name,
                 counterparty_iban=row.counterparty_iban,
                 reference=row.reference,
+                bank_code=row.bank_code,
                 raw_data=row.raw,
             )
         )
@@ -168,6 +170,7 @@ def import_bank_file(session: Session, filename: str, content: bytes) -> BankImp
         result.new_transactions += 1
 
     session.flush()
+    apply_rules(session)
     result.matching = run_matching(session)
     session.commit()
     return result
@@ -181,6 +184,7 @@ def run_sync(session: Session) -> SyncResult:
     _sync_invoices(session, since, result)
     session.flush()
 
+    apply_rules(session)
     result.matching = run_matching(session)
     session.commit()
     sync_state.record(result)

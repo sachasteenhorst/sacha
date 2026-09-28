@@ -36,6 +36,7 @@ class BankTransactionRow:
     counterparty_iban: str
     reference: str
     raw: dict
+    bank_code: str = ""  # Rabobank CSV "Code" column (e.g. "tb", "ba"); empty for CAMT.053/MT940
 
 
 def _parse_signed_amount(raw: str) -> int:
@@ -73,6 +74,7 @@ _CSV_NAME_COLS = ["Naam tegenpartij", "Naam uiteindelijke partij", "Naam initië
 _CSV_CPTY_IBAN_COLS = ["Tegenrekening IBAN/BBAN", "Tegenrekening"]
 _CSV_OWN_IBAN_COLS = ["IBAN/BBAN"]
 _CSV_SEQ_COLS = ["Volgnr"]
+_CSV_CODE_COLS = ["Code"]
 _CSV_DESC_COLS = ["Omschrijving-1", "Omschrijving-2", "Omschrijving-3"]
 
 
@@ -127,6 +129,7 @@ def parse_rabobank_csv(content: bytes) -> list[BankTransactionRow]:
     iban_col = _find_column(reader.fieldnames, _CSV_CPTY_IBAN_COLS)
     own_iban_col = _find_column(reader.fieldnames, _CSV_OWN_IBAN_COLS)
     seq_col = _find_column(reader.fieldnames, _CSV_SEQ_COLS)
+    code_col = _find_column(reader.fieldnames, _CSV_CODE_COLS)
     desc_cols = [c for c in (_find_column(reader.fieldnames, [cand]) for cand in _CSV_DESC_COLS) if c]
 
     rows: list[BankTransactionRow] = []
@@ -141,12 +144,14 @@ def parse_rabobank_csv(content: bytes) -> list[BankTransactionRow]:
         counterparty_iban = (row.get(iban_col) or "").strip() if iban_col else ""
         own_iban = (row.get(own_iban_col) or "").strip() if own_iban_col else ""
         seq = (row.get(seq_col) or "").strip() if seq_col else ""
+        code = (row.get(code_col) or "").strip() if code_col else ""
 
         rows.append(
             BankTransactionRow(
                 external_ref=_hash_ref("csv", own_iban, raw_date, raw_amount, counterparty_iban, description, seq),
                 booking_date=_parse_rabo_date(raw_date),
                 amount_cents=_parse_signed_amount(raw_amount),
+                bank_code=code,
                 currency="EUR",
                 description=description,
                 counterparty_name=counterparty_name,

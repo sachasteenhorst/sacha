@@ -18,6 +18,10 @@
     <span class="stat-number">{{ counters.gekoppeld_deze_maand }}</span>
     <span class="stat-label">Gekoppeld in {{ counters.maand_label }}</span>
   </a>
+  <a href="#automatisch-afgehandeld" class="stat-tile stat-positive">
+    <span class="stat-number">{{ counters.automatisch_afgehandeld }}</span>
+    <span class="stat-label">Automatisch afgehandeld</span>
+  </a>
 </section>
 
 <section class="status-bar">
@@ -152,6 +156,8 @@
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-ignore">Bon staat in Basecone</button>
           </form>
+          <a class="btn btn-secondary"
+             href="/regels?counterparty={{ t.counterparty_name|urlencode }}&amp;iban={{ t.counterparty_iban|urlencode }}&amp;code={{ t.bank_code|urlencode }}&amp;direction={{ t|transaction_direction }}">Maak regel</a>
         </td>
       </tr>
       {% endfor %}
@@ -227,6 +233,73 @@
   </div>
   {% else %}
   <p class="empty">Nog geen matches.</p>
+  {% endif %}
+</section>
+
+<section id="automatisch-afgehandeld">
+  <h2>Automatisch afgehandeld ({{ rule_handled_transactions|length }})</h2>
+  <p class="hint">Deze betalingen zijn door een <a href="/regels">regel</a> afgehandeld, dus ze tellen niet meer mee bij "Betalingen zonder factuur". Klopt het niet? Zet 'm terug.</p>
+  {% if rule_handled_transactions %}
+  <div class="table-scroll">
+  <table class="muted">
+    <thead>
+      <tr><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Regel</th><th>Actie</th></tr>
+    </thead>
+    <tbody>
+      {% for t in rule_handled_transactions %}
+      <tr>
+        <td>{{ t.booking_date|dutch_date }}</td>
+        <td class="amount">{{ t.amount_cents|euros }}</td>
+        <td>
+          <strong>{{ t.counterparty_name or "?" }}</strong>
+          {% if t.description %}<br><small class="muted-text">{{ t.description }}</small>{% endif %}
+        </td>
+        <td>
+          {% if t.applied_rule %}
+          {{ t.applied_rule.name }} ({{ t.applied_rule.action|rule_action_label }})
+          {% else %}
+          ?
+          {% endif %}
+        </td>
+        <td class="actions">
+          <form method="post" action="/transactions/{{ t.id }}/undo-rule">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-secondary">Terugzetten</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Nog niets automatisch afgehandeld.</p>
+  {% endif %}
+</section>
+
+<section id="voortgang">
+  <h2>Voortgang per maand</h2>
+  <p class="hint">Percentage betalingen dat is afgehandeld: gekoppeld aan een factuur, door een regel afgehandeld, bon staat in Basecone, of geen factuur nodig.</p>
+  {% if monthly_progress %}
+  <div class="table-scroll">
+  <table class="muted">
+    <thead>
+      <tr><th>Maand</th><th>Afgehandeld</th><th>Totaal</th><th>Percentage</th></tr>
+    </thead>
+    <tbody>
+      {% for row in monthly_progress %}
+      <tr>
+        <td>{{ row.label }}</td>
+        <td>{{ row.resolved }}</td>
+        <td>{{ row.total }}</td>
+        <td>{{ row.pct }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Nog geen afschriften geüpload.</p>
   {% endif %}
 </section>
 

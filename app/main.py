@@ -26,7 +26,9 @@ from app import sync_state
 from app.config import settings
 from app.db import get_session, init_db
 from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE
-from app.models import Invoice, Match, MatchMethod, MatchStatus, Transaction
+from app.matcher import _transaction_direction
+from app.models import Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
+from app.rules import apply_rules
 from app.scheduler import start_scheduler
 from app.sync import import_bank_file, run_sync
 
@@ -89,9 +91,21 @@ def _method_label(method: MatchMethod) -> str:
     return METHOD_LABELS.get(method, getattr(method, "value", str(method)))
 
 
+RULE_ACTION_LABELS = {
+    RuleAction.NO_INVOICE_NEEDED.value: "geen factuur nodig",
+    RuleAction.REVENUE.value: "omzet",
+}
+
+
+def _rule_action_label(action: str) -> str:
+    return RULE_ACTION_LABELS.get(action, action)
+
+
 templates.env.filters["euros"] = _euros
 templates.env.filters["dutch_date"] = _dutch_date
 templates.env.filters["method_label"] = _method_label
+templates.env.filters["transaction_direction"] = _transaction_direction
+templates.env.filters["rule_action_label"] = _rule_action_label
 
 
 def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:
@@ -182,6 +196,44 @@ def _group_and_filter_matches(matches: list[Match], q: str, maand: str) -> list[
     return result
 
 
+_RESOLVED_STATUSES = {
+    MatchStatus.MATCHED,
+    MatchStatus.RULE_HANDLED,
+    MatchStatus.RECEIPT_ELSEWHERE,
+    MatchStatus.IGNORED,
+}
+
+
+def _monthly_progress(session: Session) -> list[dict]:
+    """Per calendar month: what percentage of that month's transactions are
+    "afgehandeld" (matched, rule-handled, receipt filed in Basecone, or
+    marked no-invoice-needed) -- so Sacha can see progress without having to
+    count rows by hand."""
+    buckets: "OrderedDict[str, dict[str, int]]" = OrderedDict()
+    rows = session.execute(select(Transaction.booking_date, Transaction.status)).all()
+    for booking_date, tx_status in rows:
+        key = _month_key(booking_date)
+        bucket = buckets.setdefault(key, {"total": 0, "resolved": 0})
+        bucket["total"] += 1
+        if tx_status in _RESOLVED_STATUSES:
+            bucket["resolved"] += 1
+
+    result = []
+    for key in sorted(buckets.keys(), reverse=True):
+        bucket = buckets[key]
+        year, month = (int(part) for part in key.split("-"))
+        pct = round(100 * bucket["resolved"] / bucket["total"]) if bucket["total"] else 0
+        result.append(
+            {
+                "label": f"{MONTHS_NL[month - 1]} {year}",
+                "total": bucket["total"],
+                "resolved": bucket["resolved"],
+                "pct": pct,
+            }
+        )
+    return result
+
+
 def _dot_status(configured: bool, error: str | None) -> str:
     if error:
         return "red"
@@ -226,6 +278,11 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             .limit(60)
         )
     )
+    rule_handled_all = list(
+        session.scalars(
+            select(Transaction).where(Transaction.status == MatchStatus.RULE_HANDLED).order_by(Transaction.booking_date.desc())
+        )
+    )
 
     # For the manual-match dropdown -- never filtered by q/maand.
     all_open_invoices = list(
@@ -251,6 +308,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "betalingen_zonder_factuur": len(unmatched_transactions_all),
         "facturen_niet_betaald": len(unmatched_invoices_all),
         "gekoppeld_deze_maand": matched_this_month,
+        "automatisch_afgehandeld": len(rule_handled_all),
         "maand_label": MONTHS_NL[now_ams.month - 1],
     }
 
@@ -312,6 +370,8 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "recent_groups": _group_and_filter_matches(recent_matches_all, q, maand),
             "all_open_invoices": all_open_invoices,
             "oldest_unmatched_days": oldest_unmatched_days,
+            "rule_handled_transactions": _filter_transactions(rule_handled_all, q, maand),
+            "monthly_progress": _monthly_progress(session),
         },
     )
 
@@ -486,3 +546,98 @@ def ignore_invoice(
     invoice.status = MatchStatus.IGNORED
     session.commit()
     return _dashboard_redirect(q, maand)
+
+
+@app.post("/transactions/{transaction_id}/undo-rule")
+def undo_rule(
+    transaction_id: int,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    transaction = session.get(Transaction, transaction_id)
+    if transaction is None:
+        raise HTTPException(404, "Transactie niet gevonden")
+    transaction.status = MatchStatus.UNMATCHED
+    transaction.applied_rule_id = None
+    session.commit()
+    return _dashboard_redirect(q, maand)
+
+
+@app.get("/regels")
+def rules_page(request: Request, user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    prefill = {
+        "counterparty": request.query_params.get("counterparty", ""),
+        "iban": request.query_params.get("iban", ""),
+        "code": request.query_params.get("code", ""),
+        "direction": request.query_params.get("direction", ""),
+    }
+    rules = list(session.scalars(select(Rule).order_by(Rule.created_at.desc())))
+    rule_counts = dict(
+        session.execute(
+            select(Transaction.applied_rule_id, func.count())
+            .where(Transaction.applied_rule_id.is_not(None))
+            .group_by(Transaction.applied_rule_id)
+        ).all()
+    )
+    return templates.TemplateResponse(
+        "rules.html",
+        {
+            "request": request,
+            "rules": rules,
+            "rule_counts": rule_counts,
+            "prefill": prefill,
+        },
+    )
+
+
+@app.post("/regels")
+def create_rule(
+    name: str = Form(""),
+    action: str = Form(...),
+    counterparty_contains: str = Form(""),
+    counterparty_iban: str = Form(""),
+    description_contains: str = Form(""),
+    transaction_code: str = Form(""),
+    direction: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    rule = Rule(
+        name=name.strip() or "Regel",
+        action=action,
+        counterparty_contains=counterparty_contains.strip(),
+        counterparty_iban=counterparty_iban.strip(),
+        description_contains=description_contains.strip(),
+        transaction_code=transaction_code.strip(),
+        direction=direction.strip(),
+    )
+    session.add(rule)
+    session.flush()
+    apply_rules(session)
+    session.commit()
+    return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/regels/{rule_id}/toggle")
+def toggle_rule(rule_id: int, user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    rule = session.get(Rule, rule_id)
+    if rule is None:
+        raise HTTPException(404, "Regel niet gevonden")
+    rule.enabled = not rule.enabled
+    session.commit()
+    return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/regels/{rule_id}/delete")
+def delete_rule(rule_id: int, user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    rule = session.get(Rule, rule_id)
+    if rule is None:
+        raise HTTPException(404, "Regel niet gevonden")
+    for transaction in list(rule.transactions):
+        transaction.status = MatchStatus.UNMATCHED
+        transaction.applied_rule_id = None
+    session.delete(rule)
+    session.commit()
+    return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
