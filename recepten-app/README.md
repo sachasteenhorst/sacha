@@ -17,7 +17,7 @@ Alles wat je instelt, blijft bewaard in de browser.
   Julièn inbegrepen.
 - **Aanbiedingen**: kies je supermarkt en tik aan wat er in de actie is. Je kunt
   ook tekst uit de online folder plakken; de app herkent dan zelf de producten.
-- **Julièn**: leeftijd, wat hij niet mag, graanvrije vervangers, structuuradvies
+- **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
   per leeftijd en een teller voor nitraatrijke groente.
 
 ## Hoe recepten worden gekozen
