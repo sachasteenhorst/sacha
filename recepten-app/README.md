@@ -25,6 +25,13 @@ kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
 - **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
   per leeftijd en een teller voor nitraatrijke groente.
+- **Kaarten**: je spaarkaarten (Bonuskaart, Extra's en andere) met een grote
+  streepjescode om bij de kassa te laten scannen. De kaarten staan in je
+  privédeel van de app-opslag (`data/users/<jouw id>/kaarten`): alleen jij ziet
+  ze, ook als je de app deelt, en ze staan op elk apparaat waarop je bent
+  ingelogd. Een kopie op het apparaat zorgt dat ze ook zonder bereik werken.
+  Echt koppelen aan een winkelaccount kan niet; supermarkten bieden daar geen
+  openbare koppeling voor.
 
 ## Folders
 

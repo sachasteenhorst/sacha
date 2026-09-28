@@ -206,7 +206,39 @@
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface);
     border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   }
-  nav.tabs .inner { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  nav.tabs .inner { max-width: 680px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+
+  /* Spaarkaarten */
+  .cards { display: grid; gap: 12px; }
+  .lcard {
+    width: 100%; text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 16px;
+    background: var(--surface); padding: 18px 18px 16px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px;
+    box-shadow: var(--shadow); aspect-ratio: 1.9 / 1; max-height: 190px; align-content: space-between;
+  }
+  .lcard .cname { font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1.1; }
+  .lcard .ctype { font-size: 13px; color: var(--muted); grid-column: 1; }
+  .lcard .cnum { grid-column: 1 / -1; font-variant-numeric: tabular-nums; letter-spacing: .12em; font-size: 16px; }
+  .lcard .copen { grid-row: 1; grid-column: 2; font-size: 13px; font-weight: 700; color: var(--green); align-self: start; }
+  .lcard.s0 { border-top: 6px solid var(--green); }
+  .lcard.s1 { border-top: 6px solid var(--tag); }
+  .lcard.s2 { border-top: 6px solid var(--baby); }
+  .lcard.s3 { border-top: 6px solid var(--warn); }
+  .syncnote { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .syncnote .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
+  .syncnote.local .dot { background: var(--warn); }
+  .cardform { display: grid; gap: 12px; margin-top: 14px; }
+  .cardform input[type="text"] { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+  .cardform .err { color: var(--no); font-size: 14px; min-height: 1.4em; }
+  /* Streepjescode altijd zwart op wit, ook in donkere modus: dat scant de kassa het best */
+  .scan { position: fixed; inset: 0; z-index: 30; background: #FFFFFF; color: #111111; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .scan h2 { color: #111111; font-size: 26px; text-align: center; }
+  .scan .ctype { color: #555555; font-size: 14px; margin-top: -12px; }
+  .scan svg.bc { width: 100%; max-width: 520px; height: auto; background: #FFFFFF; }
+  .scan .bignum { font-variant-numeric: tabular-nums; letter-spacing: .14em; font-size: 20px; font-weight: 700; }
+  .scan .hint { color: #555555; font-size: 14px; text-align: center; max-width: 34ch; }
+  .scan .sbtns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .scan .btn { background: #F2F2F2; color: #111111; border-color: #DDDDDD; }
+  .scan .btn.danger { color: #9B2F2F; }
   nav.tabs button {
     border: 0; background: none; padding: 8px 4px; border-radius: 10px; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--muted);
@@ -252,9 +284,14 @@
       <svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>Aanbiedingen</button>
     <button role="tab" data-tab="julien" id="tab-julien" class="babytab">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="6"/><path d="M9.5 11.5c.8.8 4.2.8 5 0M6 20c1.5-2 3.6-3 6-3s4.5 1 6 3"/></svg>Julièn</button>
+    <button role="tab" data-tab="kaarten" id="tab-kaarten">
+      <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 10v5M10 10v5M12.5 10v5M16 10v5"/></svg>Kaarten</button>
   </div>
 </nav>
 
+<div class="scan" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scan-title"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script>
 /* ---------- Opslag ---------- */
 const store = {
@@ -542,7 +579,11 @@ let personen = store.get('personen', 2);
 let geboorte = store.get('geboorte', '2026-01-28');
 let overrides = store.get('overrides', {});
 let tab = store.get('tab', 'vandaag');
-if (['vandaag', 'week', 'aanbiedingen', 'julien'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
+if (['vandaag', 'week', 'aanbiedingen', 'julien', 'kaarten'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
+// Spaarkaarten: lokale kopie (werkt ook zonder bereik in de winkel); de echte opslag is je privédeel in de app-opslag
+let kaarten = store.get('kaarten', []);
+let kaartenSync = 'lokaal'; // 'lokaal' | 'account'
+let saveCards = null;       // wordt gezet zodra de privé-opslag beschikbaar is
 
 /* ---------- Datum ---------- */
 const DAYS = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
@@ -917,13 +958,103 @@ function viewBaby() {
   <p class="disclaimer">De adviezen zijn algemeen en gebaseerd op de Nederlandse richtlijnen voor babyvoeding. Het advies van het consultatiebureau, de huisarts of de diëtist van Julièn gaat altijd voor, zeker omdat Julièn geen brood en granen mag.</p>`;
 }
 
+/* ---------- Spaarkaarten ---------- */
+const CARD_TYPES = ['Albert Heijn (Bonuskaart)', "Jumbo (Extra's)", 'Plus', 'Lidl', 'Dirk', 'Aldi', 'Kruidvat', 'Etos', 'Andere kaart'];
+const cleanNum = v => String(v || '').replace(/[\s-]/g, '');
+function eanOk(d) {
+  if (!/^\d{8}$|^\d{13}$/.test(d)) return false;
+  const n = d.split('').map(Number), c = n.pop();
+  const sum = n.reverse().reduce((s, x, i) => s + x * (i % 2 ? 1 : 3), 0);
+  return (10 - sum % 10) % 10 === c;
+}
+const cardFormat = d => eanOk(d) ? (d.length === 13 ? 'EAN13' : 'EAN8') : 'CODE128';
+const groupNum = d => d.replace(/(.{4})/g, '$1 ').trim();
+
+function viewCards() {
+  return `
+  <section>
+    <div class="eyebrow">Altijd bij de hand</div>
+    <h2 style="font-size:28px;margin-top:4px">Spaarkaarten</h2>
+    <p class="muted small" style="margin:6px 0 0">Tik op een kaart en laat de streepjescode scannen bij de kassa.</p>
+  </section>
+  <div class="syncnote ${kaartenSync === 'account' ? '' : 'local'}"><span class="dot"></span>${kaartenSync === 'account'
+    ? 'Veilig bewaard bij je account. Alleen jij ziet je kaarten, ook als je de app deelt.'
+    : 'Alleen op dit apparaat bewaard. Open de app via claude.ai om je kaarten bij je account te bewaren.'}</div>
+  ${kaarten.length ? `<div class="cards">${kaarten.map((c, i) => `
+    <button class="lcard s${i % 4}" data-card="${esc(c.id)}">
+      <span class="cname">${esc(c.naam || c.type)}</span>
+      <span class="copen">Toon code</span>
+      <span class="ctype">${c.naam ? esc(c.type) : ''}</span>
+      <span class="cnum">${esc(groupNum(c.nummer))}</span>
+    </button>`).join('')}</div>`
+    : '<article class="card"><p style="margin:0">Je hebt nog geen kaarten. Voeg hieronder je eerste spaarkaart toe.</p></article>'}
+  <details class="card"${kaarten.length ? '' : ' open'} id="addcard">
+    <summary style="cursor:pointer;font-family:var(--display);font-weight:700;font-size:17px">Kaart toevoegen</summary>
+    <form class="cardform" id="cardform" novalidate>
+      <div class="field"><label for="ctype">Winkel</label>
+        <select id="ctype">${CARD_TYPES.map(t => `<option>${esc(t)}</option>`).join('')}</select></div>
+      <div class="field"><label for="cnaam">Naam op de kaart (optioneel)</label>
+        <input type="text" id="cnaam" maxlength="40" placeholder="Bijvoorbeeld: Bonuskaart Sacha" autocomplete="off"></div>
+      <div class="field"><label for="cnummer">Kaartnummer</label>
+        <input type="text" id="cnummer" inputmode="numeric" maxlength="40" placeholder="Het nummer onder de streepjescode" autocomplete="off"></div>
+      <div class="err" id="cerr" aria-live="polite"></div>
+      <div><button class="btn primary" type="submit">Kaart bewaren</button></div>
+      <p class="small muted" style="margin:0">Het nummer staat onder de streepjescode op je fysieke kaart of in de app van de winkel. Controleer bij de eerste keer of de kassa de code goed scant.</p>
+    </form>
+  </details>`;
+}
+
+function persistCards() {
+  store.set('kaarten', kaarten);
+  if (saveCards) saveCards(kaarten).catch(() => { kaartenSync = 'lokaal'; render(); });
+}
+function openCard(id) {
+  const c = kaarten.find(x => x.id === id); if (!c) return;
+  const scan = document.getElementById('scan');
+  scan.innerHTML = `
+    <h2 id="scan-title">${esc(c.naam || c.type)}</h2>
+    ${c.naam ? `<div class="ctype">${esc(c.type)}</div>` : ''}
+    <svg class="bc" id="bc" role="img" aria-label="Streepjescode ${esc(c.nummer)}"></svg>
+    <div class="bignum">${esc(groupNum(c.nummer))}</div>
+    <p class="hint">Zet je scherm op de hoogste helderheid als de kassa de code niet leest.</p>
+    <div class="sbtns">
+      <button class="btn" data-scan="close">Sluiten</button>
+      <button class="btn danger" data-scan="delete" data-id="${esc(c.id)}">Verwijderen</button>
+    </div>`;
+  try {
+    if (!window.JsBarcode) throw new Error('geen barcode-bibliotheek');
+    JsBarcode('#bc', c.nummer, { format: cardFormat(c.nummer), displayValue: false, background: '#FFFFFF', lineColor: '#000000', margin: 16, height: 110, width: 2.4 });
+  } catch (e) {
+    document.getElementById('bc').outerHTML = '<p class="hint">De streepjescode kan niet worden getekend. Laat de kassamedewerker het nummer hieronder intypen.</p>';
+  }
+  scan.hidden = false;
+  scan.querySelector('[data-scan="close"]').focus();
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').then(l => { scan._lock = l; }).catch(() => {}); } catch (e) {}
+}
+function closeCard() {
+  const scan = document.getElementById('scan');
+  scan.hidden = true;
+  try { scan._lock && scan._lock.release(); } catch (e) {}
+  scan._lock = null;
+}
+document.getElementById('scan').addEventListener('click', e => {
+  const b = e.target.closest('[data-scan]'); if (!b) return;
+  if (b.dataset.scan === 'close') closeCard();
+  else if (b.dataset.scan === 'delete') {
+    // Bevestigen binnen de pagina: eerste tik vraagt, tweede tik verwijdert
+    if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Zeker weten? Tik nog eens'; return; }
+    kaarten = kaarten.filter(x => x.id !== b.dataset.id); persistCards(); closeCard(); render();
+  }
+});
+
 /* ---------- Render en events ---------- */
 const app = document.getElementById('app');
 document.getElementById('today-label').textContent = fmtDate(today);
 
 function render() {
-  const views = { vandaag: viewToday, week: viewWeek, aanbiedingen: viewOffers, julien: viewBaby };
+  const views = { vandaag: viewToday, week: viewWeek, aanbiedingen: viewOffers, julien: viewBaby, kaarten: viewCards };
   renderStoreBar();
+  document.querySelector('.storebar-wrap').hidden = !['vandaag', 'week', 'aanbiedingen'].includes(tab);
   app.innerHTML = `<div class="view">${views[tab]()}</div>`;
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
 }
@@ -941,14 +1072,15 @@ document.getElementById('storebar').addEventListener('click', e => {
 document.getElementById('sheet').addEventListener('click', e => {
   if (e.target.id === 'sheet' || e.target.closest('.sheet-close')) closeCompare();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCompare(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCompare(); closeCard(); } });
 
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) go(b.dataset.tab); });
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],#zoek,#wis');
+  const t = e.target.closest('[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],#zoek,#wis');
   if (!t) return;
-  if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
+  if (t.dataset.card) openCard(t.dataset.card);
+  else if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
   else if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
   else if (t.dataset.swap) swap(+t.dataset.swap);
   else if (t.dataset.reset) resetDay(+t.dataset.reset);
@@ -979,6 +1111,21 @@ app.addEventListener('change', e => {
   }
 });
 
+app.addEventListener('submit', e => {
+  if (e.target.id !== 'cardform') return;
+  e.preventDefault();
+  const type = document.getElementById('ctype').value;
+  const naam = document.getElementById('cnaam').value.trim().slice(0, 40);
+  const nummer = cleanNum(document.getElementById('cnummer').value);
+  const err = document.getElementById('cerr');
+  if (!nummer) { err.textContent = 'Vul het kaartnummer in.'; return; }
+  if (!/^[0-9A-Za-z]+$/.test(nummer)) { err.textContent = 'Een kaartnummer bestaat alleen uit cijfers (en soms letters). Controleer het nummer.'; return; }
+  if (nummer.length < 6) { err.textContent = 'Dit nummer is te kort. Neem het hele nummer onder de streepjescode over.'; return; }
+  if (kaarten.some(c => c.nummer === nummer)) { err.textContent = 'Deze kaart staat er al in.'; return; }
+  kaarten = [...kaarten, { id: Date.now().toString(36), type, naam, nummer }];
+  persistCards(); render();
+});
+
 render();
 
 /* Folders laden: eerst uit de gedeelde opslag van de app, anders uit aanbiedingen.json ernaast */
@@ -992,10 +1139,37 @@ function setLive(d) {
   const db = window.claude && window.claude.use ? await window.claude.use('db').catch(() => null) : null;
   if (db) {
     db.doc('folders/actueel').onSnapshot(snap => { if (snap.exists) setLive(snap.data()); }, () => {});
+    connectCards(db);
     return;
   }
   try { const r = await fetch('aanbiedingen.json', { cache: 'no-store' }); if (r.ok) setLive(await r.json()); } catch (e) {}
 })();
+
+/* Spaarkaarten in je privédeel van de opslag (data/users/<jouw id>), op elk apparaat gelijk */
+async function connectCards(db) {
+  const user = await window.claude.use('user').catch(() => null);
+  const uid = user ? await user.id() : null;
+  if (!uid) return; // geen account in deze weergave: kaarten blijven op dit apparaat
+  const ref = db.doc(`data/users/${uid}/kaarten`);
+  saveCards = list => ref.set({ lijst: list });
+  ref.onSnapshot(snap => {
+    const remote = snap.exists && Array.isArray((snap.data() || {}).lijst) ? snap.data().lijst : null;
+    if (!store.get('kaartenAccount', false)) {
+      // Allereerste koppeling op dit apparaat: kaarten die alleen lokaal stonden meenemen naar je account.
+      // Daarna is je account leidend, zodat een op een ander apparaat verwijderde kaart niet terugkomt.
+      const merged = [...(remote || [])];
+      kaarten.forEach(c => { if (!merged.some(m => m.nummer === c.nummer)) merged.push(c); });
+      if (merged.length && (!remote || merged.length !== remote.length)) saveCards(merged).catch(() => {});
+      kaarten = merged;
+      store.set('kaartenAccount', true);
+    } else if (remote) {
+      kaarten = remote;
+    }
+    kaartenSync = 'account';
+    store.set('kaarten', kaarten);
+    if (tab === 'kaarten' && document.getElementById('scan').hidden && !(document.getElementById('cnummer') || {}).value) render();
+  }, () => { kaartenSync = 'lokaal'; if (tab === 'kaarten') render(); });
+}
 </script>
 <!--wrapper-->
 </body>
