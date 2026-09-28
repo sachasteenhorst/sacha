@@ -526,7 +526,6 @@
   ul.ingr li .marks { flex-basis: auto; }
   ul.ingr li.omitted { opacity: .6; }
   ul.ingr li.omitted .iname { text-decoration: line-through; }
-  .iname, .oname { overflow-wrap: anywhere; }
   ul.gerei { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
   ul.gerei li { background: var(--tile); border-radius: 10px; padding: 6px 11px; font-size: 14px; }
   ol.steps.cook { list-style: none; padding: 0; gap: 10px; }
@@ -559,12 +558,62 @@
   .addfree input { width: 100%; }
   .orow { grid-template-columns: 34px minmax(0, 1fr) auto 12px; }
   .obest { flex-wrap: wrap; row-gap: 2px; max-width: 150px; white-space: normal; }
+
+  /* ---------- Welkomstscherm ---------- */
+  .splash {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; color: #FFFFFF; cursor: pointer;
+    background: radial-gradient(120% 80% at 50% 20%, #2FA766 0%, #1E7A4C 55%, #11502F 100%);
+    transition: opacity .4s ease, transform .4s ease;
+  }
+  .splash.weg { opacity: 0; transform: scale(1.04); pointer-events: none; }
+  .splash-q { color: #FFFFFF; font-size: clamp(38px, 11vw, 60px); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; animation: sp-rise .6s .15s both; }
+  .splash-sub { margin: 0; font-size: 16px; opacity: .92; max-width: 30ch; animation: sp-rise .6s .45s both; }
+  .splash-go { margin-top: 10px; background: #FFFFFF; color: #145C38; box-shadow: 0 4px 0 #0B3A22; animation: sp-rise .6s .7s both; }
+  .splash-art { position: relative; width: min(340px, 90vw); height: 160px; }
+  .sp { position: absolute; animation: sp-pop .5s both; filter: drop-shadow(0 8px 10px rgba(0,0,0,.25)); }
+  .sp0 { left: 2%; top: 50%; animation-delay: .05s; } .sp1 { left: 18%; top: 6%; animation-delay: .13s; }
+  .sp2 { left: 39%; top: 40%; animation-delay: .21s; } .sp3 { left: 57%; top: 0; animation-delay: .29s; }
+  .sp4 { left: 74%; top: 46%; animation-delay: .37s; } .sp5 { left: 84%; top: 2%; animation-delay: .45s; }
+  .sp0 .art, .sp4 .art { transform: rotate(-10deg); } .sp1 .art, .sp5 .art { transform: rotate(8deg); }
+  @keyframes sp-pop { from { opacity: 0; transform: translateY(24px) scale(.6); } to { opacity: 1; transform: none; } }
+  @keyframes sp-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .splash-q, .splash-sub, .splash-go, .sp { animation: none; } .splash { transition: none; } }
+
+  /* ---------- Ingrediënttegel: rij 1 icoon + naam, rij 2 winkel en labels links, Laat weg rechts ---------- */
+  ul.ingr li.itile {
+    display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 8px; align-items: center;
+  }
+  li.itile > .art, li.itile > .art-empty { grid-column: 1; grid-row: 1; }
+  li.itile .ibody { grid-column: 2 / 4; grid-row: 1; }
+  li.itile .marks { grid-column: 2; grid-row: 2; max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; }
+  li.itile .omit { grid-column: 3; grid-row: 2; align-self: center; }
+  li.itile.omitted .omit { grid-row: 1; }
+  li.itile.omitted .ibody { grid-column: 2; }
+  li.itile .price { max-width: 100%; white-space: normal; text-align: left; }
+  .price { flex-wrap: wrap; row-gap: 2px; column-gap: 4px; }
+  .price .more { white-space: nowrap; }
+  .iname, .oname, .ltext .iname, ul.costs li span, .stext { overflow-wrap: break-word; word-break: normal; -webkit-hyphens: auto; hyphens: auto; }
+
+  /* Acties-overzicht: naam over de volle breedte, winkel en prijs eronder */
+  .orow { grid-template-columns: 34px minmax(0, 1fr) 14px; grid-template-rows: auto auto; row-gap: 4px; }
+  .orow > .art, .orow > .art-empty { grid-row: 1 / 3; }
+  .orow .oname { grid-column: 2; grid-row: 1; }
+  .orow .obest { grid-column: 2; grid-row: 2; justify-content: flex-start; text-align: left; max-width: none; }
+  .orow .chev { grid-column: 3; grid-row: 1 / 3; }
+
+  /* Boodschappenlijst: vinkje, naam en × op rij 1; prijs op rij 2 */
+  ul.shop li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px; align-items: center; }
+  ul.shop li > input { grid-column: 1; grid-row: 1; }
+  ul.shop li > .lmain { grid-column: 2; grid-row: 1; }
+  ul.shop li > .lrm { grid-column: 3; grid-row: 1; }
+  ul.shop li > .leur { grid-column: 2; grid-row: 2; justify-self: start; }
 </style>
 <!--wrapper-->
 </head>
 <body>
 <!--/wrapper-->
-<div class="wrap">
+<div class="wrap" lang="nl">
   <header class="top">
     <div class="brand">
       <span class="applogo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16l-1.6 7.2A2 2 0 0 1 16.4 20H7.6a2 2 0 0 1-2-1.8z"/><path d="M8 11c0-3 1.8-5 4-5s4 2 4 5"/><path d="M12 6c.4-1.6 1.6-2.6 3-2.8"/></svg></span>
@@ -577,6 +626,12 @@
     <div class="storebar" id="storebar" role="group" aria-label="Kies je winkels"></div>
   </div>
   <main id="app"></main>
+  <div class="splash" id="splash" role="dialog" aria-label="Welkom">
+    <div class="splash-art" id="splash-art" aria-hidden="true"></div>
+    <h1 class="splash-q">Wat eten we<br>deze week?</h1>
+    <p class="splash-sub" id="splash-sub"></p>
+    <button class="btn splash-go" id="splash-go">Bekijk het weekmenu</button>
+  </div>
 </div>
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
@@ -670,7 +725,8 @@ const NITRATE = new Set(['spinazie', 'rode-biet']);
 /* ---------- Recepten (hoeveelheden voor 2 volwassenen) ---------- */
 const I = (q, u, n, k = null, baby = false) => ({ q, u, n, k, baby });
 const RECIPES = [
-  { id: 'zalm-zoet', naam: 'Zalm uit de oven met zoete aardappel en broccoli', tijd: 35, soort: 'Vis',
+  { id: 'zalm-zoet', foto: {"src": "fotos/zalm-zoet.jpg", "auteur": "nathanborror", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/72897141@N00/2815891083", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Zalm uit de oven met zoete aardappel en broccoli', tijd: 35, soort: 'Vis',
     ingr: [I(2, '', 'zalmfilets (± 250 g)', 'zalm'), I(500, 'g', 'zoete aardappel', 'zoete-aardappel'), I(400, 'g', 'broccoli', 'broccoli'),
       I(1, 'el', 'olijfolie'), I(1, '', 'citroen'), I(null, '', 'peper en zout')],
     gerei: ["Bakplaat met bakpapier", "Snijplank en scherp mes", "Kom", "Dunschiller"],
@@ -680,7 +736,8 @@ const RECIPES = [
       'Controleer de zalm goed op graatjes. Prak alles grof met een scheutje water, moedermelk of flesvoeding.',
       'Zachte broccoliroosjes en blokjes zoete aardappel zijn ook goed als vingervoedsel.'], allergenen: ['vis'] } },
 
-  { id: 'pompoencurry', naam: 'Pompoencurry met kip en kikkererwten', tijd: 35, soort: 'Kip',
+  { id: 'pompoencurry', foto: {"src": "fotos/pompoencurry.jpg", "auteur": "OriginalJo", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/20081689@N00/4107782153", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Pompoencurry met kip en kikkererwten', tijd: 35, soort: 'Kip',
     ingr: [I(300, 'g', 'kippendijfilet', 'kippendij'), I(600, 'g', 'pompoen', 'pompoen'), I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'),
       I(1, '', 'ui', 'ui'), I(200, 'ml', 'kokosmelk', 'kokosmelk'), I(1, 'el', 'milde currypasta'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(null, '', 'koriander, zout')],
     gerei: ["Grote hapjespan of wok met deksel", "Pan voor de rijst", "Snijplank en scherp mes", "Zeef", "Dunschiller"],
@@ -690,7 +747,8 @@ const RECIPES = [
       'Haal de velletjes van de kikkererwten, snijd de kip heel fijn en prak alles met de pompoen tot een grove puree.',
       'Geen rijst: geef wat extra pompoen of een gekookte aardappel.'], allergenen: [] } },
 
-  { id: 'linzenstoof', naam: 'Linzenstoof met wortel en tomaat', tijd: 40, soort: 'Vega',
+  { id: 'linzenstoof', foto: {"src": "fotos/linzenstoof.jpg", "auteur": "You As A Machine", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/82815184@N03/8126652808", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Linzenstoof met wortel en tomaat', tijd: 40, soort: 'Vega',
     ingr: [I(150, 'g', 'rode linzen', 'linzen'), I(300, 'g', 'wortel', 'wortel'), I(1, '', 'ui', 'ui'), I(400, 'g', 'tomatenblokjes', 'passata'),
       I(500, 'g', 'aardappelen', 'aardappel'), I(1, 'tl', 'komijn'), I(1, '', 'groentebouillonblokje'), I(null, '', 'peterselie')],
     gerei: ["Grote pan met dikke bodem en deksel", "Pan voor de aardappelen", "Zeef", "Dunschiller"],
@@ -699,7 +757,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de portie vóór de bouillon (die bevat veel zout).',
       'Prak de linzenstoof met een aardappel tot een smeuïge puree. Rode linzen zijn na lang koken vanzelf zacht.'], allergenen: [] } },
 
-  { id: 'frittata', naam: 'Frittata met courgette en paprika', tijd: 25, soort: 'Ei',
+  { id: 'frittata', foto: {"src": "fotos/frittata.jpg", "auteur": "jeffreyw", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/7927684@N03/5182567699", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Frittata met courgette en paprika', tijd: 25, soort: 'Ei',
     ingr: [I(6, '', 'eieren', 'eieren'), I(1, '', 'courgette', 'courgette'), I(1, '', 'rode paprika', 'paprika'), I(50, 'g', 'feta', 'feta'),
       I(400, 'g', 'krieltjes', 'aardappel'), I(null, '', 'peterselie, peper, zout')],
     gerei: ["Ovenvaste koekenpan (ongeveer 24 cm)", "Kom en garde of vork", "Pan voor de krieltjes", "Snijplank en mes"],
@@ -709,7 +768,8 @@ const RECIPES = [
       'Laat het ei helemaal stollen, zonder zacht of lopend eigeel.',
       'Snijd het in reepjes als vingervoedsel en geef er zachte stukjes krieltje en courgette bij.'], allergenen: ['ei'] } },
 
-  { id: 'kabeljauw-prei', naam: 'Kabeljauw met preipuree', tijd: 30, soort: 'Vis',
+  { id: 'kabeljauw-prei', foto: {"src": "fotos/kabeljauw-prei.jpg", "auteur": "susan@kingstreetmarketinggroup", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/64141731@N00/8211344754", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Kabeljauw met preipuree', tijd: 30, soort: 'Vis',
     ingr: [I(300, 'g', 'kabeljauw- of koolvisfilet', 'witvis'), I(700, 'g', 'kruimige aardappelen', 'aardappel'), I(2, '', 'preien', 'prei'),
       I(100, 'ml', 'melk'), I(1, 'el', 'roomboter'), I(1, '', 'citroen'), I(null, '', 'nootmuskaat, peper, zout')],
     gerei: ["Pan voor de aardappelen", "Pureestamper", "Koekenpan met deksel", "Vergiet", "Snijplank en mes"],
@@ -718,7 +778,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de puree vóór het zout.',
       'Controleer de vis goed op graatjes en prak hem door de preipuree. Gebruik een scheutje water als het te dik is.'], allergenen: ['vis', 'melk'] } },
 
-  { id: 'gehaktballetjes', naam: 'Gehaktballetjes in tomatensaus met volkoren spaghetti', tijd: 35, soort: 'Vlees',
+  { id: 'gehaktballetjes', foto: {"src": "fotos/gehaktballetjes.jpg", "auteur": "Unsound Media", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/39714654@N07/5953485010", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Gehaktballetjes in tomatensaus met volkoren spaghetti', tijd: 35, soort: 'Vlees',
     ingr: [I(300, 'g', 'rundergehakt', 'gehakt'), I(1, '', 'ei', 'eieren'), I(1, '', 'kleine courgette (geraspt)', 'courgette'), I(500, 'g', 'passata', 'passata'),
       I(1, '', 'ui', 'ui'), I(1, '', 'teen knoflook'), I(160, 'g', 'volkoren spaghetti', 'pasta'), I(1, '', 'pastinaak (voor {baby})', 'pastinaak', true), I(null, '', 'basilicum, zout, peper')],
     gerei: ["Kom", "Rasp", "Grote pan met deksel", "Pan voor de pasta", "Snijplank en mes"],
@@ -728,7 +789,8 @@ const RECIPES = [
       'Geen spaghetti: prak de balletjes met de gekookte pastinaak en wat tomatensaus.',
       'Draai voor vingervoedsel een paar extra kleine, zachte balletjes.'], allergenen: ['ei'] } },
 
-  { id: 'bloemkool-ovenschotel', naam: 'Bloemkool-broccoli-ovenschotel met kip', tijd: 40, soort: 'Kip',
+  { id: 'bloemkool-ovenschotel', foto: {"src": "fotos/bloemkool-ovenschotel.jpg", "auteur": "ndrwfgg", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/69024001@N00/107549297", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Bloemkool-broccoli-ovenschotel met kip', tijd: 40, soort: 'Kip',
     ingr: [I(0.5, '', 'bloemkool', 'bloemkool'), I(300, 'g', 'broccoli', 'broccoli'), I(300, 'g', 'kipfilet', 'kipfilet'), I(500, 'g', 'aardappelen', 'aardappel'),
       I(2, '', 'eieren', 'eieren'), I(150, 'ml', 'melk'), I(50, 'g', 'geraspte kaas', 'kaas'), I(null, '', 'nootmuskaat, peper, zout')],
     gerei: ["Ovenschaal", "Grote pan", "Koekenpan", "Kom en garde", "Vergiet"],
@@ -737,7 +799,8 @@ const RECIPES = [
     baby: { stappen: ['Neem kip, bloemkool, broccoli en aardappel apart vóór het ei-melkmengsel en de kaas (kaas is zout).',
       'Snijd de kip heel fijn en prak alles met een klontje ongezouten boter of wat kookvocht.'], allergenen: [] } },
 
-  { id: 'spinaziestoof', naam: 'Zoete-aardappelstoof met spinazie en kikkererwten', tijd: 30, soort: 'Vega',
+  { id: 'spinaziestoof', foto: {"src": "fotos/spinaziestoof.jpg", "auteur": "jules:stonesoup", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/58367355@N00/14850704523", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Zoete-aardappelstoof met spinazie en kikkererwten', tijd: 30, soort: 'Vega',
     ingr: [I(500, 'g', 'zoete aardappel', 'zoete-aardappel'), I(300, 'g', 'spinazie', 'spinazie'), I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'),
       I(1, '', 'ui', 'ui'), I(400, 'g', 'tomatenblokjes', 'passata'), I(1, 'tl', 'komijn en paprikapoeder'), I(4, 'el', 'volle yoghurt', 'yoghurt'), I(null, '', 'zout')],
     gerei: ["Grote pan of hapjespan met deksel", "Zeef", "Dunschiller", "Snijplank en mes"],
@@ -746,7 +809,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de portie vóór het zout. Haal de velletjes van de kikkererwten en prak alles fijn.',
       'Geef het meteen en warm het niet op. Bewaar geen restjes met spinazie voor {baby}.'], allergenen: ['melk (yoghurt)'] } },
 
-  { id: 'kalkoen-sperzie', naam: 'Kalkoenfilet met sperziebonen en krieltjes', tijd: 30, soort: 'Kip',
+  { id: 'kalkoen-sperzie', foto: {"src": "fotos/kalkoen-sperzie.jpg", "auteur": "jeffreyw", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/7927684@N03/41113564590", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Kalkoenfilet met sperziebonen en krieltjes', tijd: 30, soort: 'Kip',
     ingr: [I(300, 'g', 'kalkoenfilet', 'kalkoen'), I(400, 'g', 'sperziebonen', 'sperziebonen'), I(500, 'g', 'krieltjes', 'aardappel'),
       I(1, '', 'ui', 'ui'), I(1, 'el', 'olijfolie'), I(null, '', 'tijm, peper, zout')],
     gerei: ["Twee pannen", "Koekenpan", "Snijplank en mes"],
@@ -764,7 +828,8 @@ const RECIPES = [
     baby: { stappen: ['Neem stamppot en kip vóór het zout. Snijd de kip fijn en prak alles.',
       'Rode biet kleurt poepluiers rood; dat is onschuldig. Warm het niet op en geef het de dag erna niet opnieuw.'], allergenen: ['melk'] } },
 
-  { id: 'wraps-kip', naam: 'Volkoren wraps met kip, avocado en paprika', tijd: 20, soort: 'Kip',
+  { id: 'wraps-kip', foto: {"src": "fotos/wraps-kip.jpg", "auteur": "Vegan Feast Catering", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/25128194@N02/3389183328", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Volkoren wraps met kip, avocado en paprika', tijd: 20, soort: 'Kip',
     ingr: [I(4, '', 'volkoren wraps', 'wraps'), I(300, 'g', 'kipfilet', 'kipfilet'), I(1, '', 'avocado', 'avocado'), I(2, '', 'paprika', 'paprika'),
       I(200, 'g', 'cherrytomaten', 'tomaat'), I(100, 'g', 'volle yoghurt', 'yoghurt'), I(1, 'tl', 'paprikapoeder')],
     gerei: ["Koekenpan", "Snijplank en mes", "Kom en vork"],
@@ -773,7 +838,8 @@ const RECIPES = [
     baby: { stappen: ['Geen wrap. Gaar de kip zonder kruiden en snijd hem in dunne, zachte reepjes.',
       'Stoom de paprikareepjes zacht en geef er een partje of wat prak van rijpe avocado bij.'], allergenen: [] } },
 
-  { id: 'pompoensoep', naam: 'Pompoensoep met rode linzen', tijd: 35, soort: 'Vega',
+  { id: 'pompoensoep', foto: {"src": "fotos/pompoensoep.jpg", "auteur": "stu_spivack", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/35034346243@N01/319266288", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Pompoensoep met rode linzen', tijd: 35, soort: 'Vega',
     ingr: [I(800, 'g', 'pompoen', 'pompoen'), I(100, 'g', 'rode linzen', 'linzen'), I(1, '', 'ui', 'ui'), I(2, '', 'wortels', 'wortel'),
       I(100, 'ml', 'kokosmelk', 'kokosmelk'), I(1, '', 'groentebouillonblokje'), I(4, '', 'sneetjes volkoren brood', 'brood')],
     gerei: ["Grote soeppan", "Staafmixer", "Snijplank en mes", "Dunschiller", "Zeef"],
@@ -782,7 +848,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de soep vóór de bouillon en laat hem dikker. Een lepel is hier handiger dan een beker.',
       'Geen brood: geef er zachte stukjes gekookte wortel of pompoen bij.'], allergenen: [] } },
 
-  { id: 'shakshuka', naam: 'Shakshuka met kikkererwten', tijd: 30, soort: 'Ei',
+  { id: 'shakshuka', foto: {"src": "fotos/shakshuka.jpg", "auteur": "adactio", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/74105777@N00/12149680454", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Shakshuka met kikkererwten', tijd: 30, soort: 'Ei',
     ingr: [I(4, '', 'eieren', 'eieren'), I(2, '', 'paprika', 'paprika'), I(1, '', 'ui', 'ui'), I(500, 'g', 'passata', 'passata'),
       I(1, 'blik', 'kikkererwten (400 g)', 'kikkererwten'), I(1, 'tl', 'komijn'), I(1, '', 'aardappel (voor {baby})', 'aardappel', true), I(2, '', 'sneetjes volkoren brood', 'brood'), I(null, '', 'chilivlokken, peterselie, zout')],
     gerei: ["Grote koekenpan of hapjespan met deksel", "Zeef", "Kopje", "Snijplank en mes"],
@@ -792,7 +859,8 @@ const RECIPES = [
       'Kook een ei hard (10 minuten) en prak het erdoor of geef het in partjes.',
       'Geen brood: serveer met een gekookte aardappel.'], allergenen: ['ei'] } },
 
-  { id: 'kip-traybake', naam: 'Kip uit de oven met pastinaak, wortel en rode ui', tijd: 45, soort: 'Kip',
+  { id: 'kip-traybake', foto: {"src": "fotos/kip-traybake.jpg", "auteur": "wlayton", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/34917178@N08/5205365229", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Kip uit de oven met pastinaak, wortel en rode ui', tijd: 45, soort: 'Kip',
     ingr: [I(400, 'g', 'kippendijfilet', 'kippendij'), I(2, '', 'pastinaken', 'pastinaak'), I(4, '', 'wortels', 'wortel'), I(2, '', 'rode uien', 'ui'),
       I(300, 'g', 'krieltjes', 'aardappel'), I(1, 'el', 'olijfolie'), I(null, '', 'rozemarijn, peper, zout')],
     gerei: ["Grote bakplaat met bakpapier", "Snijplank en mes", "Dunschiller"],
@@ -802,7 +870,8 @@ const RECIPES = [
       'De pastinaak- en wortelstaafjes zijn na 35 minuten zacht genoeg om als vingervoedsel te geven. Druk er even op om het te testen.',
       'Trek de kip in draadjes of snijd hem fijn.'], allergenen: [] } },
 
-  { id: 'chili', naam: 'Chili sin carne met zoete aardappel en bonen', tijd: 40, soort: 'Vega',
+  { id: 'chili', foto: {"src": "fotos/chili.jpg", "auteur": "Thriving Vegetarian", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/90155432@N02/12021820346", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Chili sin carne met zoete aardappel en bonen', tijd: 40, soort: 'Vega',
     ingr: [I(2, 'blik', 'kidney- of zwarte bonen', 'bonen'), I(400, 'g', 'zoete aardappel', 'zoete-aardappel'), I(2, '', 'paprika', 'paprika'), I(1, '', 'ui', 'ui'),
       I(500, 'g', 'passata', 'passata'), I(1, 'tl', 'komijn'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(4, 'el', 'volle yoghurt', 'yoghurt'), I(null, '', 'chilipoeder, zout')],
     gerei: ["Grote pan met deksel", "Pan voor de rijst", "Zeef", "Snijplank en mes", "Dunschiller"],
@@ -812,7 +881,8 @@ const RECIPES = [
       'Prak de bonen goed of haal de velletjes eraf. Meng met de zoete aardappel tot een grove puree.',
       'Geen rijst: de zoete aardappel geeft al genoeg vulling.'], allergenen: [] } },
 
-  { id: 'hutspot', naam: 'Hutspot met gehaktballetjes', tijd: 40, soort: 'Vlees',
+  { id: 'hutspot', foto: {"src": "fotos/hutspot.jpg", "auteur": "kellyhogaboom", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/11597293@N00/3699380835", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Hutspot met gehaktballetjes', tijd: 40, soort: 'Vlees',
     ingr: [I(700, 'g', 'aardappelen', 'aardappel'), I(500, 'g', 'winterpeen', 'wortel'), I(3, '', 'uien', 'ui'), I(250, 'g', 'rundergehakt', 'gehakt'),
       I(100, 'ml', 'melk'), I(null, '', 'nootmuskaat, peper, zout')],
     gerei: ["Grote pan", "Pureestamper", "Koekenpan", "Dunschiller", "Snijplank en mes"],
@@ -821,7 +891,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de hutspot en een paar balletjes vóór het zout. Prak ze fijn of geef ze als zacht vingervoedsel.',
       'Maak de hutspot eventueel smeuïger met wat kookvocht.'], allergenen: ['melk'] } },
 
-  { id: 'lasagne', naam: 'Lasagne met courgette, champignons en gehakt', tijd: 50, soort: 'Vlees',
+  { id: 'lasagne', foto: {"src": "fotos/lasagne.jpg", "auteur": "plasticrevolver", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/31474531@N00/5413268570", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Lasagne met courgette, champignons en gehakt', tijd: 50, soort: 'Vlees',
     ingr: [I(250, 'g', 'rundergehakt', 'gehakt'), I(2, '', 'courgettes', 'courgette'), I(250, 'g', 'champignons', 'champignons'), I(500, 'g', 'passata', 'passata'),
       I(1, '', 'ui', 'ui'), I(6, '', 'volkoren lasagnebladen', 'pasta'), I(75, 'g', 'geraspte kaas', 'kaas'), I(1, '', 'zoete aardappel (voor {baby})', 'zoete-aardappel', true), I(null, '', 'oregano, zout, peper')],
     gerei: ["Ovenschaal (ongeveer 20 × 30 cm)", "Grote koekenpan of hapjespan", "Snijplank en mes", "Bakplaat"],
@@ -839,7 +910,8 @@ const RECIPES = [
     baby: { stappen: ['Neem de puree vóór het zout. De velletjes van doperwten kunnen draderig zijn, dus prak goed of wrijf even door een zeef.',
       'Controleer de vis op graten en prak hem erdoor.'], allergenen: ['vis', 'melk (boter)'] } },
 
-  { id: 'kip-pinda', naam: 'Kip met pindasaus, sperziebonen en rijst', tijd: 30, soort: 'Kip',
+  { id: 'kip-pinda', foto: {"src": "fotos/kip-pinda.jpg", "auteur": "loustejskal.com", "licentie": "CC BY 2.0", "bron": "https://www.flickr.com/photos/63311602@N08/23521255278", "licurl": "https://creativecommons.org/licenses/by/2.0/"},
+    naam: 'Kip met pindasaus, sperziebonen en rijst', tijd: 30, soort: 'Kip',
     ingr: [I(300, 'g', 'kipfilet', 'kipfilet'), I(400, 'g', 'sperziebonen', 'sperziebonen'), I(3, 'el', 'pindakaas (100% pinda)', 'pindakaas'),
       I(100, 'ml', 'kokosmelk', 'kokosmelk'), I(1, 'el', 'ketjap'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(1, '', 'aardappel (voor {baby})', 'aardappel', true), I(1, '', 'teen knoflook')],
     gerei: ["Twee pannen", "Koekenpan", "Steelpannetje", "Snijplank en mes", "Knoflookpers"],
@@ -849,7 +921,8 @@ const RECIPES = [
       'Snijd de kip fijn en prak met de aardappel, sperziebonen en een lepel pindasaus.',
       'Is pinda nog nieuw voor {baby}? Geef het dan overdag, als je {baby} daarna een paar uur in de gaten kunt houden.'], allergenen: ['pinda'] } },
 
-  { id: 'bloemkoolcurry', naam: 'Bloemkool-linzencurry', tijd: 35, soort: 'Vega',
+  { id: 'bloemkoolcurry', foto: {"src": "fotos/bloemkoolcurry.jpg", "auteur": "draxil", "licentie": "CC BY-SA 2.0", "bron": "https://www.flickr.com/photos/45977080@N00/5494667447", "licurl": "https://creativecommons.org/licenses/by-sa/2.0/"},
+    naam: 'Bloemkool-linzencurry', tijd: 35, soort: 'Vega',
     ingr: [I(0.5, '', 'bloemkool', 'bloemkool'), I(150, 'g', 'rode linzen', 'linzen'), I(1, '', 'ui', 'ui'), I(200, 'ml', 'kokosmelk', 'kokosmelk'),
       I(400, 'g', 'tomatenblokjes', 'passata'), I(1, 'el', 'milde currypasta'), I(150, 'g', 'zilvervliesrijst', 'rijst'), I(null, '', 'koriander, zout')],
     gerei: ["Grote pan met deksel", "Pan voor de rijst", "Zeef", "Snijplank en mes"],
@@ -906,7 +979,8 @@ if (!gezin) {
 }
 let saveGezin = null;
 let overrides = store.get('overrides', {});
-let tab = store.get('tab', 'vandaag');
+// Beginscherm is altijd het weekmenu (na het welkomstscherm)
+let tab = 'week';
 if (tab === 'julien') tab = 'gezin';
 if (['vandaag', 'week', 'recepten', 'lijst', 'aanbiedingen', 'gezin', 'kaarten'].includes(location.hash.slice(1))) tab = location.hash.slice(1);
 // Spaarkaarten: lokale kopie (werkt ook zonder bereik in de winkel); de echte opslag is je privédeel in de app-opslag
@@ -1140,7 +1214,7 @@ function photoBlock(r, cls) {
   return `<figure class="${cls}">
     <img src="${f.src}" alt="${esc(r.naam)}" loading="lazy" decoding="async">
     <div class="veggies" aria-hidden="true">${recipeArt(r, 4).map(a => art(a, 30)).join('')}</div>
-    <figcaption>Voorbeeldfoto: <a href="${esc(f.bron)}" target="_blank" rel="noopener">${esc(f.auteur || 'Wikimedia Commons')}</a>, ${esc(f.licentie)}</figcaption>
+    <figcaption>Voorbeeldfoto: <a href="${esc(f.bron)}" target="_blank" rel="noopener">${esc(f.auteur)}</a>, ${f.licurl ? `<a href="${esc(f.licurl)}" target="_blank" rel="noopener">${esc(f.licentie)}</a>` : esc(f.licentie)} · bijgesneden</figcaption>
   </figure>`;
 }
 const produceRow = names => `<div class="producerow" aria-hidden="true">${names.map(a => art(a, 34)).join('')}</div>`;
@@ -1216,7 +1290,9 @@ const SWAPS = [
 // Alle ingrediënten van een recept, met de gekozen goedkopere alternatieven
 function allIngr(r, active = swaps[r.id] || []) {
   const act = SWAPS.filter(w => active.includes(w.id));
-  return r.ingr.filter(i => !i.baby || hasBaby()).flatMap(i => { const w = act.find(x => x.from.includes(i.k)); return w ? w.apply(i) : [i]; });
+  return r.ingr.filter(i => !i.baby || hasBaby())
+    .map(i => i.n.includes('{baby}') ? { ...i, n: i.n.split('{baby}').join(babyNames()) } : i)
+    .flatMap(i => { const w = act.find(x => x.from.includes(i.k)); return w ? w.apply(i) : [i]; });
 }
 // Wat je zelf weglaat, telt niet mee voor kosten, boodschappen en allergenen
 const omitKey = (r, i) => r.id + '|' + i.n;
@@ -1288,6 +1364,7 @@ function adultStep(t) {
   return x.split(/(?<=\.)\s+/).filter(z => !z.includes('{baby}')).join(' ').trim();
 }
 const babyStep = t => t.split('{baby}').join(babyNames());
+const shownName = n => n.split('{baby}').join(hasBaby() ? babyNames() : 'de baby');
 function persistGezin() {
   store.set('gezin', gezin);
   if (saveGezin) saveGezin([gezin]).catch(() => {});
@@ -1362,9 +1439,9 @@ function recipeBody(r, dayIndex) {
   return `
     <div class="section-title">Ingrediënten</div>
     <ul class="ingr">${alle.map(i => isOmitted(r, i) ? `
-      <li class="omitted">${artIcon(i.k, i.n, 30)}<span class="ibody"><span class="iname">${esc(i.n)}</span><span class="qty">weggelaten</span></span>
+      <li class="itile omitted">${artIcon(i.k, i.n, 30)}<span class="ibody"><span class="iname">${esc(i.n)}</span><span class="qty">weggelaten</span></span>
         <button class="omit back" data-omit="${esc(omitKey(r, i))}" aria-label="${esc(i.n)} terugzetten">Terug</button></li>` : `
-      <li>${artIcon(i.k, i.n, 30)}<span class="ibody"><span class="iname">${esc(i.n)}</span><span class="qty">${esc(fmtQ(i))}</span></span>
+      <li class="itile">${artIcon(i.k, i.n, 30)}<span class="ibody"><span class="iname">${esc(i.n)}</span><span class="qty">${esc(fmtQ(i))}</span></span>
         <button class="omit" data-omit="${esc(omitKey(r, i))}" aria-label="${esc(i.n)} weglaten">Laat weg</button>
         <span class="marks">${priceBtn(i.k)}${forbidders(i).length ? `<span class="pill no">niet voor ${esc(opsomming(forbidders(i).map(naamVan)))}</span>` : ''}${i.baby ? `<span class="pill baby">${esc(babyNames())}</span>` : ''}</span></li>`).join('')}
     </ul>
@@ -1576,7 +1653,7 @@ function viewList() {
       <ul class="ingr shop">${items.map(i => { const c = cost(i); const b = w && i.k ? best(i.k) : null; return `
         <li class="${i.gekocht ? 'done' : ''}">
           <input type="checkbox" id="l-${i.id}" data-lcheck="${i.id}" ${i.gekocht ? 'checked' : ''} aria-label="${esc(i.n)} gekocht">
-          <label for="l-${i.id}" class="lmain">${artIcon(i.k, i.n, 28)}<span class="ltext"><span class="iname">${esc(i.n)}</span>
+          <label for="l-${i.id}" class="lmain">${artIcon(i.k, i.n, 28)}<span class="ltext"><span class="iname">${esc(shownName(i.n))}</span>
             <span class="lsub small muted">${esc([listQty(i), b ? b.actie : ''].filter(Boolean).join(' · '))}</span></span></label>
           ${c ? (i.k ? `<button class="leur" data-cmp="${i.k}">${fmtEur(c.eur)}</button>` : `<span class="leur">${fmtEur(c.eur)}</span>`) : '<span class="leur muted">–</span>'}
           <button class="lrm" data-lrm="${i.id}" aria-label="${esc(i.n)} verwijderen">×</button>
@@ -2045,6 +2122,20 @@ app.addEventListener('submit', e => {
 });
 
 render();
+
+/* Welkomstscherm: "Wat eten we deze week?", daarna het weekmenu */
+(() => {
+  const sp = document.getElementById('splash');
+  if (!sp) return;
+  const namen = ['tomaat', 'wortel', 'broccoli', 'avocado', 'paprika', 'peer'];
+  document.getElementById('splash-art').innerHTML = namen.map((a, i) => `<span class="sp sp${i}">${art(a, 64)}</span>`).join('');
+  const n = plan().filter(r => hits(r).length).length;
+  document.getElementById('splash-sub').textContent = n ? `${n} van de 7 gerechten met producten uit de aanbieding` : 'Zeven gezonde gerechten voor je klaargezet';
+  let klaar = false;
+  const sluit = () => { if (klaar) return; klaar = true; sp.classList.add('weg'); setTimeout(() => sp.remove(), 450); };
+  sp.addEventListener('click', sluit);
+  setTimeout(sluit, matchMedia('(prefers-reduced-motion: reduce)').matches ? 1200 : 2600);
+})();
 
 /* Als geïnstalleerde app (buiten claude.ai): offline-laag registreren */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !(window.claude && window.claude.use)) {
