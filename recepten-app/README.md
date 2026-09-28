@@ -36,10 +36,11 @@ De tijdlijn met gedeelde recepten gebruikt een gratis [Supabase](https://supabas
 2. Open **SQL Editor → New query**, plak de inhoud van `supabase/setup.sql` en klik **Run**.
 3. Zet onder **Authentication → Sign In / Providers** de optie
    **Allow anonymous sign-ins** aan. Gebruikers hebben dan geen account nodig.
-4. Kopieer onder **Project Settings → API** de *Project URL* en de publieke
-   *anon*-sleutel en vul ze in bij `SUPA` in `index.html`.
+4. Kopieer onder **Project Settings → API Keys** de *Project URL* en de
+   *publishable key* (vroeger: anon public key) en vul ze in bij `SUPA` in
+   `index.html`. De *secret*/service_role-sleutel hoort nooit in de app.
 
-De anon-sleutel mag in de app staan: de regels in `setup.sql` zorgen dat iedereen
+De app is gekoppeld aan het project `aanbiedingskeuken`. De publishable key mag in de app staan: de regels in `setup.sql` zorgen dat iedereen
 alleen eigen recepten, hartjes en foto's kan plaatsen of verwijderen. Berichten
 van anderen verwijder je als beheerder via **Table Editor → recepten**.
 De tijdlijn werkt in de telefoonversie; binnen claude.ai blokkeert de pagina

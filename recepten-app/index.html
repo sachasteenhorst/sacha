@@ -2005,7 +2005,7 @@ function viewGezin() {
 /* ---------- Tijdlijn: gedeelde recepten van alle gebruikers (Supabase) ---------- */
 // Vul hier de Project URL en de publieke 'anon'-sleutel van het Supabase-project in.
 // De anon-sleutel is bedoeld om in apps te staan; de beveiliging zit in de regels van supabase/setup.sql.
-const SUPA = window.AK_SUPA || { url: '', key: '' };
+const SUPA = window.AK_SUPA || { url: 'https://dfegvnmmfpuzfjrlypcb.supabase.co', key: 'sb_publishable_XhqFcuJz6DWmmGyihd_1xA_Pz9Xbm0Y' };
 const inClaude = !!(window.claude && window.claude.use);
 let sb = null, sbUid = null, feed = null, feedErr = '', feedBusy = false;
 let schermnaam = store.get('schermnaam', '');
