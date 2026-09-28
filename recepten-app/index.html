@@ -2479,6 +2479,11 @@ render();
 /* Als geïnstalleerde app (buiten claude.ai): offline-laag registreren */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !(window.claude && window.claude.use)) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Nieuwe versie actief? Dan één keer herladen, zodat je meteen de nieuwste app ziet.
+  if (navigator.serviceWorker.controller) {
+    let herladen = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!herladen) { herladen = true; location.reload(); } });
+  }
 }
 
 /* Folders laden: eerst uit de gedeelde opslag van de app, anders uit aanbiedingen.json ernaast */
