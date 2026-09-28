@@ -72,7 +72,13 @@ PRODUCTEN: dict[str, list[str]] = {
     "pasta": ["pasta", "spaghetti", "penne", "fusilli", "lasagnebladen"],
     "rijst": ["rijst", "zilvervliesrijst", "basmatirijst"],
     "wraps": ["wrap", "wraps", "tortilla", "tortillas"],
-    "brood": ["brood", "volkorenbrood", "volkoren brood"],
+    "brood": ["brood", "volkorenbrood", "volkoren brood", "hamburgerbroodjes", "bolletjes", "pita", "pitabroodjes"],
+    "bloem": ["bloem", "tarwebloem", "patentbloem"],
+    "spek": ["spekjes", "spekreepjes", "spekblokjes", "ontbijtspek", "bacon"],
+    "stoofvlees": ["stoofvlees", "runderstoofvlees", "sukadelappen", "riblappen"],
+    "room": ["kookroom", "slagroom"],
+    "rode-kool": ["rode kool", "rodekool"],
+    "komkommer": ["komkommer", "komkommers"],
 }
 
 # Titels met deze woorden zijn bewerkte producten of geen eten voor ons

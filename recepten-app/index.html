@@ -262,6 +262,8 @@
   .fgroup h4 { margin: 0 0 6px; font-size: 15px; }
   .prefs { display: grid; gap: 8px; }
   .pref { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .pref > span { min-width: 0; }
+  @media (max-width: 370px) { .pref { flex-wrap: wrap; gap: 4px 8px; } }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
   .seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--muted); }
   .seg button + button { border-left: 1px solid var(--line); }
@@ -658,6 +660,9 @@
   .bigeur { white-space: nowrap; font-size: clamp(24px, 7vw, 30px); }
   .brandtext small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { nav.tabs { left: 6px; right: 6px; padding: 5px 3px; } nav.tabs button { font-size: 9.5px; letter-spacing: -.01em; padding: 7px 0; } nav.tabs button svg { width: 19px; height: 19px; } }
+  .pill.comfort { background: #FFE6CF; color: #8A3B00; align-self: flex-start; margin-top: 4px; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.comfort { background: #4A2B14; color: #FFC999; } }
+  :root[data-theme="dark"] .pill.comfort { background: #4A2B14; color: #FFC999; }
 </style>
 <!--wrapper-->
 </head>
@@ -770,10 +775,16 @@ const CATALOG = [
   ['pasta', 'Volkoren pasta', 'Brood & granen', ['pasta', 'spaghetti', 'penne', 'fusilli', 'lasagnebladen', 'lasagne']],
   ['rijst', 'Zilvervliesrijst', 'Brood & granen', ['rijst', 'zilvervliesrijst', 'basmatirijst']],
   ['wraps', 'Volkoren wraps', 'Brood & granen', ['wrap', 'wraps', 'tortilla', 'tortillas']],
-  ['brood', 'Volkoren brood', 'Brood & granen', ['brood', 'volkorenbrood', 'volkoren brood']],
+  ['brood', 'Brood', 'Brood & granen', ['brood', 'volkorenbrood', 'volkoren brood', 'hamburgerbroodjes', 'bolletjes', 'pita', 'pitabroodjes']],
+  ['bloem', 'Bloem', 'Brood & granen', ['bloem', 'tarwebloem', 'patentbloem']],
+  ['spek', 'Spekjes', 'Vlees & vis', ['spekjes', 'spekreepjes', 'spekblokjes', 'ontbijtspek', 'bacon']],
+  ['stoofvlees', 'Stoofvlees', 'Vlees & vis', ['stoofvlees', 'runderstoofvlees', 'sukadelappen', 'riblappen', 'hachee']],
+  ['room', 'Kookroom', 'Zuivel & ei', ['kookroom', 'slagroom', 'room']],
+  ['rode-kool', 'Rode kool', 'Groente', ['rode kool', 'rodekool']],
+  ['komkommer', 'Komkommer', 'Groente', ['komkommer', 'komkommers']],
 ];
 const CAT = Object.fromEntries(CATALOG.map(([k, n, c, s]) => [k, { k, n, c, s }]));
-const GRAIN = new Set(['pasta', 'rijst', 'wraps', 'brood']);
+const GRAIN = new Set(['pasta', 'rijst', 'wraps', 'brood', 'bloem']);
 const NITRATE = new Set(['spinazie', 'rode-biet']);
 
 /* ---------- Recepten (hoeveelheden voor 2 volwassenen) ---------- */
@@ -986,6 +997,83 @@ const RECIPES = [
     stappen: ["Kook de rijst volgens de verpakking.", "Snijd de bloemkool in kleine roosjes. Pel en snipper de ui. Spoel de linzen af in een zeef.", "Verhit een scheutje olie in de pan op middelhoog vuur en fruit de ui 3 minuten.", "Voeg bloemkool, linzen, tomatenblokjes, kokosmelk en ongeveer 300 ml water toe. Breng aan de kook.", "Leg de deksel schuin op de pan en laat 20 minuten zacht koken. Roer af en toe. De curry is klaar als de linzen zacht zijn en de bloemkool gaar.", "Schep nu de portie van {baby} eruit.", "Roer de currypasta en wat zout door de rest en laat nog 5 minuten koken. Serveer met de rijst en koriander."],
     baby: { stappen: ['Neem de portie vóór currypasta en zout.',
       'Prak de bloemkool en linzen tot een grove puree. Geen rijst: geef er een stukje gekookte aardappel of pompoen bij.'], allergenen: [] } },
+  { id: "carbonara", foto: {"src": "fotos/carbonara.jpg", "auteur": "Nilo Velez", "licentie": "CC0", "bron": "https://wordpress.org/photos/photo/480677d127/", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Romige pasta carbonara met spekjes", tijd: 20, soort: "Vlees",
+    ingr: [I(200, "g", "spaghetti", "pasta"), I(125, "g", "spekjes", "spek"), I(3, "", "eieren", "eieren"), I(50, "g", "Parmezaanse kaas (geraspt)", "kaas"), I(1, "", "teen knoflook"), I(null, "", "zwarte peper"), I(1, "", "wortel (voor {baby})", "wortel", true), I(1, "", "ei (voor {baby})", "eieren", true)],
+    gerei: ["Grote pan voor de pasta", "Koekenpan", "Kom en vork", "Rasp"],
+    tip: "Haal de pan van het vuur voordat je het ei toevoegt. Zo wordt de saus romig in plaats van roerei.",
+    stappen: ["Breng een grote pan water met een flinke snuf zout aan de kook en kook de spaghetti volgens de verpakking beetgaar.", "Bak ondertussen de spekjes zonder olie in de koekenpan op middelhoog vuur in 5 tot 6 minuten krokant. Pers de knoflook erbij en bak nog 30 seconden. Zet het vuur uit.", "Klop in een kom de eieren los met de geraspte kaas en flink wat zwarte peper.", "Schep vlak voor het afgieten een kopje kookwater uit de pan. Giet de spaghetti af.", "Doe de spaghetti bij de spekjes in de uitgezette pan. Giet het eimengsel erover en roer snel door, met af en toe een scheutje kookwater, tot er een romige saus ontstaat.", "Serveer direct met extra kaas en peper.", "Kook voor {baby} de wortel in stukjes zacht en kook het ei in 10 minuten hard."],
+    baby: { stappen: ["Geen pasta: prak de gekookte wortel met het hardgekookte ei en een klein beetje ongezouten boter.", "Spekjes en Parmezaanse kaas zijn te zout voor een baby. Geef die niet mee."], allergenen: ["ei"] } },
+  { id: "nasi-goreng", foto: {"src": "fotos/nasi-goreng.jpg", "auteur": "rawpixel", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/5959832/free-public-domain-cc0-photo", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Nasi goreng met kip en gebakken ei", tijd: 30, soort: "Kip",
+    ingr: [I(150, "g", "rijst", "rijst"), I(250, "g", "kippendijfilet", "kippendij"), I(2, "", "eieren", "eieren"), I(1, "", "ui", "ui"), I(1, "", "rode paprika", "paprika"), I(1, "", "prei", "prei"), I(1, "el", "nasikruiden"), I(2, "el", "ketjap"), I(1, "", "teen knoflook"), I(null, "", "atjar en kroepoek"), I(1, "", "zoete aardappel (voor {baby})", "zoete-aardappel", true)],
+    gerei: ["Wok of grote koekenpan", "Pan voor de rijst", "Kleine koekenpan", "Snijplank en mes"],
+    tip: "Rijst van gisteren is ideaal voor nasi: die is droger en wordt in de wok lekker los en knapperig.",
+    stappen: ["Kook de rijst volgens de verpakking, spoel hem af met koud water en laat hem goed uitlekken.", "Snijd de kip in reepjes. Snipper de ui, snijd de paprika in blokjes en de prei in dunne ringen. Pers de knoflook.", "Verhit een scheut olie in de wok op hoog vuur. Bak de kip 4 minuten tot hij bruin en gaar is en schep hem uit de pan.", "Neem nu een stukje kip apart voor {baby}.", "Bak de ui, knoflook en nasikruiden 1 minuut. Voeg de paprika en prei toe en roerbak 3 minuten.", "Doe de rijst en de kip erbij en roerbak op hoog vuur 4 minuten, tot de rijst heet is en hier en daar een korstje krijgt. Roer de ketjap erdoor.", "Bak in de kleine pan de eieren als spiegelei. Leg op elk bord een ei op de nasi en serveer met atjar en kroepoek.", "Kook voor {baby} de zoete aardappel in blokjes zacht."],
+    baby: { stappen: ["Geen rijst: prak de zoete aardappel met het apart gehouden stukje kip.", "Stoom een paar reepjes paprika zacht als vingervoedsel. Geef {baby} alleen een ei met een helemaal gestolde dooier."], allergenen: ["ei"] } },
+  { id: "burgers", foto: {"src": "fotos/burgers.jpg", "auteur": "Jakub Kapusnak", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/448145/free-photo-image-bacon-fries-beef", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Zelfgemaakte burgers met ovenfriet", tijd: 40, soort: "Vlees",
+    ingr: [I(300, "g", "rundergehakt", "gehakt"), I(2, "", "hamburgerbroodjes", "brood"), I(700, "g", "kruimige aardappelen", "aardappel"), I(2, "", "plakken kaas", "kaas"), I(1, "", "tomaat", "tomaat"), I(1, "", "rode ui", "ui"), I(2, "el", "olijfolie"), I(null, "", "sla, augurk, ketchup en mayonaise"), I(null, "", "paprikapoeder, peper, zout")],
+    gerei: ["Bakplaat met bakpapier", "Koekenpan of grillpan met deksel", "Kom", "Schone theedoek", "Snijplank en mes"],
+    tip: "Droog de frietjes goed af voordat ze de oven in gaan. Hoe droger, hoe knapperiger.",
+    stappen: ["Verwarm de oven voor op 220 °C (hetelucht 200 °C) en leg bakpapier op de bakplaat.", "Snijd de aardappelen in frietjes van ongeveer 1 cm dik; de schil mag eraan blijven. Spoel ze af, dep ze goed droog en meng ze met de olie en wat paprikapoeder.", "Verdeel de frietjes in één laag over de bakplaat en bak ze 30 tot 35 minuten, tot ze goudbruin en knapperig zijn. Keer ze halverwege om.", "Neem nu wat gehakt apart voor {baby} en maak daar kleine balletjes van, zonder zout.", "Kneed de rest van het gehakt met peper en zout en vorm er twee platte burgers van, iets breder dan het broodje. Druk met je duim een kuiltje in het midden, dan bollen ze niet op.", "Bak de burgers in een hete koekenpan met een beetje olie 3 tot 4 minuten per kant. Leg de laatste minuut een plak kaas op elke burger en doe de deksel op de pan, zodat de kaas smelt.", "Bak de balletjes voor {baby} mee tot ze vanbinnen helemaal gaar zijn.", "Snijd de broodjes open en rooster ze kort in de pan. Beleg ze met sla, tomaat, rode ui, de burger en je favoriete saus. Serveer met de frietjes."],
+    baby: { stappen: ["Prak de gaar gebakken balletjes met een paar zachte frietjes en een stukje tomaat zonder vel.", "Geen broodje: geef extra zachte frietjes als vingervoedsel."], allergenen: [] } },
+  { id: "macaroni", foto: {"src": "fotos/macaroni.jpg", "auteur": "rawpixel", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/5941063/free-public-domain-cc0-photo", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Macaroni-ovenschotel met gehakt en kaas", tijd: 40, soort: "Vlees",
+    ingr: [I(200, "g", "macaroni", "pasta"), I(250, "g", "rundergehakt", "gehakt"), I(1, "", "ui", "ui"), I(1, "", "rode paprika", "paprika"), I(150, "g", "champignons", "champignons"), I(400, "g", "passata", "passata"), I(100, "g", "geraspte kaas", "kaas"), I(null, "", "Italiaanse kruiden, peper, zout"), I(1, "", "aardappel (voor {baby})", "aardappel", true)],
+    gerei: ["Ovenschaal", "Grote pan voor de macaroni", "Hapjespan of grote koekenpan", "Snijplank en mes"],
+    tip: "Laat de schotel 5 minuten rusten voordat je hem opschept. Dan blijft hij mooi in model.",
+    stappen: ["Verwarm de oven voor op 200 °C.", "Kook de macaroni 2 minuten korter dan op de verpakking staat, want hij gaart straks nog na in de oven. Giet af.", "Snipper de ui, snijd de paprika in blokjes en de champignons in plakjes.", "Rul het gehakt in de hapjespan op middelhoog vuur in 5 minuten bruin. Voeg ui, paprika en champignons toe en bak 5 minuten mee.", "Schenk de passata erbij en laat 5 minuten pruttelen.", "Schep nu de portie van {baby} eruit.", "Breng de rest van de saus op smaak met de kruiden, peper en zout. Meng de macaroni erdoor en doe alles in de ovenschaal.", "Strooi de kaas erover en bak 15 tot 20 minuten in de oven, tot de kaas goudbruin is en borrelt.", "Kook voor {baby} de aardappel gaar."],
+    baby: { stappen: ["Geen macaroni: prak de gehakt-groentesaus door de gekookte aardappel."], allergenen: [] } },
+  { id: "kip-champignon", foto: {"src": "fotos/kip-champignon.jpg", "auteur": "tristup", "licentie": "CC0", "bron": "https://wordpress.org/photos/photo/83567a316b/", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Kip in romige champignonsaus met krieltjes", tijd: 35, soort: "Kip",
+    ingr: [I(300, "g", "kipfilet", "kipfilet"), I(250, "g", "champignons", "champignons"), I(150, "ml", "kookroom", "room"), I(1, "", "ui", "ui"), I(1, "", "teen knoflook"), I(500, "g", "krieltjes", "aardappel"), I(300, "g", "sperziebonen", "sperziebonen"), I(1, "el", "roomboter"), I(null, "", "tijm, peper, zout")],
+    gerei: ["Hapjespan", "Twee pannen", "Snijplank en mes"],
+    tip: "Bak de champignons niet allemaal tegelijk als je pan klein is. Anders koken ze in hun eigen vocht in plaats van dat ze bakken.",
+    stappen: ["Kook de krieltjes in 15 minuten gaar. Haal de uiteinden van de sperziebonen af en kook ze 8 tot 10 minuten.", "Snijd de kip in blokjes en de champignons in plakjes. Snipper de ui en pers de knoflook.", "Smelt de boter in de hapjespan op middelhoog vuur. Bak de kip in 6 minuten rondom goudbruin en gaar. Schep hem uit de pan.", "Bak in dezelfde pan de ui, knoflook en champignons 5 minuten, tot het vocht van de champignons is verdampt.", "Schenk de kookroom erbij, doe de kip terug en laat 3 minuten zachtjes pruttelen tot de saus iets dikker is.", "Neem nu de portie van {baby} apart.", "Breng de rest op smaak met tijm, peper en zout. Serveer met de krieltjes en sperziebonen."],
+    baby: { stappen: ["Snijd de kip heel fijn en prak hem met een krieltje, sperziebonen en een lepel saus."], allergenen: ["melk (room)"] } },
+  { id: "wrappizza", foto: {"src": "fotos/wrappizza.jpg", "auteur": "rawpixel", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/5924747/free-pizza-image-public-domain-food-cc0-photo", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Wrappizza's met champignons en paprika", tijd: 20, soort: "Vega",
+    ingr: [I(4, "", "tortillawraps", "wraps"), I(200, "g", "passata", "passata"), I(150, "g", "geraspte mozzarella", "kaas"), I(150, "g", "champignons", "champignons"), I(1, "", "paprika", "paprika"), I(1, "", "rode ui", "ui"), I(100, "g", "cherrytomaten", "tomaat"), I(null, "", "oregano en verse basilicum"), I(1, "", "avocado (voor {baby})", "avocado", true)],
+    gerei: ["Twee bakplaten met bakpapier", "Snijplank en mes", "Lepel"],
+    tip: "Bak de lege wraps eerst 2 minuten voor. Dan blijft de bodem extra krokant.",
+    stappen: ["Verwarm de oven voor op 220 °C en leg bakpapier op de bakplaten.", "Snijd de champignons in plakjes, de paprika in reepjes en de rode ui in dunne ringen. Halveer de tomaatjes.", "Leg de wraps op de bakplaten en besmeer ze dun met passata. Laat een randje van 1 cm vrij.", "Houd voor {baby} wat paprika en tomaat apart.", "Verdeel de groente over de wraps en strooi de kaas en oregano erover.", "Bak de pizza's 8 tot 10 minuten, tot de randen knapperig zijn en de kaas gesmolten is. Houd ze in de gaten: dunne wraps gaan snel.", "Leg er verse basilicum op en snijd ze in punten."],
+    baby: { stappen: ["Geen wrap: stoom de paprika en tomaat zacht en geef ze met partjes rijpe avocado als vingervoedsel.", "Kaas is vrij zout. Geef {baby} hooguit een klein beetje."], allergenen: ["melk (kaas)"] } },
+  { id: "hachee", foto: {"src": "fotos/hachee.jpg", "auteur": "Jakub Kapusnak", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/448010/free-photo-image-stew-meat-appetite", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Hollandse hachee met puree en rode kool", tijd: 150, soort: "Vlees",
+    ingr: [I(500, "g", "runderstoofvlees", "stoofvlees"), I(3, "", "uien", "ui"), I(2, "el", "bloem", "bloem"), I(1, "el", "roomboter"), I(2, "", "laurierblaadjes"), I(3, "", "kruidnagels"), I(1, "el", "azijn"), I(1, "", "runderbouillonblokje"), I(700, "g", "kruimige aardappelen", "aardappel"), I(100, "ml", "melk"), I(500, "g", "rode kool", "rode-kool"), I(1, "", "appel", "appel")],
+    gerei: ["Braadpan met dikke bodem en deksel", "Pan voor de aardappelen", "Pan voor de rode kool", "Pureestamper"],
+    tip: "Hachee wordt nog lekkerder als je hem een dag van tevoren maakt en de volgende dag rustig opwarmt.",
+    stappen: ["Dep het vlees droog en snijd het in blokken van 3 cm. Bestrooi met peper en zout en wentel de blokken door de bloem.", "Smelt de boter in de braadpan op hoog vuur. Bak het vlees in twee porties rondom bruin, zodat het niet gaat koken. Schep het uit de pan.", "Snijd de uien in halve ringen en bak ze in dezelfde pan 8 minuten op middelhoog vuur, tot ze zacht en goudbruin zijn.", "Doe het vlees terug met de laurier, kruidnagels en azijn. Schenk er water bij tot het vlees net onder staat.", "Laat het met de deksel op de pan 2 tot 2,5 uur heel zacht stoven. Het vlees is klaar als het met een vork uit elkaar valt.", "Snijd ondertussen de rode kool fijn en de appel in blokjes. Stoof ze met een bodem water 30 minuten zacht.", "Neem nu een stukje vlees en wat ui apart voor {baby}.", "Verkruimel het bouillonblokje in de rest van de hachee en laat nog 10 minuten zonder deksel inkoken tot de saus mooi dik is.", "Kook de aardappelen gaar en stamp ze met de melk tot een smeuïge puree. Serveer alles samen."],
+    baby: { stappen: ["Trek het vlees met twee vorken in fijne draadjes en prak het met aardappelpuree en een beetje rode kool.", "Na lang stoven is het vlees heel zacht, en daardoor goed te eten voor een baby."], allergenen: ["gluten (bloem)"] } },
+  { id: "pannenkoeken", foto: {"src": "fotos/pannenkoeken.jpg", "auteur": "Skitter Photo", "licentie": "CC0", "bron": "https://stocksnap.io/photo/pancakes-breakfast-GL0X7W9QLC", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Pannenkoeken met spek en appel", tijd: 35, soort: "Vlees",
+    ingr: [I(250, "g", "bloem", "bloem"), I(2, "", "eieren", "eieren"), I(500, "ml", "melk"), I(100, "g", "spekjes", "spek"), I(2, "", "appels", "appel"), I(1, "el", "roomboter"), I(null, "", "stroop of poedersuiker"), I(1, "", "banaan (voor {baby})", "banaan", true), I(1, "", "ei (voor {baby})", "eieren", true)],
+    gerei: ["Grote kom en garde", "Koekenpan (liefst met antiaanbaklaag)", "Soeplepel", "Spatel"],
+    tip: "De eerste pannenkoek mislukt bijna altijd: de pan moet eerst goed op temperatuur komen. Dat hoort erbij.",
+    stappen: ["Doe de bloem met een snufje zout in een kom en maak een kuiltje. Breek de eieren erin en schenk er een scheut melk bij.", "Klop met een garde vanuit het midden tot een glad beslag. Voeg de rest van de melk in delen toe, zodat er geen klontjes komen. Laat het beslag 10 minuten rusten.", "Schil de appels, haal het klokhuis eruit en snijd ze in dunne plakjes.", "Bak de spekjes in de koekenpan krokant en schep ze eruit.", "Smelt een klein klontje boter in de pan op middelhoog vuur. Leg er wat spekjes en appelplakjes in en schenk er een soeplepel beslag over. Draai de pan zodat de bodem helemaal bedekt is.", "Bak de pannenkoek tot de bovenkant droog is en de onderkant goudbruin, 2 tot 3 minuten. Keer hem om en bak de andere kant nog 1 minuut.", "Herhaal dit tot het beslag op is. Houd de pannenkoeken warm onder een schone theedoek en serveer met stroop.", "Prak voor {baby} de banaan met het ei en bak er kleine pannenkoekjes van, helemaal gaar."],
+    baby: { stappen: ["Geef {baby} de banaan-eipannenkoekjes in reepjes als vingervoedsel. Die zijn zonder meel, zout en suiker.", "Spek en stroop zijn niet geschikt voor een baby."], allergenen: ["ei"] } },
+  { id: "teriyaki", foto: {"src": "fotos/teriyaki.jpg", "auteur": "rawpixel", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/11524475/photo-image-public-domain-plate-white", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Kip teriyaki met rijst en broccoli", tijd: 30, soort: "Kip",
+    ingr: [I(350, "g", "kippendijfilet", "kippendij"), I(150, "g", "rijst", "rijst"), I(300, "g", "broccoli", "broccoli"), I(3, "el", "sojasaus"), I(1, "el", "honing"), I(1, "", "teen knoflook"), I(1, "", "stukje verse gember"), I(null, "", "sesamzaadjes en lente-ui"), I(1, "", "zoete aardappel (voor {baby})", "zoete-aardappel", true)],
+    gerei: ["Koekenpan", "Pan voor de rijst", "Pan of stoommandje voor de broccoli", "Kommetje", "Rasp"],
+    tip: "Laat de saus niet te lang inkoken. De honing brandt snel aan.",
+    stappen: ["Kook de rijst volgens de verpakking.", "Meng in een kommetje de sojasaus, honing, geperste knoflook en geraspte gember met 3 eetlepels water.", "Snijd de kip in stukken van 3 cm. Snijd de broccoli in roosjes en stoom of kook ze 4 minuten beetgaar.", "Verhit een scheutje olie in de koekenpan op middelhoog vuur. Bak de kip 6 tot 8 minuten tot hij rondom goudbruin en gaar is.", "Neem nu een stukje kip en wat broccoli apart voor {baby}.", "Schenk de saus over de kip en laat 2 minuten bubbelen, tot de saus stroperig wordt en de kip glanst.", "Serveer de kip met de rijst en broccoli en bestrooi met sesamzaadjes en lente-ui.", "Kook voor {baby} de zoete aardappel in blokjes zacht."],
+    baby: { stappen: ["Geen rijst: prak de zoete aardappel met de kip en broccoli.", "Honing mag pas vanaf 1 jaar en sojasaus is heel zout. Houd de portie van {baby} daarom apart voordat de saus erbij gaat."], allergenen: [] } },
+  { id: "shoarma", foto: {"src": "fotos/shoarma.jpg", "auteur": "Vishnu Chandra", "licentie": "CC0", "bron": "https://wordpress.org/photos/photo/24369e2fe7/", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Shoarmabowl met knoflooksaus", tijd: 30, soort: "Kip",
+    ingr: [I(350, "g", "kippendijfilet", "kippendij"), I(2, "tl", "shoarmakruiden"), I(150, "g", "rijst", "rijst"), I(1, "", "komkommer", "komkommer"), I(2, "", "tomaten", "tomaat"), I(1, "", "rode ui", "ui"), I(150, "g", "volle yoghurt", "yoghurt"), I(1, "", "teen knoflook"), I(2, "", "pitabroodjes", "brood"), I(1, "", "aardappel (voor {baby})", "aardappel", true)],
+    gerei: ["Koekenpan", "Pan voor de rijst", "Kommetje", "Snijplank en mes"],
+    tip: "Bak de kip in één laag op hoog vuur. Zo krijg je de knapperige randjes van echte shoarma.",
+    stappen: ["Kook de rijst volgens de verpakking.", "Snijd de kip in dunne reepjes.", "Neem nu wat kip apart voor {baby}, zonder kruiden.", "Meng de rest van de kip met de shoarmakruiden en een scheutje olie.", "Maak de knoflooksaus: roer de yoghurt met de geperste knoflook en een snufje zout.", "Snijd de komkommer en tomaten in blokjes en de rode ui in dunne ringen.", "Bak de kip in een hete koekenpan 6 tot 8 minuten, tot hij bruin, knapperig en gaar is.", "Bak de kip voor {baby} apart zonder kruiden gaar.", "Verdeel rijst, kip en groente over kommen, schep de knoflooksaus erop en serveer met warme pitabroodjes.", "Kook voor {baby} de aardappel gaar."],
+    baby: { stappen: ["Geen rijst of pita: prak de aardappel met de fijngesneden kip, een stukje komkommer zonder schil en wat yoghurt zonder knoflook."], allergenen: ["melk (yoghurt)"] } },
+  { id: "tomatensoep", foto: {"src": "fotos/tomatensoep.jpg", "auteur": "rawpixel", "licentie": "CC0", "bron": "https://www.rawpixel.com/image/5970739/tomato-soup-bread", "licurl": "https://creativecommons.org/publicdomain/zero/1.0/", "soort": "gerecht"}, comfort: true,
+    naam: "Romige tomatensoep met tosti's", tijd: 30, soort: "Vega",
+    ingr: [I(500, "g", "tomaten", "tomaat"), I(400, "g", "passata", "passata"), I(1, "", "ui", "ui"), I(1, "", "teen knoflook"), I(100, "ml", "kookroom", "room"), I(1, "", "groentebouillonblokje"), I(4, "", "sneetjes brood", "brood"), I(4, "", "plakken kaas", "kaas"), I(1, "el", "roomboter"), I(null, "", "basilicum, peper, zout"), I(1, "", "wortel (voor {baby})", "wortel", true)],
+    gerei: ["Soeppan", "Staafmixer", "Koekenpan", "Spatel", "Snijplank en mes"],
+    tip: "Druk de tosti tijdens het bakken zachtjes aan met een spatel. Dan smelt de kaas sneller.",
+    stappen: ["Snipper de ui, pers de knoflook en snijd de tomaten in grove stukken.", "Verhit een scheutje olie in de soeppan en fruit de ui en knoflook 3 minuten.", "Voeg de tomaten en de passata toe met 400 ml water. Breng aan de kook en laat 15 minuten zacht koken.", "Pureer de soep glad met de staafmixer en roer de kookroom erdoor.", "Schep nu de portie van {baby} eruit.", "Los het bouillonblokje op in de rest van de soep, breng op smaak met peper en zout en warm nog even door.", "Maak de tosti's: beleg twee sneetjes brood met kaas en leg er een sneetje op. Besmeer de buitenkant dun met boter en bak ze in de koekenpan op middelhoog vuur 3 minuten per kant, tot ze goudbruin zijn en de kaas gesmolten is.", "Snijd de tosti's in reepjes om te dippen en serveer met de soep en verse basilicum.", "Kook voor {baby} de wortel in stukjes zacht."],
+    baby: { stappen: ["Maak de soep dikker met de geprakte wortel en geef hem lauw met een lepel.", "Geen tosti: geef zachte stukjes wortel als vingervoedsel."], allergenen: ["melk (room)"] } },
 ];
 const RMAP = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
@@ -1106,23 +1194,25 @@ const isNitrate = r => r.ingr.some(i => NITRATE.has(i.k));
 /* ---------- Allergieën, voorkeuren en favorieten ---------- */
 // Allergenen per ingrediënt (productsleutel of naam). Geldt voor het hele gezin.
 const ALLERGENS = [
-  { id: 'gluten', naam: 'Gluten (tarwe)', keys: ['pasta', 'wraps', 'brood'], re: /ketjap|currypasta/ },
-  { id: 'melk', naam: 'Melk', keys: ['yoghurt', 'feta', 'kaas'], re: /\bmelk\b|boter/ },
+  { id: 'gluten', naam: 'Gluten (tarwe)', keys: ['pasta', 'wraps', 'brood', 'bloem'], re: /ketjap|currypasta|sojasaus/ },
+  { id: 'melk', naam: 'Melk', keys: ['yoghurt', 'feta', 'kaas', 'room'], re: /\bmelk\b|boter/ },
   { id: 'ei', naam: 'Ei', keys: ['eieren'] },
   { id: 'vis', naam: 'Vis', keys: ['zalm', 'witvis'] },
   { id: 'pinda', naam: 'Pinda', keys: ['pindakaas'] },
   { id: 'noten', naam: 'Noten', keys: [] },
-  { id: 'soja', naam: 'Soja', keys: [], re: /ketjap/ },
+  { id: 'soja', naam: 'Soja', keys: [], re: /ketjap|sojasaus/ },
   { id: 'selderij', naam: 'Selderij', keys: [], re: /bouillon|currypasta/ },
   { id: 'kokos', naam: 'Kokos', keys: ['kokosmelk'] },
 ];
 const SOORTEN = ['Vega', 'Vis', 'Kip', 'Vlees', 'Ei'];
+const PREF_ROWS = [...SOORTEN, 'Comfortfood'];   // comfortfood: lekkere, minder lichte recepten
 const hasAllergen = (ingrs, a) => ingrs.some(i => a.keys.includes(i.k) || (a.re && a.re.test(i.n)));
 const recipeAllergens = r => ALLERGENS.filter(a => hasAllergen(effIngr(r), a));
 const voorkeur = soort => (voorkeuren.find(v => v.startsWith(soort + ':')) || soort + ':normaal').split(':')[1];
 const isFav = r => favorieten.includes(r.id);
 function allowed(r) {
   if (voorkeur(r.soort) === 'niet') return false;
+  if (r.comfort && voorkeur('Comfortfood') === 'niet') return false;
   const bad = ALLERGENS.filter(a => allergieen.includes(a.id));
   return !bad.some(a => hasAllergen(effIngr(r), a));
 }
@@ -1131,6 +1221,7 @@ const filtersOn = () => allergieen.length > 0 || voorkeuren.some(v => !v.endsWit
 function prefBonus(r) {
   let b = 0;
   if (voorkeur(r.soort) === 'vaker') b += 12;
+  if (r.comfort && voorkeur('Comfortfood') === 'vaker') b += 12;
   if (voorkeuren.includes('snel') && r.tijd <= 30) b += 6;
   if (isFav(r)) b += 8;
   return b;
@@ -1229,6 +1320,11 @@ const ART = {
   potje: '<rect x="8" y="9" width="16" height="20" rx="4" fill="#C0392B"/><rect x="9" y="5" width="14" height="5" rx="1.5" fill="#6B4E16"/><rect x="10" y="15" width="12" height="7" rx="1.5" fill="#FAF6EE"/>',
   pinda: '<path d="M16 4c-4 0-6 3-6 6s2 4 2 6-2 3-2 6 2 6 6 6 6-3 6-6-2-4-2-6 2-3 2-6-2-6-6-6z" fill="#D2A060"/><path d="M13 9h6M13 23h6" stroke="#B5813F" stroke-width="1.3" stroke-linecap="round"/>',
   graan: '<path d="M16 30V6" stroke="#B8903C" stroke-width="1.6" stroke-linecap="round"/><g fill="#D8B25A"><ellipse cx="12.5" cy="10" rx="2.4" ry="4" transform="rotate(-30 12.5 10)"/><ellipse cx="19.5" cy="10" rx="2.4" ry="4" transform="rotate(30 19.5 10)"/><ellipse cx="12.5" cy="16" rx="2.4" ry="4" transform="rotate(-30 12.5 16)"/><ellipse cx="19.5" cy="16" rx="2.4" ry="4" transform="rotate(30 19.5 16)"/><ellipse cx="12.5" cy="22" rx="2.4" ry="4" transform="rotate(-30 12.5 22)"/><ellipse cx="19.5" cy="22" rx="2.4" ry="4" transform="rotate(30 19.5 22)"/><ellipse cx="16" cy="5" rx="2.2" ry="3.6"/></g>',
+  spek: '<path d="M5 9c4-3 8 3 12 0s6-2 10 0v4c-4-2-6-3-10 0s-8-3-12 0z" fill="#C8574A"/><path d="M5 13c4-3 8 3 12 0s6-2 10 0v4c-4-2-6-3-10 0s-8-3-12 0z" fill="#F3D2C4"/><path d="M5 17c4-3 8 3 12 0s6-2 10 0v4c-4-2-6-3-10 0s-8-3-12 0z" fill="#B84A3E"/>',
+  room: '<path d="M9 9l3-5h8l3 5v18a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2z" fill="#FFFFFF" stroke="#D3DEE6" stroke-width="1.2"/><path d="M9 9h14" stroke="#D3DEE6" stroke-width="1.2"/><rect x="9" y="14" width="14" height="7" fill="#7FB3E0"/>',
+  vlees: '<path d="M6 12c2-6 12-8 18-4 4 3 3 10-2 13-6 4-14 3-16-2-1-2-1-4 0-7z" fill="#B5533C"/><path d="M9 13c2-4 9-5 13-2" stroke="#E7A08C" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="20" cy="16" r="2.5" fill="#F3E3D8"/>',
+  rodekool: '<circle cx="16" cy="17" r="11.5" fill="#6D2E6B"/><path d="M16 6c-3 5-3 16 0 22M16 6c3 5 3 16 0 22M6 14c5 2 15 2 20 0" stroke="#A35FA0" stroke-width="1.4" fill="none"/>',
+  komkommer: '<rect x="3" y="12.5" width="26" height="8" rx="4" transform="rotate(-35 16 16)" fill="#4E9B3E"/><g fill="#8BC77A"><circle cx="11" cy="20" r=".9"/><circle cx="15" cy="17" r=".9"/><circle cx="19" cy="14" r=".9"/><circle cx="23" cy="11" r=".9"/></g>',
   citroen: '<ellipse cx="16" cy="16" rx="11" ry="8.5" transform="rotate(-25 16 16)" fill="#F7D640"/><ellipse cx="12" cy="13" rx="3" ry="2" transform="rotate(-25 12 13)" fill="#FBE98A"/>',
   knoflook: '<path d="M16 5c-2 4-9 6-9 14 0 6 4 9 9 9s9-3 9-9c0-8-7-10-9-14z" fill="#F4EEE3" stroke="#DCCFB8" stroke-width="1.2"/><path d="M16 9c-2 5-3 10-2 18M16 9c2 5 3 10 2 18" stroke="#DCCFB8" stroke-width="1.1" fill="none"/>',
 };
@@ -1240,7 +1336,8 @@ const ART_KEY = {
   'blauwe-bessen': 'bessen', mango: 'mango', aardbeien: 'aardbei', kipfilet: 'kip', kippendij: 'kip', kalkoen: 'kip',
   gehakt: 'gehakt', zalm: 'zalm', witvis: 'vis', eieren: 'ei', yoghurt: 'yoghurt', feta: 'kaas', kaas: 'kaas',
   kikkererwten: 'peulvrucht', linzen: 'linzen', bonen: 'bonen', kokosmelk: 'kokos', pindakaas: 'pinda',
-  pasta: 'graan', rijst: 'graan', wraps: 'graan', brood: 'graan',
+  pasta: 'graan', rijst: 'graan', wraps: 'graan', brood: 'graan', bloem: 'graan',
+  spek: 'spek', room: 'room', stoofvlees: 'vlees', 'rode-kool': 'rodekool', komkommer: 'komkommer',
 };
 function artFor(k, n = '') {
   if (k && ART_KEY[k]) return ART_KEY[k];
@@ -1286,6 +1383,7 @@ const EST = {
   mango: [3.75, 400], aardbeien: [8], kipfilet: [11], kippendij: [10], kalkoen: [13], gehakt: [9], zalm: [22, 125],
   witvis: [15, 150], eieren: [5, 60], yoghurt: [1.8], feta: [12], kaas: [12], kikkererwten: [2.25], linzen: [3.5],
   bonen: [2.25], kokosmelk: [4], passata: [2], pindakaas: [7], pasta: [2.5], rijst: [2.5], wraps: [4, 62], brood: [3.2, 35],
+  bloem: [1.1], spek: [12], stoofvlees: [13], room: [4], 'rode-kool': [1.5, 1000], komkommer: [3, 350],
 };
 // Kleine voorraadproducten zonder eigen folderproduct
 const PANTRY = [
@@ -1341,6 +1439,8 @@ const SWAPS = [
   { id: 'gehakt-linzen', from: ['gehakt'], label: 'Helft van het gehakt vervangen door rode linzen', apply: i => [{ ...i, q: i.q / 2 }, { q: Math.round(i.q / 4), u: 'g', n: 'rode linzen (mee laten garen)', k: 'linzen' }] },
   { id: 'kaas-weg', from: ['kaas', 'feta'], label: 'Kaas weglaten', apply: () => [] },
   { id: 'zoet-gewoon', from: ['zoete-aardappel'], label: 'Gewone aardappel in plaats van zoete aardappel', apply: i => [{ ...i, k: 'aardappel', n: i.n.replace('zoete aardappel', 'aardappel') }] },
+  { id: 'room-half', from: ['room'], label: 'Halve hoeveelheid kookroom, aanvullen met melk', apply: i => [{ ...i, q: i.q / 2 }] },
+  { id: 'spek-half', from: ['spek'], label: 'Halve hoeveelheid spekjes', apply: i => [{ ...i, q: i.q / 2 }] },
   { id: 'kokos-half', from: ['kokosmelk'], label: 'Halve hoeveelheid kokosmelk, aanvullen met water', apply: i => [{ ...i, q: i.q / 2 }] },
 ];
 // Alle ingrediënten van een recept, met de gekozen goedkopere alternatieven
@@ -1400,11 +1500,11 @@ function texture(m) {
 // Wat een baby wel of niet mag; per baby aan te vinken
 const BABY_RULES = [
   { id: 'granen', naam: 'Granen en brood', uitleg: 'brood, pasta, rijst, wraps, havermout', test: i => GRAIN.has(i.k) },
-  { id: 'gluten', naam: 'Gluten (tarwe)', test: i => ['pasta', 'wraps', 'brood'].includes(i.k) },
-  { id: 'zuivel', naam: 'Koemelk en zuivel', test: i => ['yoghurt', 'feta', 'kaas'].includes(i.k) || /\bmelk\b|boter/.test(i.n) },
+  { id: 'gluten', naam: 'Gluten (tarwe)', test: i => ['pasta', 'wraps', 'brood', 'bloem'].includes(i.k) },
+  { id: 'zuivel', naam: 'Koemelk en zuivel', test: i => ['yoghurt', 'feta', 'kaas', 'room'].includes(i.k) || /\bmelk\b|boter/.test(i.n) },
   { id: 'ei', naam: 'Ei', test: i => i.k === 'eieren' },
   { id: 'vis', naam: 'Vis', test: i => ['zalm', 'witvis'].includes(i.k) },
-  { id: 'vlees', naam: 'Vlees en kip', test: i => ['kipfilet', 'kippendij', 'kalkoen', 'gehakt'].includes(i.k) },
+  { id: 'vlees', naam: 'Vlees en kip', test: i => ['kipfilet', 'kippendij', 'kalkoen', 'gehakt', 'spek', 'stoofvlees'].includes(i.k) },
   { id: 'pinda', naam: 'Pinda en noten', test: i => i.k === 'pindakaas' },
   { id: 'peulvruchten', naam: 'Peulvruchten', test: i => ['kikkererwten', 'linzen', 'bonen', 'doperwten'].includes(i.k) },
   { id: 'kokos', naam: 'Kokos', test: i => i.k === 'kokosmelk' },
@@ -1533,7 +1633,7 @@ function viewToday() {
   <article class="card hero">
     ${r.foto ? `<figure class="cover">
       <img src="${r.foto.src}" alt="${esc(r.naam)}" decoding="async">
-      <div class="covertext"><div class="eyebrow">Recept van vandaag · ${esc(r.soort)}</div><h2>${esc(r.naam)}</h2></div>
+      <div class="covertext"><div class="eyebrow">Recept van vandaag · ${esc(r.soort)}${r.comfort ? ' · Comfortfood' : ''}</div><h2>${esc(r.naam)}</h2></div>
     </figure>
     <p class="credit">${credit(r.foto)}</p>` : `<div class="herobanner" aria-hidden="true">${recipeArt(r, 5).map((a, i) => art(a, 58, 'h' + i)).join('')}</div>
     <div class="eyebrow">Recept van vandaag · ${esc(r.soort)}</div>
@@ -1585,7 +1685,7 @@ function viewWeek() {
     <details class="day${i === dayIdx ? ' today' : ''}"${i === dayIdx ? ' open' : ''}>
       <summary>
         ${plate(r)}
-        <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]}</span><span class="rname">${esc(r.naam)}</span></span>
+        <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]}</span><span class="rname">${esc(r.naam)}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
         <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
       </summary>
       <div class="inner">
@@ -1601,7 +1701,7 @@ function viewWeek() {
 function filterSummary() {
   const parts = [];
   if (allergieen.length) parts.push('zonder ' + ALLERGENS.filter(a => allergieen.includes(a.id)).map(a => a.naam.toLowerCase()).join(', '));
-  const niet = SOORTEN.filter(x => voorkeur(x) === 'niet'), vaker = SOORTEN.filter(x => voorkeur(x) === 'vaker');
+  const niet = PREF_ROWS.filter(x => voorkeur(x) === 'niet'), vaker = PREF_ROWS.filter(x => voorkeur(x) === 'vaker');
   if (niet.length) parts.push('geen ' + niet.join(', ').toLowerCase());
   if (vaker.length) parts.push('vaker ' + vaker.join(', ').toLowerCase());
   if (voorkeuren.includes('snel')) parts.push('vaker snel');
@@ -1613,7 +1713,7 @@ function recipeRow(r) {
       <summary>
         ${plate(r)}
         <span class="dtext"><span class="rname">${esc(r.naam)}${isFav(r) ? ' <span class="heart" aria-label="Favoriet">♥</span>' : ''}</span>
-          <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span></span>
+          <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
         <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span></span>
       </summary>
       <div class="inner">${r.foto ? photoBlock(r, 'rowphoto') : ''}${recipeBody(r, null)}</div>
@@ -1646,7 +1746,7 @@ function viewRecipes() {
     </div>
     <div class="fgroup">
       <h4>Voorkeuren</h4>
-      <div class="prefs">${SOORTEN.map(x => `
+      <div class="prefs">${PREF_ROWS.map(x => `
         <div class="pref"><span>${esc(x)}</span>
           <div class="seg" role="group" aria-label="${esc(x)}">${['niet', 'normaal', 'vaker'].map(v => `<button data-pref="${esc(x)}:${v}" aria-pressed="${voorkeur(x) === v}">${v === 'niet' ? 'Niet' : v === 'normaal' ? 'Normaal' : 'Vaker'}</button>`).join('')}</div>
         </div>`).join('')}

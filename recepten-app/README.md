@@ -63,7 +63,8 @@ zelf toe onder "Zelf aanbiedingen toevoegen".
 - **Recepten**: je favorieten (tik bij een recept op het hartje), filters en
   alle recepten. Vink allergieën aan (gluten, melk, ei, vis, pinda, noten, soja,
   selderij, kokos) en kies per soort gerecht (vega, vis, kip, vlees, ei) tussen
-  niet, normaal of vaker. Het weekmenu en "Ander recept" houden zich aan de
+  niet, normaal of vaker. Hetzelfde kan voor **Comfortfood**: lekkere, minder
+  lichte gerechten zoals carbonara, burgers, nasi, hachee en pannenkoeken. Het weekmenu en "Ander recept" houden zich aan de
   filters; voorkeuren en favorieten komen vaker voor. Ook deze instellingen
   worden bij je account bewaard.
 - **Gezin**: het aantal volwassenen en kinderen (een kind telt als ongeveer 0,6
@@ -151,4 +152,5 @@ Het advies van het consultatiebureau of de arts gaat altijd voor.
 
 Recepten staan in de lijst `RECIPES` in `index.html`. Ingrediënten koppel je
 via `I(hoeveelheid, eenheid, naam, productsleutel)` aan de producten in
-`CATALOG`, zodat de app ze met de aanbiedingen kan matchen.
+`CATALOG`, zodat de app ze met de aanbiedingen kan matchen. Zet
+`comfort: true` bij een recept dat onder Comfortfood valt.
