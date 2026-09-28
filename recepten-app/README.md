@@ -1,8 +1,10 @@
 # Aanbiedingskeuken
 
 Een webapp die elke dag een gezond recept laat zien, gekozen op basis van wat
-er deze week in de aanbieding is bij de supermarkt. Bij elk recept staat
-hoe je een portie maakt voor **Julièn** (8 maanden, geen brood en geen granen).
+er deze week in de aanbieding is bij de supermarkt. De app is voor elk gezin:
+je stelt zelf in hoeveel volwassenen en kinderen er mee-eten, en je kunt baby's
+toevoegen met wat ze wel en niet mogen. Voor elke baby staat bij elk recept hoe
+je een aparte babyportie maakt.
 
 Open `index.html` in een browser. Er is geen server of installatie nodig.
 Alles wat je instelt, blijft bewaard in de browser.
@@ -10,11 +12,10 @@ Alles wat je instelt, blijft bewaard in de browser.
 ## Onderdelen
 
 - **Vandaag**: het recept van de dag, de producten uit de aanbieding die erin
-  zitten, de bereiding en een apart stappenplan voor Julièn. Er komt ook elke dag
-  een graanvrij tussendoortje bij. Met "Ander recept" wissel je het gerecht.
+  zitten, de bereiding en, als je een baby hebt toegevoegd, een apart stappenplan
+  voor de baby met een tussendoortje erbij. Met "Ander recept" wissel je het gerecht.
 - **Week**: het weekmenu en een boodschappenlijst om af te vinken. De
-  hoeveelheden passen zich aan het aantal volwassenen aan, met een portie voor
-  Julièn inbegrepen.
+  hoeveelheden passen zich aan je gezin aan.
 - **Aanbiedingen**: een overzicht van alles wat in jouw winkels in de
   aanbieding is. Tik op een product om te zien waar het het goedkoopst is.
 
@@ -29,8 +30,12 @@ zelf toe onder "Zelf aanbiedingen toevoegen".
   niet, normaal of vaker. Het weekmenu en "Ander recept" houden zich aan de
   filters; voorkeuren en favorieten komen vaker voor. Ook deze instellingen
   worden bij je account bewaard.
-- **Julièn**: leeftijd, wat Julièn niet mag, graanvrije vervangers, structuuradvies
-  per leeftijd en een teller voor nitraatrijke groente.
+- **Gezin**: het aantal volwassenen en kinderen (een kind telt als ongeveer 0,6
+  portie) en je baby's. Per baby vul je naam en geboortedatum in en tik je aan
+  wat de baby niet mag: granen en brood, gluten, zuivel, ei, vis, vlees, pinda en
+  noten, peulvruchten, kokos of nitraatrijke groente. Met een baby erbij zie je
+  ook de algemene regels voor baby's, structuuradvies per leeftijd en een teller
+  voor nitraatrijke groente. Het gezin wordt bij je account bewaard.
 - **Lijst**: je boodschappenlijst. Met één tik zet je een gerecht of het hele
   weekmenu erop. De lijst is gegroepeerd per winkel (waar het product in de
   aanbieding is, met de actie erbij) en toont per product en per winkel wat het
@@ -92,13 +97,16 @@ Websites van supermarkten veranderen af en toe. Geeft een winkel ineens
      twee dagen achter elkaar.
 3. Elke nieuwe week of andere aanbieding geeft een nieuw menu.
 
-## Regels voor Julièn
+## Babyportie
 
-- Brood, pasta, rijst, wraps en andere granen horen alleen bij de volwassenen.
-  Ze staan in de app als "niet voor Julièn" gemarkeerd. Julièn krijgt aardappel,
-  zoete aardappel, pastinaak, pompoen of peulvruchten.
-- De portie van Julièn gaat eruit vóór zout, bouillon, ketjap, currypasta of
-  chili. Die bevatten zout en soms tarwe.
+- In de recepten staat `{baby}` waar de naam van de baby komt. Zonder baby
+  verdwijnen die zinnen uit de bereiding.
+- Een ingrediënt dat een baby niet mag, krijgt in de app het label
+  "niet voor <naam>". Bevat een gerecht iets wat een baby niet mag (zoals vis),
+  dan staat er een waarschuwing bij de babyportie.
+- Stappen voor een graanvrije babyportie ("Geen rijst: …") verschijnen alleen
+  voor baby's die geen granen of gluten mogen.
+- De babyportie gaat eruit vóór zout, bouillon, ketjap, currypasta of chili.
 - Allergenen zoals vis, ei, pinda en melk staan per recept vermeld.
 
 Het advies van het consultatiebureau of de arts gaat altijd voor.
