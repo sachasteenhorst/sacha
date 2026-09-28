@@ -83,7 +83,7 @@ UITSLUITEN = re.compile(
     r"toast|borrel|kroket|frikandel|chocola|siroop|limonade|vla|pudding|dessert|"
     r"schnitzel|gerookt|haring|sushi|nuggets|pannenkoek|ontbijt|muesli|granola|"
     r"cruesli|babyvoeding|knijpfruit|parfum|wasmiddel|luier|croissant|salami|broodje|"
-    r"\bham\b|beleg|vleeswaren|plakjes|spread",
+    r"\bham\b|beleg|vleeswaren|plakjes|spread|bami|nasi|tonight|aardappel anders",
     re.I,
 )
 _WOORD = "a-zà-ÿ"
@@ -106,11 +106,15 @@ def koppel(titel: str) -> list[str]:
     return keys
 
 
-def haal(url: str, pogingen: int = 3) -> str:
-    """Haalt een pagina op; sommige winkels weigeren af en toe (403), dan opnieuw."""
+def haal(url: str, pogingen: int = 3, browser: bool = False) -> str:
+    """Haalt een pagina op; sommige winkels weigeren af en toe (403), dan opnieuw.
+    browser=True stuurt de headers van een gewone browser mee (nodig voor DekaMarkt)."""
+    headers = {"User-Agent": UA}
+    if browser:
+        headers.update({"Accept": "text/html,application/json;q=0.9,*/*;q=0.8", "Accept-Language": "nl-NL,nl;q=0.9"})
     for poging in range(pogingen):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as r:
                 return r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
@@ -141,6 +145,8 @@ def per_kg(prijs, omschrijving: str):
     """Prijs per kilo uit bijvoorbeeld '500 gram' of '4 stuks, 1 kg'; None als dat niet kan."""
     if not isinstance(prijs, (int, float)) or not omschrijving:
         return None
+    if re.search(r"bijv|\bà\b|\bper\s+\d+\b|\d+\s*(bakken|zakken|pakken|stuks)", omschrijving, re.I):
+        return None  # combinatieactie (bijv. 3 bakken à 1 kilo): de kiloprijs is niet betrouwbaar te bepalen
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|kilo|gram|gr|g)\b", omschrijving, re.I)
     if not m:
         return None
@@ -189,7 +195,16 @@ def _nuxt(s: str) -> list:
 
 
 def dirk() -> dict:
-    a = _nuxt(haal("https://www.dirk.nl/aanbiedingen"))
+    return detailresult("https://www.dirk.nl/aanbiedingen")
+
+
+def dekamarkt() -> dict:
+    # DekaMarkt hoort net als Dirk bij Detailresult en gebruikt dezelfde site-opzet
+    return detailresult("https://www.dekamarkt.nl/aanbiedingen", browser=True)
+
+
+def detailresult(bron: str, browser: bool = False) -> dict:
+    a = _nuxt(haal(bron, browser=browser))
     val = lambda x: a[x] if isinstance(x, int) and 0 <= x < len(a) else x
     items, tot = [], ""
     for v in a:
@@ -207,7 +222,7 @@ def dirk() -> dict:
             items.append({"titel": titel, "actie": actie, "geldig": tm(eind),
                           "prijs": prijs if isinstance(prijs, (int, float)) else None,
                           "perKg": per_kg(prijs, eenheid), "eenheid": eenheid})
-    return {"geldig": tm(tot), "items": items, "bron": "https://www.dirk.nl/aanbiedingen"}
+    return {"geldig": tm(tot), "items": items, "bron": bron}
 
 
 def aldi() -> dict:
@@ -227,7 +242,37 @@ def aldi() -> dict:
     return {"geldig": tm(tot), "items": items, "bron": "https://www.aldi.nl/aanbiedingen.html"}
 
 
-WINKELS = {"Jumbo": jumbo, "Dirk": dirk, "Aldi": aldi}
+# Vomar publiceert zijn weekfolder alleen als bladerfolder (Publitas). De tekstlaag daarvan
+# staat door elkaar, dus we lezen alleen welke producten erin staan, zonder prijs.
+VOMAR_FOLDER = "https://view.publitas.com/folder-deze-week"
+VOMAR_UIT = re.compile(
+    r"brood|bollen|meergranen|tarwe|versgesneden|flinterdun|vleeswaren|per 100 gram|salade|maaltijd|"
+    r"diepvries|crème de la crème|chips|saus|pizza|soep|\bmix\b|fles|liter|ricotta|zakje|limonade",
+    re.I,
+)
+
+
+def vomar() -> dict:
+    req = urllib.request.Request(VOMAR_FOLDER, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=30) as r:  # volgt de doorverwijzing naar de folder van deze week
+        folder = r.geturl().rstrip("/")
+    spreads = json.loads(haal(folder + "/spreads.json"))
+    week = re.search(r"week-(\d+)", folder)
+    items = []
+    for spread in spreads:
+        for page in spread.get("pages", []):
+            blokken = [b.strip() for b in re.split(r"\n\s*\n", page.get("text") or "") if b.strip()]
+            for i, blok in enumerate(blokken):
+                titel = re.sub(r"\s+", " ", blok)
+                omgeving = " ".join(blokken[max(0, i - 2):i + 2])
+                if len(titel) > 80 or VOMAR_UIT.search(omgeving):
+                    continue
+                items.append({"titel": titel, "actie": "in de weekfolder", "geldig": f"week {week.group(1)}" if week else "",
+                              "prijs": None, "perKg": None, "eenheid": ""})
+    return {"geldig": f"week {week.group(1)}" if week else "", "items": items, "bron": folder + "/"}
+
+
+WINKELS = {"Jumbo": jumbo, "Dirk": dirk, "Aldi": aldi, "DekaMarkt": dekamarkt, "Vomar": vomar}
 NIET_AUTOMATISCH = {
     "Albert Heijn": "ah.nl blokkeert automatisch ophalen. Zet de bonus met de hand aan.",
     "Lidl": "Lidl laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan.",

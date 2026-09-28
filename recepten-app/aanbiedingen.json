@@ -1,5 +1,5 @@
 {
- "bijgewerkt": "2026-09-28T15:05:36Z",
+ "bijgewerkt": "2026-09-28T15:37:40Z",
  "winkels": {
   "Jumbo": {
    "status": "ok",
@@ -252,7 +252,7 @@
      "titel": "Wraps",
      "actie": "€ 1,69 (-11%)",
      "prijs": 1.69,
-     "perKg": 2.27,
+     "perKg": null,
      "eenheid": "12 stuks, 744 g"
     },
     {
@@ -278,6 +278,198 @@
      "prijs": 7.99,
      "perKg": 1.6,
      "eenheid": "5 kg"
+    }
+   ]
+  },
+  "DekaMarkt": {
+   "status": "ok",
+   "geldig": "t/m di 29 sep",
+   "bron": "https://www.dekamarkt.nl/aanbiedingen",
+   "aantal": 94,
+   "items": [
+    {
+     "k": "appel",
+     "titel": "Pitloze Rode Druiven, Zespri Sungold Kiwi, Hollandse Conference Peren of Hollandse Elstar ",
+     "actie": "€ 3,98 (was € 5,97)",
+     "prijs": 3.98,
+     "perKg": null,
+     "eenheid": "bijv. 3 bakken à 1 kilo hollandse confer"
+    },
+    {
+     "k": "peer",
+     "titel": "Pitloze Rode Druiven, Zespri Sungold Kiwi, Hollandse Conference Peren of Hollandse Elstar ",
+     "actie": "€ 3,98 (was € 5,97)",
+     "prijs": 3.98,
+     "perKg": null,
+     "eenheid": "bijv. 3 bakken à 1 kilo hollandse confer"
+    },
+    {
+     "k": "aardappel",
+     "titel": "Hollandse Aardappelen",
+     "actie": "€ 0,99 (was € 1,25)",
+     "prijs": 0.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "wortel",
+     "titel": "Hollandse Bospeen",
+     "actie": "€ 0,99 (was € 1,49)",
+     "prijs": 0.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "gehakt",
+     "titel": "Slagers Rundergehakt",
+     "actie": "€ 3,99 (was € 5,10)",
+     "prijs": 3.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kipfilet",
+     "titel": "Kipfilet",
+     "actie": "€ 1,99 (was € 2,15)",
+     "prijs": 1.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "brood",
+     "titel": "Hollander of Tarpan Brood",
+     "actie": "€ 1,89 (was € 2,29)",
+     "prijs": 1.89,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kaas",
+     "titel": "Leerdammer Gesneden Kaas",
+     "actie": "€ 1,99 (was € 2,75)",
+     "prijs": 1.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "yoghurt",
+     "titel": "Campina Greek Style Yoghurt of Chocomel Protein",
+     "actie": "€ 1,29 (was € 1,85)",
+     "prijs": 1.29,
+     "perKg": null,
+     "eenheid": ""
+    }
+   ]
+  },
+  "Vomar": {
+   "status": "ok",
+   "geldig": "week 40",
+   "bron": "https://view.publitas.com/folder-deze-week/online-weekfolder-week-40/",
+   "aantal": 802,
+   "items": [
+    {
+     "k": "kaas",
+     "titel": "Beemster Gesneden Kaas",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "aardbeien",
+     "titel": "Hollandse Aardbeien",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kaas",
+     "titel": "Beemster Gesneden Kaas Alle soorten 125-150 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "spinazie",
+     "titel": "Hollandse Gewassen Spinazie",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "avocado",
+     "titel": "VOMAR Eetrijpe Avocado’s",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "eieren",
+     "titel": "Scharreleieren Maat S/M",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "banaan",
+     "titel": "Bananen",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "gehakt",
+     "titel": "Rundergehakt Per kilo",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "zalm",
+     "titel": "Zalmfilet met Huid",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kaas",
+     "titel": "Goudse Geraspte Kaas",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "yoghurt",
+     "titel": "Zuivelhoeve Yoghurt Alle soorten 750 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pasta",
+     "titel": "Daily Chef Verse Pasta of Gnocchi Alle soorten 250-400 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pindakaas",
+     "titel": "G'woon 100% Pindakaas Alle soorten 1 kilo",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
     }
    ]
   },

@@ -19,7 +19,7 @@ Alles wat je instelt, blijft bewaard in de browser.
   aanbieding is. Tik op een product om te zien waar het het goedkoopst is.
 
 Bovenaan kies je van welke winkels je de aanbiedingen wilt zien (Jumbo, Dirk,
-Aldi, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de goedkoopste actie
+Aldi, Vomar, DekaMarkt, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de goedkoopste actie
 in jouw winkels; tik erop voor de vergelijking met alle winkels, op prijs per
 kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
@@ -58,6 +58,8 @@ verpakking en waar mogelijk de prijs per kilo uit.
 | Jumbo | weekaanbiedingen-pagina | alleen de eerste ± 44 acties; weigert soms (403), dan blijven de vorige acties staan |
 | Dirk | Nuxt-gegevens in de pagina | alle acties, met actie- en normale prijs |
 | Aldi | productgegevens in de pagina | prijs, korting en geldigheid |
+| DekaMarkt | zelfde opzet als Dirk (Detailresult) | alle acties, met actie- en normale prijs; vraagt browser-headers |
+| Vomar | tekstlaag van de Publitas-bladerfolder | alleen welke producten in de folder staan, zonder prijs (de tekstlaag staat door elkaar) |
 | Albert Heijn | niet automatisch | ah.nl blokkeert scripts (Akamai) |
 | Lidl, Plus | niet automatisch | de folder laadt pas in de browser |
 

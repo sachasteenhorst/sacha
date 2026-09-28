@@ -596,9 +596,10 @@ const SNACKS = [
 const DEFAULT_OFFERS = ['pompoen', 'broccoli', 'zalm', 'kippendij', 'peer', 'champignons', 'gehakt', 'eieren', 'courgette', 'blauwe-bessen', 'kikkererwten', 'zoete-aardappel'];
 const STORES = {
   'Albert Heijn': 'https://www.ah.nl/bonus', 'Jumbo': 'https://www.jumbo.com/aanbiedingen/nu', 'Dirk': 'https://www.dirk.nl/aanbiedingen',
-  'Aldi': 'https://www.aldi.nl/aanbiedingen.html', 'Lidl': 'https://www.lidl.nl', 'Plus': 'https://www.plus.nl/aanbiedingen'
+  'Aldi': 'https://www.aldi.nl/aanbiedingen.html', 'Lidl': 'https://www.lidl.nl', 'Plus': 'https://www.plus.nl/aanbiedingen',
+  'Vomar': 'https://www.vomar.nl/aanbiedingen', 'DekaMarkt': 'https://www.dekamarkt.nl/aanbiedingen'
 };
-const MANUAL_STORES = ['Albert Heijn', 'Lidl', 'Plus', 'Jumbo', 'Dirk', 'Aldi'];
+const MANUAL_STORES = ['Albert Heijn', 'Lidl', 'Plus', 'Vomar', 'DekaMarkt', 'Jumbo', 'Dirk', 'Aldi'];
 
 /* ---------- Toestand ---------- */
 // Handmatig aangezette aanbiedingen (voor winkels zonder automatische folder, zoals Albert Heijn)
@@ -607,7 +608,12 @@ if (offers.voorbeeld) offers = { winkel: offers.winkel, items: [], voorbeeld: fa
 if (!MANUAL_STORES.includes(offers.winkel)) offers.winkel = 'Albert Heijn';
 // Automatisch opgehaalde folders (gedeelde opslag van de app); laatste versie ook lokaal voor snelle start
 let live = store.get('live', null);
-let mijnWinkels = store.get('mijnWinkels', ['Jumbo', 'Dirk', 'Aldi']);
+let mijnWinkels = store.get('mijnWinkels', ['Jumbo', 'Dirk', 'Aldi', 'Vomar', 'DekaMarkt']);
+// Vomar en DekaMarkt zijn later toegevoegd: zet ze één keer aan voor wie al winkels had gekozen
+if (!store.get('winkels-v2', false)) {
+  ['Vomar', 'DekaMarkt'].forEach(w => { if (!mijnWinkels.includes(w)) mijnWinkels.push(w); });
+  store.set('mijnWinkels', mijnWinkels); store.set('winkels-v2', true);
+}
 let personen = store.get('personen', 2);
 let geboorte = store.get('geboorte', '2026-01-28');
 let overrides = store.get('overrides', {});
@@ -1087,7 +1093,7 @@ function openCompare(k) {
 function closeCompare() { document.getElementById('sheet').hidden = true; }
 
 /* ---------- Winkelkeuze ---------- */
-const ALL_STORES = ['Jumbo', 'Dirk', 'Aldi', 'Albert Heijn', 'Lidl', 'Plus'];
+const ALL_STORES = ['Jumbo', 'Dirk', 'Aldi', 'Vomar', 'DekaMarkt', 'Albert Heijn', 'Lidl', 'Plus'];
 function renderStoreBar() {
   document.getElementById('storebar').innerHTML = ALL_STORES.map(w =>
     `<button class="schip" data-store="${esc(w)}" aria-pressed="${mijnWinkels.includes(w)}">${esc(w)}</button>`).join('');
@@ -1155,7 +1161,7 @@ function viewBaby() {
 }
 
 /* ---------- Spaarkaarten ---------- */
-const CARD_TYPES = ['Albert Heijn (Bonuskaart)', "Jumbo (Extra's)", 'Plus', 'Lidl', 'Dirk', 'Aldi', 'Kruidvat', 'Etos', 'Andere kaart'];
+const CARD_TYPES = ['Albert Heijn (Bonuskaart)', "Jumbo (Extra's)", 'Vomar (KIK-kaart)', 'DekaMarkt', 'Plus', 'Lidl', 'Dirk', 'Aldi', 'Kruidvat', 'Etos', 'Andere kaart'];
 const cleanNum = v => String(v || '').replace(/[\s-]/g, '');
 function eanOk(d) {
   if (!/^\d{8}$|^\d{13}$/.test(d)) return false;
