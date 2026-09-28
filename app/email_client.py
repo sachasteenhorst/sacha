@@ -58,6 +58,17 @@ TOTAL_LABEL_PATTERNS = [
     r"eindtotaal",
     r"invoice\s*total",
     r"\btotal\b",
+    # Lowest priority, bare label: some suppliers just print "Totaal" with
+    # nothing else on the line (real examples: Vlechtservice's
+    # "TOTAAL € INCL. BTW 247,99" -- the € sitting between the label and
+    # "incl. btw" breaks the more specific pattern above -- and Mobility
+    # Services/Lease a Bike's "Totaal\n5.004,79 €", where the € trails the
+    # amount instead of leading it). Safe to search last: it only matters
+    # once every more specific label above has already failed, and
+    # AMOUNT_BARE_RE picks the number out regardless of where the currency
+    # symbol landed. Doesn't match "Subtotaal" (no word boundary before
+    # "totaal" there).
+    r"\btotaal\b",
 ]
 # For INCOMING documents (money paid onto the account, e.g. an ENRA
 # rekening-courant overzicht) the meaningful label is what's being paid

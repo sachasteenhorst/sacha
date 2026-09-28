@@ -196,8 +196,12 @@ def import_bank_file(session: Session, filename: str, content: bytes) -> BankImp
         result.new_transactions += 1
 
     session.flush()
-    apply_rules(session)
+    # A real invoice match always wins over a rule (e.g. a "geen factuur
+    # nodig"/"omzet" rule someone made for a counterparty that ALSO happens
+    # to send real invoices, like a leasing platform) -- run the matcher
+    # first, and let rules mop up only what's still open afterwards.
     result.matching = run_matching(session)
+    apply_rules(session)
     session.commit()
     return result
 
@@ -210,8 +214,8 @@ def run_sync(session: Session) -> SyncResult:
     _sync_invoices(session, since, result)
     session.flush()
 
-    apply_rules(session)
     result.matching = run_matching(session)
+    apply_rules(session)
     session.commit()
 
     # Independent of matching -- purely about getting documents to the

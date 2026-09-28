@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.models import BaseconeForwardStatus, DocumentKind, Invoice, Match, MatchMethod, MatchStatus, Transaction
-from app.vraagposten import build_vraagposten
+from app.vraagposten import _extract_reference_suffixes, build_vraagposten
 
 
 @pytest.fixture()
@@ -52,6 +52,66 @@ def make_invoice(**kwargs):
     )
     defaults.update(kwargs)
     return Invoice(**defaults)
+
+
+def test_extract_reference_suffixes_reassembles_split_group():
+    # Real production description: "0723 3" is "07233" split by a stray
+    # space (PDF line-wrap artifact).
+    desc = (
+        "ID ACCELL NL42375PMTINF42375TRANS2 2967 Descr. 01123 03005 05120 "
+        "0723 3 09087 Kenmerk machtiging / incassant ID: 3458514 NL68ZZZ010542980000"
+    )
+    assert _extract_reference_suffixes(desc) == ["01123", "03005", "05120", "07233", "09087"]
+
+
+def test_extract_reference_suffixes_empty_without_marker():
+    assert _extract_reference_suffixes("Gewone omschrijving zonder incasso-referenties") == []
+
+
+def test_incasso_with_missing_invoice_suggests_opvragen_with_specific_numbers(session):
+    # Two invoices referenced, only one exists in the database -- the other
+    # was apparently never received by e-mail.
+    tx = make_transaction(
+        description=(
+            "ID ACCELL NL42375PMTINF42375TRANS2 2967 Descr. 01123 03005 "
+            "Kenmerk machtiging / incassant ID: 3458514 NL68ZZZ010542980000"
+        ),
+        counterparty_name="ACCELL NEDERLAND",
+        amount_cents=-50000,
+    )
+    known_invoice = make_invoice(invoice_number="251101123", amount_cents=50000, supplier_name="Accell")
+    session.add_all([tx, known_invoice])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert len(items) == 1
+    assert items[0].kind == "opvragen"
+    assert "03005" in items[0].label
+    assert "01123" not in items[0].label
+    assert "03005" in items[0].mailto
+
+
+def test_incasso_with_all_invoices_known_falls_through_to_normal_categorization(session):
+    # All referenced invoices exist -- this isn't a "missing invoice" case,
+    # so the usual controleren/regel/bon/opvragen logic decides instead
+    # (here: same-supplier candidate with a different amount -- controleren).
+    tx = make_transaction(
+        description=(
+            "ID ACCELL NL42375PMTINF42375TRANS2 2967 Descr. 01123 "
+            "Kenmerk machtiging / incassant ID: 3458514 NL68ZZZ010542980000"
+        ),
+        counterparty_name="ACCELL NEDERLAND",
+        amount_cents=-9999,
+    )
+    known_invoice = make_invoice(invoice_number="251101123", amount_cents=50000, supplier_name="Accell")
+    session.add_all([tx, known_invoice])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert len(items) == 1
+    assert items[0].kind == "controleren"
 
 
 def test_unmatched_with_same_supplier_candidate_suggests_controleren(session):

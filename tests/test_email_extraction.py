@@ -90,6 +90,27 @@ def test_amount_finds_value_on_the_next_line():
     assert _parse_amount_to_cents(text) == 24500
 
 
+def test_amount_bare_totaal_label_with_euro_sign_between_label_and_incl_btw():
+    # Real Vlechtservice layout: the € sits BETWEEN "Totaal" and "incl.
+    # btw", breaking the more specific "totaal incl btw" pattern.
+    text = "SUBTOTAAL 204,95\nBTW-BEDRAG 43,04\nTOTAAL € INCL. BTW 247,99"
+    assert _parse_amount_to_cents(text) == 24799
+
+
+def test_amount_bare_totaal_label_with_trailing_euro_sign():
+    # Real Mobility Services/Lease a Bike layout: the € trails the amount
+    # instead of leading it, and "Totaal" has nothing else on its own line.
+    text = "Subtotaal\n4.136,19 €\nbtw (21%)\n868,60 €\nTotaal\n5.004,79 €\nIBAN: NL44 RABO 0199970777"
+    assert _parse_amount_to_cents(text) == 500479
+
+
+def test_amount_bare_totaal_does_not_match_subtotaal():
+    # "Subtotaal" must never satisfy the bare \btotaal\b fallback -- there's
+    # no word boundary between "Sub" and "totaal".
+    text = "Subtotaal 100,00"
+    assert _parse_amount_to_cents(text) is None
+
+
 # -- Invoice number parsing --
 
 def test_invoice_number_after_factuurnummer_label():
@@ -236,6 +257,22 @@ def test_direction_defaults_to_outgoing():
 def test_direction_incoming_for_configured_suppliers():
     assert _assign_direction("ENRA") == Direction.INCOMING.value
     assert _assign_direction("HelloRider") == Direction.INCOMING.value
+    assert _assign_direction("Mobility Services") == Direction.INCOMING.value
+
+
+def test_mobility_services_lease_a_bike_invoice_is_incoming_with_amount():
+    # Real production case: this platform's "factuur" is actually a
+    # verkoopfactuur the shop sends to VWPFS (a leasing company) -- the IBAN
+    # in the document is the shop's OWN account, so it's money coming in.
+    text = (
+        "Nummer: 22533\nFactuur\nVWPFS Van der Linden Tweewielers\n"
+        "Subtotaal\n4.136,19 €\nbtw (21%)\n868,60 €\nTotaal\n5.004,79 €\n"
+        "IBAN: NL44 RABO 0199970777"
+    )
+    fields = _extract_fields(text, "support@mobility-services.bike", "")
+    assert fields["direction"] == Direction.INCOMING.value
+    assert fields["amount_cents"] == 500479
+    assert fields["supplier_name"] == "Mobility Services"
 
 
 def test_incoming_amount_label_gestort():

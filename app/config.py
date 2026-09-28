@@ -53,7 +53,12 @@ class Settings(BaseSettings):
     # to pay -- e.g. ENRA settlement statements, HelloRider payouts. A bank
     # transaction only ever matches documents of the same direction
     # (positive amount = incoming).
-    incoming_suppliers: str = "ENRA,HelloRider"
+    # "Mobility Services" (from mobility-services.bike) is the platform
+    # behind Lease a Bike -- their invoices are verkoopfacturen this shop
+    # issues to a leasing company (VWPFS) for a customer's lease bike, so
+    # the IBAN in the document is this shop's OWN account: it's money
+    # coming in, not a bill to pay.
+    incoming_suppliers: str = "ENRA,HelloRider,Mobility Services"
     # A REFERENCE match (invoice number found in the transaction description)
     # doesn't have to line up exactly on amount -- some suppliers (Kruitbosch,
     # Accell) settle for slightly less than invoiced (betalingskorting /

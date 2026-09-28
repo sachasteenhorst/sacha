@@ -37,6 +37,13 @@ aan een bewijsstuk (factuur, creditnota of bon). Deze tool:
   gehaald uit de "Saldo RC &lt;datum&gt; Agentnr. &lt;nr&gt;"-regel, die
   letterlijk ook in de omschrijving van de bijbehorende bankbijschrijving
   staat.
+- **Bedrag herkennen**: het eindtotaal wordt gezocht op een label als
+  "Totaal", "Totaalbedrag", "Te betalen" of "Factuurbedrag incl. btw", met
+  of zonder euroteken ervoor. Sommige leveranciers zetten het euroteken
+  er juist ACHTER (Mobility Services: "Totaal 4.507,08 €") of ertussenin
+  vóór "incl. btw" (Vlechtservice.nl: "TOTAAL € INCL. BTW 247,99") -- een
+  kaal `Totaal`-label (zonder "incl. btw" erachter) wordt ook herkend,
+  mits het niet per ongeluk op "Subtotaal" matcht.
 - **Bedrag komt exact overeen + datum binnen het tijdvenster** (standaard
   60 dagen) -> als "te bevestigen" suggestie in het dashboard; jij klikt op
   Klopt/Klopt niet. Bij meerdere kandidaten telt ook mee hoe goed de naam
@@ -51,8 +58,13 @@ aan een bewijsstuk (factuur, creditnota of bon). Deze tool:
   het afgeschreven bedrag -> ook als groep-suggestie.
 - **Richting**: een bijschrijving (geld erbij) matcht nooit met een
   gewone leveranciersfactuur, en andersom. Leveranciers die geld op de
-  rekening storten in plaats van innen (standaard ENRA en HelloRider,
-  instelbaar via `INCOMING_SUPPLIERS`) worden apart herkend.
+  rekening storten in plaats van innen (standaard ENRA, HelloRider en
+  Mobility Services, instelbaar via `INCOMING_SUPPLIERS`) worden apart
+  herkend. Mobility Services (het Lease a Bike-platform) stuurt geen
+  inkoopfactuur maar een "factuur" die eigenlijk onze eigen verkoop aan
+  leasemaatschappij VWPFS is (het IBAN in het document is onze eigen
+  rekening) -- die telt dus als inkomend en matcht met de bijschrijvingen
+  van "VWPFS B.V.".
 - **Geen van bovenstaande** -> blijft open staan, tot jij het handmatig
   koppelt (aan één of meerdere facturen tegelijk), als "geen factuur
   nodig" markeert (bankkosten, privé-opname), of als "bon staat in
@@ -110,8 +122,10 @@ CSV-upload beschikbaar) en richting (bij/af). Een regel zonder één ingevuld
 kenmerk matcht nooit iets, zodat er geen regel per ongeluk alles pakt. Elke
 regel wijst een betaling toe aan "geen factuur nodig" of "omzet".
 
-- Regels worden toegepast **voordat** de matcher draait, bij elke upload en
-  elke sync.
+- De matcher krijgt **eerst** de kans op elke betaling, bij elke upload en
+  elke sync -- een regel handelt alleen af wat daarna nog openstaat. Dat
+  voorkomt dat een regel (bijv. "Omzet lease VWPFS") een betaling afvangt
+  die eigenlijk gewoon aan een echte factuur gekoppeld had moeten worden.
 - Bij elke betaling zonder factuur staat een knop **"Maak regel"** die een
   nieuwe regel voorinvult met de tegenpartij/IBAN/code/richting van die
   betaling. Na opslaan wordt de regel **direct** toegepast op alle
@@ -208,6 +222,15 @@ eerst), dan op bedrag. Per rij een concrete voorgestelde actie:
   klaar om de leverancier om een kopie te vragen.
 - **Factuur gevonden maar nog niet in Basecone -- doorsturen** -- al
   gekoppeld, maar de boekhouder ziet 'm nog niet.
+- **Incasso mist N factu(u)r(en) (eindigend op ...) -- opvragen bij
+  leverancier** -- specifiek voor incasso's die (zoals Accell/Kruitbosch)
+  alleen de laatste 5 cijfers van elk factuurnummer in de omschrijving
+  noemen: als één van die referenties nergens bij een ontvangen factuur
+  van diezelfde leverancier hoort, staat híer precies welk(e)
+  factuurnummer(s) ontbreken (op de laatste 5 cijfers na) -- inclusief een
+  kant-en-klare `mailto:`-link om die specifieke factu(u)r(en) bij de
+  leverancier op te vragen, in plaats van "er klopt iets niet" te moeten
+  uitzoeken.
 
 Rechtsboven staat een **CSV-export** (`/vraagposten/export.csv`) om de
 lijst door te nemen of naar de boekhouder te sturen.
