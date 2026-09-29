@@ -1,7 +1,7 @@
 // Offline-laag voor de geïnstalleerde app (PWA).
 // De app zelf komt uit de cache zodat hij ook zonder bereik opent (handig in de winkel);
 // de folders worden altijd eerst vers opgehaald.
-const CACHE = 'aanbiedingskeuken-v8';
+const CACHE = 'aanbiedingskeuken-v9';
 // Alleen deze externe bronnen mogen uit de cache komen (bibliotheken en lettertypen, die veranderen niet).
 // Al het andere van buiten, zoals de tijdlijn van Supabase, gaat altijd rechtstreeks naar het netwerk.
 const CDN = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];

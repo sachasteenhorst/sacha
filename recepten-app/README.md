@@ -48,6 +48,12 @@ verbindingen met andere servers.
 
 ## Onderdelen
 
+De onderbalk heeft vier grote knoppen: **Weekmenu**, **Recepten**,
+**Boodschappen** en **Meer**. Onder *Meer* staan Vandaag koken, Aanbiedingen,
+Tijdlijn, Spaarkaarten en Gezin; bovenaan die schermen staat een Terug-knop.
+De kleuren zijn warm (crème, terracotta en olijfgroen), met grote letters en
+knoppen zodat de app voor elke leeftijd goed te lezen en te bedienen is.
+
 - **Vandaag**: het recept van de dag, de producten uit de aanbieding die erin
   zitten, de bereiding en, als je een baby hebt toegevoegd, een apart stappenplan
   voor de baby met een tussendoortje erbij. Met "Ander recept" wissel je het gerecht.

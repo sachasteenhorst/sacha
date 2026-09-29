@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#1E7A4C">
+<meta name="theme-color" content="#B84A2A">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,13 +18,15 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
   :root {
-    --bg: #F3F6F0;
+    --bg: #FBF7F1;
     --surface: #FFFFFF;
-    --ink: #17221B;
-    --muted: #57675D;
-    --line: #D9E1D6;
-    --green: #1E7A4C;
-    --green-soft: #E1F1E7;
+    --ink: #2B2420;
+    --muted: #6B5F57;
+    --line: #EDE3D8;
+    --green: #B84A2A;
+    --green-soft: #FBE8DE;
+    --olive: #4F6B2F;
+    --olive-soft: #EDF2E1;
     --radius: 20px;
     --tag: #F6C31B;
     --tag-ink: #2A2000;
@@ -34,28 +36,28 @@
     --warn-bg: #FBEBDD;
     --no: #9B2F2F;
     --no-bg: #F8E4E2;
-    --shadow: 0 1px 2px rgba(16, 40, 28, .05), 0 12px 32px -14px rgba(16, 40, 28, .22);
-    --glass: rgba(243, 246, 241, .82);
+    --shadow: 0 1px 2px rgba(70, 40, 20, .05), 0 12px 32px -14px rgba(70, 40, 20, .22);
+    --glass: rgba(251, 247, 241, .88);
     --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
     --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --bg: #0E1411; --surface: #161E19; --ink: #E4ECE6; --muted: #98A89E; --line: #25302A;
-      --green: #6CCB94; --green-soft: #1A3024; --tag: #EDBB12; --tag-ink: #231B00;
+      --bg: #16110F; --surface: #211A17; --ink: #F4EDE7; --muted: #B5A89E; --line: #3A2F29;
+      --green: #F2916B; --green-soft: #3B2219; --olive: #B5CF8E; --olive-soft: #26301B; --tag: #EDBB12; --tag-ink: #231B00;
       --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
       --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.7);
-      --glass: rgba(14, 20, 17, .8);
+      --glass: rgba(22, 17, 15, .86);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #0E1411; --surface: #161E19; --ink: #E4ECE6; --muted: #98A89E; --line: #25302A;
-    --green: #6CCB94; --green-soft: #1A3024; --tag: #EDBB12; --tag-ink: #231B00;
+    --bg: #16110F; --surface: #211A17; --ink: #F4EDE7; --muted: #B5A89E; --line: #3A2F29;
+    --green: #F2916B; --green-soft: #3B2219; --olive: #B5CF8E; --olive-soft: #26301B; --tag: #EDBB12; --tag-ink: #231B00;
     --baby: #97B2EA; --baby-bg: #1A2437; --warn: #F0A472; --warn-bg: #36251A;
     --no: #F09A93; --no-bg: #3A1E1D; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.7);
-    --glass: rgba(14, 20, 17, .8);
+    --glass: rgba(22, 17, 15, .86);
   }
 
   * { box-sizing: border-box; }
@@ -343,7 +345,7 @@
   .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; }
   .applogo {
     width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none;
-    background: linear-gradient(150deg, #2AA566, var(--green) 70%); box-shadow: 0 8px 18px -8px rgba(30, 122, 76, .7);
+    background: linear-gradient(150deg, #D0603A, var(--green) 70%); box-shadow: 0 8px 18px -8px rgba(184, 74, 42, .7);
   }
   .applogo svg { width: 100%; height: 100%; display: block; }
   .applogo { overflow: hidden; }
@@ -381,7 +383,7 @@
   .price b, .obest b { margin-right: 5px; }
   .babybox { border-radius: 16px; }
   details.budget { border-radius: 14px; }
-  .sheet { background: rgba(8, 14, 10, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .sheet { background: rgba(20, 12, 8, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
   .sheet-panel { border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px -10px rgba(0,0,0,.35); }
   .cstore { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .shopgroup h3 { display: flex; align-items: center; gap: 10px; }
@@ -401,9 +403,9 @@
   @media (prefers-reduced-motion: reduce) { .btn, .schip, .schip .slogo, nav.tabs button { transition: none; } }
 
   /* ---------- Echte knoppen: gevuld, met een rand onderaan zodat ze indrukbaar ogen ---------- */
-  :root { --btn: #E4F2E8; --btn-ink: #145C38; --btn-edge: #BFDCC9; --tile: #F4F8F3; --tile-edge: #E1EAE0; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --btn: #1E3527; --btn-ink: #CDEBD8; --btn-edge: #0B1A11; --tile: #1B241E; --tile-edge: #0E1511; } }
-  :root[data-theme="dark"] { --btn: #1E3527; --btn-ink: #CDEBD8; --btn-edge: #0B1A11; --tile: #1B241E; --tile-edge: #0E1511; }
+  :root { --btn: #FBE8DE; --btn-ink: #8E3517; --btn-edge: #EFCDBB; --tile: #FBF5EE; --tile-edge: #EFE4D8; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --btn: #3B2219; --btn-ink: #FFD5C2; --btn-edge: #120B08; --tile: #261E1A; --tile-edge: #140E0B; } }
+  :root[data-theme="dark"] { --btn: #3B2219; --btn-ink: #FFD5C2; --btn-edge: #120B08; --tile: #261E1A; --tile-edge: #140E0B; }
 
   .btn, .chip, .schip, .seg button, .price, .orow, .rule, .stepper button, button.leur, .lrm, .sheet-close, .gezinlink,
   details.filters > summary, details.manual > summary, #addcard > summary, details.budget > summary::after, button.tag {
@@ -417,7 +419,7 @@
   .btn:active, .chip:active, .schip:active, .orow:active, .rule:active, .price:active, .stepper button:active, button.leur:active, .gezinlink:active {
     transform: translateY(3px); box-shadow: 0 0 0 transparent;
   }
-  .btn.primary { background: linear-gradient(180deg, #2FA766, #1E7A4C); color: #FFFFFF; box-shadow: 0 3px 0 #11502F, 0 10px 20px -10px rgba(20, 92, 56, .7); }
+  .btn.primary { background: linear-gradient(180deg, #D0603A, #B84A2A); color: #FFFFFF; box-shadow: 0 3px 0 #7E2E16, 0 10px 20px -10px rgba(140, 50, 20, .7); }
   .btn.danger { background: var(--no-bg); color: var(--no); box-shadow: 0 3px 0 rgba(155, 47, 47, .28); }
   .btn.fav { background: #FDECEC; color: #B42318; box-shadow: 0 3px 0 #F4C2BF; }
   .btn.fav.on { background: #D92D20; color: #FFFFFF; border: 0; box-shadow: 0 3px 0 #912018; }
@@ -429,14 +431,14 @@
     border: 0; background: var(--surface); color: var(--ink); font-weight: 700; padding: 10px 15px; border-radius: 12px;
     box-shadow: 0 3px 0 var(--tile-edge), 0 1px 3px rgba(0,0,0,.06);
   }
-  .chip[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #11502F; }
+  .chip[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #7E2E16; }
   .chip[data-allergy][aria-pressed="true"] { background: #D92D20; box-shadow: 0 3px 0 #912018; }
   .schip { border: 0; box-shadow: 0 3px 0 var(--tile-edge), 0 1px 3px rgba(0,0,0,.06); font-weight: 800; padding: 6px 14px 6px 6px; }
-  .schip[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #11502F; }
+  .schip[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #7E2E16; }
   .seg { border: 0; background: var(--tile); padding: 4px; gap: 4px; border-radius: 14px; box-shadow: inset 0 1px 3px rgba(0,0,0,.08); }
   .seg button { border-radius: 10px; padding: 8px 12px; background: transparent; }
   .seg button + button { border-left: 0; }
-  .seg button[aria-pressed="true"] { box-shadow: 0 2px 0 #11502F; color: #FFFFFF; }
+  .seg button[aria-pressed="true"] { box-shadow: 0 2px 0 #7E2E16; color: #FFFFFF; }
   .seg button[data-pref$=":niet"][aria-pressed="true"] { box-shadow: 0 2px 0 #912018; }
   .price { border: 0; background: #FFF1BF; color: #3A2E00; box-shadow: 0 3px 0 #E9C75A; min-height: 32px; padding: 4px 10px 4px 5px; }
   button.tag { box-shadow: 0 3px 0 #C99A00; }
@@ -482,14 +484,14 @@
   /* Groente en fruit in beeld */
   .herobanner {
     display: flex; justify-content: center; align-items: flex-end; gap: 6px; margin: -22px -20px 16px; padding: 18px 12px 10px;
-    background: radial-gradient(120% 90% at 50% 0%, #D6EFDD 0%, #EAF6ED 60%, transparent 100%);
+    background: radial-gradient(120% 90% at 50% 0%, #FCE3D3 0%, #FDF1E8 60%, transparent 100%);
     border-radius: var(--radius) var(--radius) 0 0;
   }
-  .herobanner .art { filter: drop-shadow(0 6px 6px rgba(16, 60, 34, .18)); }
+  .herobanner .art { filter: drop-shadow(0 6px 6px rgba(90, 40, 20, .18)); }
   .herobanner .h0 { transform: rotate(-8deg); } .herobanner .h1 { transform: translateY(-8px) rotate(6deg); }
   .herobanner .h2 { transform: scale(1.12); } .herobanner .h3 { transform: translateY(-6px) rotate(-5deg); } .herobanner .h4 { transform: rotate(9deg); }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .herobanner { background: radial-gradient(120% 90% at 50% 0%, #1F3A28 0%, #18261D 60%, transparent 100%); } }
-  :root[data-theme="dark"] .herobanner { background: radial-gradient(120% 90% at 50% 0%, #1F3A28 0%, #18261D 60%, transparent 100%); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .herobanner { background: radial-gradient(120% 90% at 50% 0%, #3E2419 0%, #241A15 60%, transparent 100%); } }
+  :root[data-theme="dark"] .herobanner { background: radial-gradient(120% 90% at 50% 0%, #3E2419 0%, #241A15 60%, transparent 100%); }
   .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
   .fact { background: var(--surface); border-radius: 14px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; flex-direction: column; }
   .flabel { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
@@ -566,13 +568,13 @@
   .splash {
     position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 14px; padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); text-align: center; color: #FFFFFF; cursor: pointer;
-    background: radial-gradient(120% 80% at 50% 20%, #2FA766 0%, #1E7A4C 55%, #11502F 100%);
+    background: radial-gradient(120% 80% at 50% 20%, #D0603A 0%, #B84A2A 55%, #7E2E16 100%);
     transition: opacity .4s ease, transform .4s ease;
   }
   .splash.weg { opacity: 0; transform: scale(1.04); pointer-events: none; }
   .splash-q { color: #FFFFFF; font-size: clamp(38px, 11vw, 60px); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; animation: sp-rise .6s .15s both; }
   .splash-sub { margin: 0; font-size: 16px; opacity: .92; max-width: 30ch; animation: sp-rise .6s .45s both; }
-  .splash-go { margin-top: 10px; background: #FFFFFF; color: #145C38; box-shadow: 0 4px 0 #0B3A22; animation: sp-rise .6s .7s both; }
+  .splash-go { margin-top: 10px; background: #FFFFFF; color: #8E3517; box-shadow: 0 4px 0 #5A1F0C; animation: sp-rise .6s .7s both; }
   .splash-art { position: relative; width: min(340px, 90vw); height: 160px; }
   .sp { position: absolute; animation: sp-pop .5s both; filter: drop-shadow(0 8px 10px rgba(0,0,0,.25)); }
   .sp0 { left: 2%; top: 50%; animation-delay: .05s; } .sp1 { left: 18%; top: 6%; animation-delay: .13s; }
@@ -618,7 +620,7 @@
     background: var(--btn); color: var(--btn-ink); border-radius: 12px; padding: 8px 12px; box-shadow: 0 3px 0 var(--btn-edge);
   }
   .gezinbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .gezinbtn[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #11502F; }
+  .gezinbtn[aria-pressed="true"] { background: var(--green); color: #FFFFFF; box-shadow: 0 3px 0 #7E2E16; }
   .gezinbtn:active { transform: translateY(3px); box-shadow: none; }
   .post { padding: 0; overflow: hidden; }
   .post > *:not(.pfoto):not(.pban) { margin-inline: 18px; }
@@ -643,7 +645,7 @@
   /* ---------- Premium foto's ---------- */
   .cover { position: relative; margin: -22px -20px 0; overflow: hidden; border-radius: var(--radius) var(--radius) 0 0; }
   .cover img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
-  .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(8,14,10,.35) 62%, rgba(8,14,10,.82) 100%); }
+  .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(20,12,8,.35) 62%, rgba(20,12,8,.82) 100%); }
   .covertext { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 18px 20px 18px; color: #FFFFFF; }
   .covertext .eyebrow { color: rgba(255,255,255,.85); }
   .covertext h2 { color: #FFFFFF; margin-top: 6px; text-shadow: 0 2px 12px rgba(0,0,0,.35); }
@@ -664,6 +666,67 @@
   .pill.comfort { background: #FFE6CF; color: #8A3B00; align-self: flex-start; margin-top: 4px; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.comfort { background: #4A2B14; color: #FFC999; } }
   :root[data-theme="dark"] .pill.comfort { background: #4A2B14; color: #FFC999; }
+  /* ---------- Warme stijl: rustig, groot en duidelijk voor elke leeftijd ---------- */
+  body { font-size: 17px; }
+  .small { font-size: 15px; }
+  .eyebrow { font-size: 13px; letter-spacing: .06em; color: var(--green); }
+  .ptitle { font-size: 32px; margin-top: 4px; letter-spacing: -.01em; }
+  .tag { transform: none; border-radius: 8px; text-transform: none; letter-spacing: 0; font-size: 13px; padding: 3px 9px; }
+  .tag.big { font-size: 14px; padding: 5px 11px; }
+  .pill { font-size: 13px; padding: 3px 10px; }
+  .pill.ok { background: var(--olive-soft); color: var(--olive); }
+  .card { border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(70, 40, 20, .04), 0 10px 26px -18px rgba(70, 40, 20, .35); }
+  .btn { min-height: 48px; font-size: 16px; }
+  .btn.primary { background: var(--green); box-shadow: 0 3px 0 #7E2E16; }
+  .day { border: 1px solid var(--line); }
+  .day.today { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-soft); }
+  .rname { font-size: 18px; }
+
+  nav.tabs { padding: 6px; border-radius: 24px; }
+  nav.tabs .inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, .8fr); gap: 4px; }
+  nav.tabs button { font-size: 13.5px; padding: 9px 2px 8px; gap: 4px; min-height: 60px; color: var(--muted); }
+  nav.tabs button svg { width: 26px; height: 26px; stroke-width: 1.9; }
+  nav.tabs button[aria-selected="true"] { color: var(--green); background: var(--green-soft); }
+  nav.tabs { padding: 5px; }
+  nav.tabs .inner { gap: 2px; }
+  @media (max-width: 430px) { nav.tabs button { font-size: 12.5px; letter-spacing: -.015em; padding-inline: 0; } }
+  @media (max-width: 365px) { nav.tabs { left: 6px; right: 6px; } nav.tabs button { font-size: 11.5px; } }
+
+  .terug {
+    display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 12px; padding: 10px 18px; min-height: 44px; width: auto; justify-self: start; align-self: start;
+    border: 0; border-radius: 999px; background: var(--btn); color: var(--btn-ink); font-weight: 700; font-size: 16px; cursor: pointer;
+    box-shadow: 0 2px 0 var(--btn-edge);
+  }
+  .meerlijst { display: grid; gap: 12px; margin-top: 16px; }
+  .meertegel {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; width: 100%; text-align: left;
+    padding: 16px 18px; min-height: 84px; border-radius: 20px; border: 1px solid var(--line); background: var(--surface);
+    box-shadow: 0 3px 0 var(--tile-edge); cursor: pointer; color: var(--ink);
+  }
+  .meertegel:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tile-edge); }
+  .micon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: var(--green-soft); color: var(--green); }
+  .meertegel:nth-child(2) .micon, .meertegel:nth-child(5) .micon { background: var(--olive-soft); color: var(--olive); }
+  .micon svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .mtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mtext b { font-family: var(--display); font-size: 20px; }
+  .mtext span { color: var(--muted); font-size: 15px; }
+  .mpijl { font-size: 30px; color: var(--muted); line-height: 1; }
+
+  .winkelregel {
+    display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 10px 14px; min-height: 52px;
+    border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; font-size: 15px;
+  }
+  .winkelregel > span:nth-child(2) { flex: 1; min-width: 0; }
+  .wlogos { display: inline-flex; flex: none; }
+  .wlogos .slogo { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface); }
+  .wlogos .slogo:first-child { margin-left: 0; }
+  .wwijzig { font-weight: 700; color: var(--green); flex: none; }
+  ul.shop li { font-size: 16px; }
+  .seg button { padding: 7px 11px; }
+  @media (max-width: 430px) { .seg button { padding: 7px 9px; } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { background: #C4552F; color: #FFFFFF; box-shadow: 0 3px 0 #5A1F0C; } }
+  :root[data-theme="dark"] .btn.primary { background: #C4552F; color: #FFFFFF; box-shadow: 0 3px 0 #5A1F0C; }
+  @media (max-width: 380px) { .shopgroup.card, .lcard.card { padding-inline: 12px; } ul.shop li { padding-inline: 8px; column-gap: 8px; } }
 </style>
 <!--wrapper-->
 </head>
@@ -703,19 +766,13 @@
 <nav class="tabs" aria-label="Onderdelen">
   <div class="inner" role="tablist">
     <button role="tab" data-tab="week" id="tab-week">
-      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Week</button>
-    <button role="tab" data-tab="vandaag" id="tab-vandaag">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Vandaag</button>
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Weekmenu</button>
     <button role="tab" data-tab="recepten" id="tab-recepten">
       <svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M12 7.5c-.9-1-2.6-.4-2.4 1 .2 1.2 2.4 2.5 2.4 2.5s2.2-1.3 2.4-2.5c.2-1.4-1.5-2-2.4-1z"/></svg>Recepten</button>
     <button role="tab" data-tab="lijst" id="tab-lijst">
-      <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Lijst</button>
-    <button role="tab" data-tab="aanbiedingen" id="tab-aanbiedingen">
-      <svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>Acties</button>
-    <button role="tab" data-tab="tijdlijn" id="tab-tijdlijn">
-      <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/><circle cx="17.5" cy="16.5" r="1.2"/></svg>Tijdlijn</button>
-    <button role="tab" data-tab="kaarten" id="tab-kaarten">
-      <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 10v5M10 10v5M12.5 10v5M16 10v5"/></svg>Kaarten</button>
+      <svg viewBox="0 0 24 24"><path d="M4 8h16l-1.6 10.2A2 2 0 0 1 16.4 20H7.6a2 2 0 0 1-2-1.8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>Boodschappen</button>
+    <button role="tab" data-tab="meer" id="tab-meer">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>Meer</button>
   </div>
 </nav>
 
@@ -1673,8 +1730,9 @@ function viewWeek() {
   return `
   <section>
     <div class="eyebrow">Week van ${monday.getDate()} ${MONTHS[monday.getMonth()]}</div>
-    <h2 style="font-size:28px;margin-top:4px">Weekmenu</h2>
-    <p class="muted small" style="margin:6px 0 0">Gerechten met de meeste aanbiedingen staan bovenaan de selectie. Er komt niet twee dagen achter elkaar hetzelfde soort gerecht, minstens één keer vis en hooguit twee keer nitraatrijke groente.</p>
+    <h2 class="ptitle">Weekmenu</h2>
+    <p class="muted" style="margin:6px 0 0">Zeven gerechten, gekozen op de aanbiedingen van deze week.</p>
+    <button class="winkelregel" data-go="aanbiedingen">${storeRow()}<span>Aanbiedingen van ${mijnWinkels.length === ALL_STORES.length ? 'alle winkels' : esc(mijnWinkels.join(', ') || 'geen winkel gekozen')}</span><span class="wwijzig">Wijzig</span></button>
   </section>
   <article class="card weekbar">
     <div><div class="eyebrow">Hele week</div><div class="bigeur">≈ ${fmtEur(week)}</div><div class="small muted">${fmtEur(week / 7)} per dag gemiddeld</div></div>
@@ -1912,6 +1970,7 @@ function storeLogo(w, size = '') {
   return `<span class="slogo${size ? ' ' + size : ''}" style="background:${l[1]};color:${l[2]}" aria-hidden="true">${l[0]}</span>`;
 }
 const cardStore = type => Object.keys(STORE_LOOK).find(w => type.startsWith(w));
+function storeRow() { return `<span class="wlogos">${mijnWinkels.slice(0, 4).map(w => storeLogo(w)).join('')}</span>`; }
 function renderStoreBar() {
   document.getElementById('storebar').innerHTML = ALL_STORES.map(w =>
     `<button class="schip" data-store="${esc(w)}" aria-pressed="${mijnWinkels.includes(w)}">${storeLogo(w)}${esc(w)}</button>`).join('');
@@ -2243,18 +2302,44 @@ const app = document.getElementById('app');
 document.getElementById('today-label').textContent = fmtDate(today);
 (() => { const h = new Date().getHours(); document.getElementById('greeting').textContent = (h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond') + ' · ' + today.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }); })();
 
+// De onderbalk heeft vier knoppen; de andere onderdelen staan onder 'Meer'.
+const HOOFD = ['week', 'recepten', 'lijst', 'meer'];
+const MEER = [
+  ['vandaag', 'Vandaag koken', 'Het recept van vandaag, stap voor stap', 'M12 3v2M5.6 5.6l1.4 1.4M3 12h2M18.4 5.6 17 7M21 12h-2M7 16a5 5 0 1 1 10 0zM4 19h16'],
+  ['aanbiedingen', 'Aanbiedingen', 'Wat er deze week in de aanbieding is en waar', 'M3 12V4h8l10 10-8 8zM7.5 8.5h.01'],
+  ['tijdlijn', 'Tijdlijn', 'Recepten die andere gebruikers delen', 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5'],
+  ['kaarten', 'Spaarkaarten', 'Je klantenkaarten altijd bij de hand', 'M3 6h18v13H3zM7 10v5M10 10v5M12.5 10v5M16 10v5'],
+  ['gezin', 'Gezin en baby', 'Voor hoeveel personen je kookt', 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a2.5 2.5 0 1 0 0-5M16 14.5a5 5 0 0 1 5 5.5'],
+];
+let terugNaar = 'meer';
+function viewMeer() {
+  return `
+  <section>
+    <h2 class="ptitle">Meer</h2>
+  </section>
+  <div class="meerlijst">
+    ${MEER.map(([t, titel, uitleg, d]) => `
+      <button class="meertegel" data-go="${t}">
+        <span class="micon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></span>
+        <span class="mtext"><b>${titel}</b><span>${t === 'gezin' ? esc(gezinLabel()) : uitleg}</span></span>
+        <span class="mpijl" aria-hidden="true">›</span>
+      </button>`).join('')}
+  </div>`;
+}
 function render() {
-  const views = { vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, gezin: viewGezin, kaarten: viewCards, tijdlijn: viewTijdlijn };
+  const views = { vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, gezin: viewGezin, kaarten: viewCards, tijdlijn: viewTijdlijn, meer: viewMeer };
   renderStoreBar();
-  document.querySelector('.storebar-wrap').hidden = !['vandaag', 'week', 'lijst', 'aanbiedingen'].includes(tab);
+  document.querySelector('.storebar-wrap').hidden = !['lijst', 'aanbiedingen'].includes(tab);
   const gc = document.getElementById('gezin-count'); if (gc) gc.textContent = `${gezin.volw + gezin.kind + babys().length} pers.`;
   document.querySelector('.gezinbtn').setAttribute('aria-pressed', tab === 'gezin');
   const openRows = [...app.querySelectorAll('details.rrow[open]')].map(d => d.querySelector('.rname').textContent);
-  app.innerHTML = `<div class="view">${views[tab]()}</div>`;
+  const terug = HOOFD.includes(tab) ? '' : `<button class="terug" data-go="${terugNaar}">‹ Terug naar ${terugNaar === 'week' ? 'weekmenu' : terugNaar === 'lijst' ? 'boodschappen' : terugNaar}</button>`;
+  app.innerHTML = `<div class="view">${terug}${(views[tab] || viewWeek)()}</div>`;
   app.querySelectorAll('details.rrow').forEach(d => { if (openRows.includes(d.querySelector('.rname').textContent)) d.open = true; });
-  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  const actief = HOOFD.includes(tab) ? tab : 'meer';
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === actief));
 }
-function go(t) { tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
+function go(t) { if (HOOFD.includes(tab) && !HOOFD.includes(t)) terugNaar = tab; tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
 function openFilters() { const d = document.querySelector('details.filters'); if (d) d.open = true; }
 // Details die de gebruiker open had, blijven open na opnieuw tekenen
 function persistPrefs() {
