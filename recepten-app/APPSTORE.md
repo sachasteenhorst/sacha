@@ -52,8 +52,13 @@ Capacitor voegt een iOS- en Android-project toe.
 - [ ] Appnaam (bijvoorbeeld "Aanbiedingskeuken") en een ondertitel.
 - [ ] Beschrijving, trefwoorden en categorie (Eten en drinken).
 - [ ] Schermafbeeldingen voor iPhone (6,7" en 6,1") en eventueel iPad.
-- [ ] Een **privacybeleid** op een openbare webpagina, en de privacyvragen in App
-      Store Connect ("welke gegevens verzamel je?").
+- [x] Een **privacybeleid** op een openbare webpagina:
+      https://sachasteenhorst.github.io/sacha/recepten-app/privacy.html
+- [ ] De privacyvragen in App Store Connect ("welke gegevens verzamel je?"):
+      gebruikersinhoud (recepten, foto's) en een anonieme gebruikers-ID, niet
+      gekoppeld aan identiteit, niet voor tracking.
+- [x] Melden en blokkeren van berichten op de tijdlijn (eis van Apple voor
+      apps met door gebruikers geplaatste inhoud).
 - [ ] Een support-URL of een e-mailadres voor vragen.
 - [ ] Leeftijdsclassificatie (vragenlijst in App Store Connect).
 - [ ] Het app-icoon in 1024×1024 (bron staat in `icons/`).

@@ -711,6 +711,9 @@
   .mtext b { font-family: var(--display); font-size: 20px; }
   .mtext span { color: var(--muted); font-size: 15px; }
   .mpijl { font-size: 30px; color: var(--muted); line-height: 1; }
+  a.meertegel { text-decoration: none; }
+  .meertegel.klein { min-height: 72px; }
+  .meertegel.klein .micon { background: var(--tile); color: var(--muted); }
 
   .winkelregel {
     display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 10px 14px; min-height: 52px;
@@ -2834,6 +2837,11 @@ function viewMeer() {
         <span class="mtext"><b>${titel}</b><span>${t === 'gezin' ? esc(gezinLabel()) : uitleg}</span></span>
         <span class="mpijl" aria-hidden="true">›</span>
       </button>`).join('')}
+    <a class="meertegel klein" href="${inClaude ? 'https://sachasteenhorst.github.io/sacha/recepten-app/privacy.html' : 'privacy.html'}"${inClaude ? ' target="_blank" rel="noopener"' : ''}>
+      <span class="micon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <span class="mtext"><b>Privacy</b><span>Wat de app bewaart en hoe je het wist</span></span>
+      <span class="mpijl" aria-hidden="true">›</span>
+    </a>
   </div>`;
 }
 function render() {

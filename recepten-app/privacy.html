@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#B84A2A">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<title>Privacy · Aanbiedingskeuken</title>
+<style>
+  :root { --bg: #FBF7F1; --surface: #FFFFFF; --ink: #2B2420; --muted: #6B5F57; --line: #EDE3D8; --accent: #B84A2A; --soft: #FBE8DE; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16110F; --surface: #211A17; --ink: #F4EDE7; --muted: #B5A89E; --line: #3A2F29; --accent: #F2916B; --soft: #3B2219; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; padding: 0 16px 48px; }
+  main { max-width: 680px; margin: 0 auto; }
+  header { padding: 20px 0 8px; display: flex; align-items: center; gap: 12px; }
+  header img { width: 44px; height: 44px; border-radius: 12px; }
+  h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; }
+  h2 { font-size: 20px; margin: 28px 0 6px; }
+  p, li { color: var(--ink); }
+  .muted { color: var(--muted); font-size: 15px; }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  .terug, .wis { display: inline-flex; align-items: center; min-height: 48px; padding: 10px 18px; border-radius: 999px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .terug { background: var(--soft); color: var(--accent); border: 0; }
+  .wis { background: var(--surface); color: #A3262A; border: 1px solid var(--line); margin-top: 8px; }
+  .kaart { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 4px 18px 14px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="icons/icon-192.png" alt=""><a class="terug" href="./">‹ Terug naar de app</a></header>
+  <h1>Privacy</h1>
+  <p class="muted">Aanbiedingskeuken · bijgewerkt op 29 september 2026</p>
+
+  <p>De Aanbiedingskeuken is gemaakt om te helpen met koken en boodschappen doen. Je hebt geen account nodig. We verzamelen zo min mogelijk gegevens, tonen geen advertenties en volgen je niet.</p>
+
+  <h2>Wat alleen op je eigen telefoon staat</h2>
+  <p>Deze gegevens blijven in de app op je toestel en worden nergens naartoe gestuurd:</p>
+  <ul>
+    <li>je gezin: het aantal volwassenen en kinderen, en de naam, geboortedatum en voedingsregels van een baby;</li>
+    <li>allergieën, voorkeuren, favorieten en weggelaten ingrediënten;</li>
+    <li>je spaarkaarten en klantenkaartnummers;</li>
+    <li>je boodschappenlijst, zolang je die niet deelt;</li>
+    <li>je etenstijd en keuze voor de herinnering. Het agendabestand wordt op je telefoon gemaakt.</li>
+  </ul>
+  <p>Gebruik je de app binnen claude.ai terwijl je ingelogd bent, dan bewaart claude.ai je boodschappenlijst, favorieten, allergieën, voorkeuren, gezin en kaarten bij je account, zodat je ze op al je apparaten hebt. Alleen jij kunt die zien.</p>
+
+  <h2>Wat je deelt met anderen</h2>
+  <p>Voor de tijdlijn en de gedeelde boodschappenlijst gebruiken we <a href="https://supabase.com/privacy" rel="noopener">Supabase</a>, met servers in Europa. De app maakt daar een anonieme gebruiker aan. Er is geen e-mailadres of wachtwoord nodig.</p>
+  <ul>
+    <li><b>Tijdlijn:</b> je schermnaam en de recepten, foto's en hartjes die je plaatst, zijn voor alle gebruikers te zien. Deel daarom geen persoonlijke gegevens of foto's van mensen. Je kunt je eigen recepten altijd zelf verwijderen.</li>
+    <li><b>Meldingen:</b> als je een bericht meldt, bewaren we welk bericht het is, de reden en je anonieme gebruikers-ID. Een bericht met 3 meldingen wordt verborgen. Wie je blokkeert, wordt alleen op je eigen telefoon bewaard.</li>
+    <li><b>Gedeelde boodschappenlijst:</b> de producten, aantallen en prijzen op een gedeelde lijst ziet iedereen die de code van die lijst heeft. Stop je met delen, dan houd je zelf een kopie en blijft de lijst bestaan voor de anderen.</li>
+  </ul>
+
+  <h2>Andere diensten die de app gebruikt</h2>
+  <ul>
+    <li><b>GitHub Pages</b> levert de app en de aanbiedingen. De app haalt de aanbiedingen op van onze eigen site, niet rechtstreeks bij de winkels.</li>
+    <li><b>Google Fonts</b> levert de lettertypen. <b>jsDelivr</b> en <b>cdnjs</b> leveren onderdelen voor de tijdlijn en de streepjescodes.</li>
+  </ul>
+  <p>Deze diensten zien, zoals bij elke website, je IP-adres wanneer je telefoon iets bij hen ophaalt. Wij krijgen die gegevens niet.</p>
+
+  <h2>Je gegevens wissen</h2>
+  <p>Met deze knop wis je alles wat de app op deze telefoon heeft bewaard, zoals je lijst, gezin, kaarten en instellingen. Recepten die je op de tijdlijn hebt geplaatst, verwijder je eerst zelf in de app.</p>
+  <button class="wis" id="wis" type="button">Alles op deze telefoon wissen</button>
+  <p id="gewist" class="muted" hidden>Alles is gewist.</p>
+
+  <h2>Vragen</h2>
+  <p>Wil je weten welke gegevens er over jou bij Supabase staan, of wil je die laten verwijderen? Neem contact op via <a href="https://github.com/sachasteenhorst" rel="noopener">github.com/sachasteenhorst</a>. Je hebt daar recht op volgens de AVG.</p>
+
+  <div class="kaart">
+    <h2>Kort samengevat</h2>
+    <ul>
+      <li>Geen account, geen advertenties en geen volgcodes.</li>
+      <li>Gezin, allergieën, kaarten en je eigen lijst blijven op je telefoon.</li>
+      <li>Wat je op de tijdlijn zet, is voor iedereen te zien.</li>
+    </ul>
+  </div>
+</main>
+<script>
+  document.getElementById('wis').addEventListener('click', () => {
+    if (!confirm('Weet je zeker dat je alles van de Aanbiedingskeuken op deze telefoon wilt wissen? Dit kun je niet ongedaan maken.')) return;
+    try {
+      Object.keys(localStorage).filter(k => k.startsWith('ak:') || k === 'ak-tijdlijn').forEach(k => localStorage.removeItem(k));
+      document.getElementById('gewist').hidden = false;
+    } catch (e) { alert('Wissen lukte niet in deze browser.'); }
+  });
+</script>
+</body>
+</html>
