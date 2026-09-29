@@ -67,6 +67,11 @@ Aldi, Vomar, DekaMarkt, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de 
 in jouw winkels; tik erop voor de vergelijking met alle winkels, op prijs per
 kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
+- **Etenstijd en agenda**: kies op het weekmenu hoe laat jullie eten. Bij elk
+  gerecht staat dan hoe laat je moet beginnen (etenstijd min kooktijd). Met
+  *Zet het weekmenu in mijn agenda* krijg je een agendabestand (.ics) met de
+  resterende maaltijden van de week, elk met een herinnering (bij de start,
+  15 of 30 minuten of 1 uur eerder). Opnieuw toevoegen werkt dezelfde dag bij.
 - **Recepten**: je favorieten (tik bij een recept op het hartje), filters en
   alle recepten. Vink allergieën aan (gluten, melk, ei, vis, pinda, noten, soja,
   selderij, kokos) en kies per soort gerecht (vega, vis, kip, vlees, ei) tussen

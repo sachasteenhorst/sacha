@@ -722,6 +722,19 @@
   .wlogos .slogo:first-child { margin-left: 0; }
   .wwijzig { font-weight: 700; color: var(--green); flex: none; }
   ul.shop li { font-size: 16px; }
+  .agendakaart { display: grid; gap: 12px; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: 520px; margin: 0 auto;
+    background: var(--ink); color: var(--bg); padding: 14px 18px; border-radius: 16px; font-size: 16px; font-weight: 700;
+    box-shadow: 0 12px 30px -10px rgba(0,0,0,.4); opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity .2s, transform .2s;
+  }
+  .toast.aan { opacity: 1; transform: none; }
+  .agendakaart h3 { font-size: 20px; }
+  .agendavelden { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 420px) { .agendavelden { grid-template-columns: 1fr; } }
+  .agendavelden .field { display: grid; gap: 4px; font-weight: 700; font-size: 15px; }
+  .agendavelden input, .agendavelden select { width: 100%; min-height: 48px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; }
   .seg button { padding: 7px 11px; }
   @media (max-width: 430px) { .seg button { padding: 7px 9px; } }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { background: #C4552F; color: #FFFFFF; box-shadow: 0 3px 0 #5A1F0C; } }
@@ -1698,6 +1711,7 @@ function viewToday() {
     <h2>${esc(r.naam)}</h2>`}
     <div class="facts">
       <div class="fact"><span class="flabel">Tijd</span><span class="fval">${r.tijd} min</span></div>
+      <div class="fact"><span class="flabel">Begin om</span><span class="fval">${startTijd(r)}</span></div>
       <div class="fact"><span class="flabel">Voor</span><span class="fval">${gezin.volw + gezin.kind + babys().length} pers.</span></div>
       <div class="fact"><span class="flabel">Kosten</span><span class="fval">${fmtEur(recipeCost(r).total)}</span></div>
     </div>
@@ -1724,6 +1738,56 @@ function pickSnack() {
   return list[n % list.length].x;
 }
 
+/* ---------- Etenstijd en agenda-herinneringen ---------- */
+let etenstijd = store.get('etenstijd', '18:00');
+let herinnering = store.get('herinnering', 15);          // minuten vóór de starttijd
+const HERINNERINGEN = [[0, 'Bij de start'], [15, '15 min eerder'], [30, '30 min eerder'], [60, '1 uur eerder']];
+const minuten = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const hhmm = min => { min = Math.max(0, min); return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; };
+const startTijd = r => hhmm(minuten(etenstijd) - r.tijd);
+const dagDatum = i => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; };
+function icsTekst(p) {
+  const pad = n => String(n).padStart(2, '0');
+  const dstr = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const tstr = min => `T${pad(Math.floor(min / 60))}${pad(min % 60)}00`;
+  const esc_ = t => String(t).replace(/\\/g, '\\\\').replace(/[,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  // Regels langer dan 75 tekens worden volgens de agenda-standaard afgebroken
+  const vouw = l => { const out = []; while (l.length > 73) { out.push(l.slice(0, 73)); l = ' ' + l.slice(73); } out.push(l); return out.join('\r\n'); };
+  const nu = new Date(), stamp = `${dstr(nu)}T${pad(nu.getHours())}${pad(nu.getMinutes())}00`;
+  const link = location.protocol === 'https:' ? location.origin + location.pathname : 'https://sachasteenhorst.github.io/sacha/recepten-app/';
+  const eind = minuten(etenstijd), nuMin = nu.getHours() * 60 + nu.getMinutes();
+  const events = p.map((r, i) => ({ r, i })).filter(({ i }) => i > dayIdx || (i === dayIdx && nuMin < eind)).map(({ r, i }) => {
+    const d = dstr(dagDatum(i)), start = Math.max(0, eind - r.tijd);
+    return ['BEGIN:VEVENT', `UID:aanbiedingskeuken-${d}@sachasteenhorst.github.io`, `DTSTAMP:${stamp}`,
+      `DTSTART:${d}${tstr(start)}`, `DTEND:${d}${tstr(eind)}`,
+      `SUMMARY:${esc_('Koken: ' + r.naam)}`,
+      `DESCRIPTION:${esc_(`Begin om ${hhmm(start)}, dan eten jullie om ${etenstijd}.\nKooktijd ${r.tijd} minuten, voor ${gezinLabel()}.\nRecept en boodschappen: ${link}`)}`,
+      'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc_(`Tijd om te koken: ${r.naam}`)}`, `TRIGGER:-PT${herinnering}M`, 'END:VALARM',
+      'END:VEVENT'];
+  });
+  return { aantal: events.length, tekst: ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Aanbiedingskeuken//Weekmenu//NL', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    ...events.flat(), 'END:VCALENDAR'].map(vouw).join('\r\n') + '\r\n' };
+}
+// Korte melding onderin beeld
+function toast(tekst) {
+  let el = document.getElementById('toast');
+  if (!el) { el = Object.assign(document.createElement('div'), { id: 'toast', className: 'toast' }); el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.textContent = tekst; el.classList.add('aan');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('aan'), 5000);
+}
+function zetInAgenda() {
+  const { aantal, tekst } = icsTekst(plan());
+  if (!aantal) { toast('Deze week zijn er geen maaltijden meer over om in te plannen.'); return; }
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) { location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(tekst); }   // iPhone opent dan direct 'Voeg toe aan agenda'
+  else {
+    const url = URL.createObjectURL(new Blob([tekst], { type: 'text/calendar;charset=utf-8' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `weekmenu-${monday.getDate()}-${MONTHS[monday.getMonth()]}.ics` });
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  toast(`${aantal} ${aantal === 1 ? 'maaltijd' : 'maaltijden'} klaargezet voor je agenda. Open het bestand om ze toe te voegen.`);
+}
+
 function viewWeek() {
   const p = plan();
   const week = p.reduce((s, r) => s + recipeCost(r).total, 0);
@@ -1739,12 +1803,21 @@ function viewWeek() {
     <button class="gezinlink" data-go="gezin"><span class="small muted">Voor</span><b>${esc(gezinLabel())}</b><span class="small" style="color:var(--green)">Aanpassen ›</span></button>
     <button class="btn primary" data-addweek style="grid-column:1/-1">Hele week op de boodschappenlijst</button>
   </article>
+  <article class="card agendakaart">
+    <h3>Herinnering in je agenda</h3>
+    <div class="agendavelden">
+      <label class="field"><span>Wij eten om</span><input type="time" id="etenstijd" value="${esc(etenstijd)}" step="300"></label>
+      <label class="field"><span>Herinnering</span><select id="herinnering">${HERINNERINGEN.map(([m, t]) => `<option value="${m}"${m === herinnering ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <p class="small muted" style="margin:0">Bij elk gerecht zie je hoe laat je moet beginnen met koken.</p>
+    <button class="btn primary" data-agenda>Zet het weekmenu in mijn agenda</button>
+  </article>
   <div style="display:grid;gap:10px">
   ${p.map((r, i) => `
     <details class="day${i === dayIdx ? ' today' : ''}"${i === dayIdx ? ' open' : ''}>
       <summary>
         ${plate(r)}
-        <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]}</span><span class="rname">${esc(r.naam)}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
+        <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]} · begin ${startTijd(r)}</span><span class="rname">${esc(r.naam)}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
         <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
       </summary>
       <div class="inner">
@@ -2368,7 +2441,7 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
   if (t.dataset.like) {
     const p = (feed || []).find(x => x.id === t.dataset.like); if (!p) return;
@@ -2461,6 +2534,7 @@ app.addEventListener('click', e => {
   }
   else if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
   else if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
+  else if (t.hasAttribute('data-agenda')) zetInAgenda();
   else if (t.dataset.swap) swap(+t.dataset.swap);
   else if (t.dataset.reset) resetDay(+t.dataset.reset);
   else if (t.dataset.offer) {
@@ -2496,6 +2570,8 @@ app.addEventListener('change', e => {
     voorkeuren = t.checked ? [...voorkeuren.filter(v => v !== 'snel'), 'snel'] : voorkeuren.filter(v => v !== 'snel');
     persistPrefs(); render(); openFilters();
   }
+  else if (t.id === 'etenstijd' && /^\d\d:\d\d/.test(t.value)) { etenstijd = t.value.slice(0, 5); store.set('etenstijd', etenstijd); render(); }
+  else if (t.id === 'herinnering') { herinnering = Number(t.value) || 0; store.set('herinnering', herinnering); }
   else if (t.id === 'stdwinkel') { standaardWinkel = t.value; store.set('standaardWinkel', t.value); }
   else if (t.hasAttribute('data-budget')) {
     const v = parseFloat(t.value); budget = v > 0 ? v : null; store.set('budget', budget); render();
