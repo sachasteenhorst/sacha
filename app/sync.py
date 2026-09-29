@@ -194,6 +194,8 @@ def import_bank_file(session: Session, filename: str, content: bytes) -> BankImp
                 reference=row.reference,
                 bank_code=row.bank_code,
                 raw_data=row.raw,
+                own_account_iban=row.own_account_iban,
+                source="csv",
             )
         )
         existing_refs.add(row.external_ref)  # guard duplicate rows within the same file

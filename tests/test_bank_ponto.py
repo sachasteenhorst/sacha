@@ -1,11 +1,12 @@
 """Tests app/bank_ponto.py against mocked HTTP -- no real Ponto API call is
-ever made. Field names/response shapes here are this project's best-effort
-reading of Ponto Connect's public JSON:API docs (see the module's own
-docstring for the "not tried against a real account yet" caveat); these
-tests verify OUR OWN code's logic (auth caching, pagination, dedup, the
-consent-expiry warning, and -- critically -- that the scheduled/read-only
-path NEVER triggers a synchronization) against that assumed shape, not that
-the assumed shape itself is exactly right.
+ever made. Some field names/response shapes here are now confirmed against
+a real Integration on production (see the module's own docstring); others
+are still this project's best-effort reading of Ponto's public JSON:API
+docs. These tests verify OUR OWN code's logic (auth caching, pagination,
+the robust IBAN/name+date-tolerance dedupe, the consent-expiry warning, and
+-- critically -- that the scheduled/read-only path NEVER triggers a
+synchronization) against that shape, not that every unverified piece of the
+shape itself is exactly right.
 """
 from datetime import date, datetime, timedelta
 
@@ -51,8 +52,7 @@ class FakeResponse:
 
 
 def _fake_token_post(url, data=None, auth=None, timeout=None):
-    assert url == bank_ponto.PONTO_TOKEN_URL
-    assert url == "https://api.ponto.com/oauth2/token"
+    assert url == settings.ponto_token_url
     assert auth == (settings.ponto_client_id, settings.ponto_client_secret)
     return FakeResponse(200, {"access_token": "tok-1", "expires_in": 1800})
 
@@ -74,6 +74,15 @@ def test_ponto_configured_false_without_credentials(monkeypatch):
     monkeypatch.setattr(settings, "ponto_client_id", "")
     monkeypatch.setattr(settings, "ponto_client_secret", "")
     assert ponto_configured() is False
+
+
+def test_default_ponto_host_is_myponto_not_ponto():
+    # Real production bug: api.ponto.com is wrong -- the correct host is
+    # api.myponto.com. Both settings are overridable via env regardless
+    # (that's what makes them settings, not hardcoded constants).
+    fields = settings.__class__.model_fields
+    assert fields["ponto_api_base_url"].default == "https://api.myponto.com"
+    assert fields["ponto_token_url"].default == "https://api.myponto.com/oauth2/token"
 
 
 def test_run_ponto_sync_noop_when_not_configured(session, monkeypatch):
@@ -111,12 +120,14 @@ def test_run_ponto_sync_never_calls_synchronizations_endpoint(session, monkeypat
     assert bank_ponto.get_state().last_read_at is not None
 
 
-def test_run_ponto_sync_records_ponto_reported_synchronized_at(session, monkeypatch):
+def test_run_ponto_sync_records_ponto_reported_synchronized_at_from_meta(session, monkeypatch):
+    # Real production bug: this was read from `attributes` and always came
+    # back None -- Ponto actually reports it under the JSON:API `meta` object.
     synced_at = "2026-09-29T06:00:00Z"
 
     def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
         if url.endswith("/accounts"):
-            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {"synchronizedAt": synced_at}}]})
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}, "meta": {"synchronizedAt": synced_at}}]})
         if url.endswith("/transactions"):
             return FakeResponse(200, {"data": [], "links": {}})
         raise AssertionError(f"unexpected {method} {url}")
@@ -131,17 +142,35 @@ def test_run_ponto_sync_records_ponto_reported_synchronized_at(session, monkeypa
     assert state.last_ponto_synchronized_at.year == 2026
 
 
+def test_account_synchronized_at_falls_back_to_attributes(monkeypatch):
+    # Defensive fallback in case a future API version moves it back/again.
+    account = {"attributes": {"synchronizedAt": "2026-01-01T00:00:00Z"}, "meta": {}}
+    result = bank_ponto._account_synchronized_at(account)
+    assert result is not None
+    assert result.year == 2026
+
+
+def test_account_synchronized_at_none_when_absent_anywhere():
+    assert bank_ponto._account_synchronized_at({"attributes": {}, "meta": {}}) is None
+
+
 def test_run_ponto_sync_skips_transaction_already_imported_from_csv(session, monkeypatch):
     # Same real-world transaction, already booked from a manually-uploaded
-    # Rabobank CSV export -- Ponto must not create a duplicate.
-    session.add(Transaction(
+    # Rabobank CSV export (with a DIFFERENT description -- the original,
+    # narrower dedupe required an exact description match, which is exactly
+    # what let 227 real Ponto/CSV pairs slip through as false "new"
+    # transactions in production) -- Ponto must not create a duplicate, and
+    # must instead reconcile onto the existing CSV row.
+    csv_tx = Transaction(
         external_ref="csv:abc",
         booking_date=date(2026, 9, 15),
         amount_cents=-3960,
         counterparty_name="Kruitbosch",
         counterparty_iban="NL00RABO0123456789",
-        description="Factuur F-1",
-    ))
+        description="SEPA Overboeking naar Kruitbosch ref 12345",  # differs from Ponto's own wording
+        source="csv",
+    )
+    session.add(csv_tx)
     session.commit()
 
     def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
@@ -157,7 +186,84 @@ def test_run_ponto_sync_skips_transaction_already_imported_from_csv(session, mon
     result = run_ponto_sync(session)
 
     assert result.new_transactions == 0
+    assert result.matched_existing == 1
     assert session.query(Transaction).count() == 1
+    session.refresh(csv_tx)
+    assert csv_tx.external_id == "tx-1"
+
+
+def test_run_ponto_sync_matches_across_a_one_day_date_difference(session, monkeypatch):
+    # Ponto's executionDate and Rabobank's own "Datum" column can differ by
+    # a day for the same real booking.
+    csv_tx = Transaction(
+        external_ref="csv:abc", booking_date=date(2026, 9, 14), amount_cents=-3960,
+        counterparty_name="Kruitbosch", counterparty_iban="NL00RABO0123456789",
+        description="Anders geformuleerd", source="csv",
+    )
+    session.add(csv_tx)
+    session.commit()
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
+        if url.endswith("/transactions"):
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)  # executionDate 2026-09-15
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_ponto_sync(session)
+    assert result.matched_existing == 1
+    assert result.new_transactions == 0
+
+
+def test_run_ponto_sync_falls_back_to_name_when_either_side_has_no_iban(session, monkeypatch):
+    csv_tx = Transaction(
+        external_ref="csv:abc", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Kruitbosch B.V.", counterparty_iban="",  # no IBAN on the CSV side
+        description="Anders geformuleerd", source="csv",
+    )
+    session.add(csv_tx)
+    session.commit()
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
+        if url.endswith("/transactions"):
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)  # counterpartName "Kruitbosch"
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_ponto_sync(session)
+    assert result.matched_existing == 1
+
+
+def test_run_ponto_sync_does_not_match_different_counterparty(session, monkeypatch):
+    csv_tx = Transaction(
+        external_ref="csv:abc", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Iemand Anders", counterparty_iban="NL00RABO0999999999",
+        description="Onverwant", source="csv",
+    )
+    session.add(csv_tx)
+    session.commit()
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
+        if url.endswith("/transactions"):
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_ponto_sync(session)
+    assert result.matched_existing == 0
+    assert result.new_transactions == 1
+    assert session.query(Transaction).count() == 2
 
 
 def test_run_ponto_sync_warns_when_consent_expires_soon(session, monkeypatch):
@@ -259,3 +365,63 @@ def test_manual_refresh_noop_when_not_configured(session, monkeypatch):
     result = run_manual_ponto_refresh(session, "203.0.113.42")
     assert result.new_transactions == 0
     assert result.errors
+
+
+# -- find_matching_transaction (the dedupe rule itself, tested directly) --
+
+def test_find_matching_transaction_scopes_to_the_same_own_account(session):
+    from app.bank_ponto import find_matching_transaction
+
+    other_account_tx = Transaction(
+        external_ref="csv:a", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Kruitbosch", counterparty_iban="NL00RABO0123456789",
+        own_account_iban="NL96RABO0112409008",
+    )
+    same_account_tx = Transaction(
+        external_ref="csv:b", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Kruitbosch", counterparty_iban="NL00RABO0123456789",
+        own_account_iban="NL44RABO0199970777",
+    )
+    session.add_all([other_account_tx, same_account_tx])
+    session.commit()
+
+    match = find_matching_transaction(
+        session, booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_iban="NL00RABO0123456789", counterparty_name="Kruitbosch",
+        own_account_iban="NL44RABO0199970777",
+    )
+    assert match is not None
+    assert match.id == same_account_tx.id
+
+
+def test_find_matching_transaction_never_returns_a_ponto_sourced_row(session):
+    from app.bank_ponto import find_matching_transaction
+
+    session.add(Transaction(
+        external_ref="ponto:xyz", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Kruitbosch", counterparty_iban="NL00RABO0123456789", source="ponto",
+    ))
+    session.commit()
+
+    match = find_matching_transaction(
+        session, booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_iban="NL00RABO0123456789", counterparty_name="Kruitbosch",
+    )
+    assert match is None
+
+
+def test_find_matching_transaction_ignores_already_reconciled_rows(session):
+    from app.bank_ponto import find_matching_transaction
+
+    session.add(Transaction(
+        external_ref="csv:a", booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_name="Kruitbosch", counterparty_iban="NL00RABO0123456789",
+        external_id="tx-already-claimed",
+    ))
+    session.commit()
+
+    match = find_matching_transaction(
+        session, booking_date=date(2026, 9, 15), amount_cents=-3960,
+        counterparty_iban="NL00RABO0123456789", counterparty_name="Kruitbosch",
+    )
+    assert match is None

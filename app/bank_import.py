@@ -37,6 +37,12 @@ class BankTransactionRow:
     reference: str
     raw: dict
     bank_code: str = ""  # Rabobank CSV "Code" column (e.g. "tb", "ba"); empty for CAMT.053/MT940
+    # This shop's OWN account IBAN this line belongs to -- lets a later
+    # Ponto-fetched duplicate of the same booking be scoped to the same
+    # account instead of matching across accounts (see app/bank_ponto.py's
+    # find_matching_transaction). Populated for CSV/MT940 (both carry it
+    # directly); left empty for CAMT.053, not extracted there yet.
+    own_account_iban: str = ""
 
 
 def _parse_signed_amount(raw: str) -> int:
@@ -158,6 +164,7 @@ def parse_rabobank_csv(content: bytes) -> list[BankTransactionRow]:
                 counterparty_iban=counterparty_iban,
                 reference=seq,
                 raw=dict(row),
+                own_account_iban=own_iban,
             )
         )
     return rows
@@ -341,6 +348,7 @@ def parse_mt940(content: bytes) -> list[BankTransactionRow]:
                 counterparty_iban=_mt940_subfield(description, "IBAN"),
                 reference="",
                 raw={"line_61": e["raw_line_61"]},
+                own_account_iban=own_iban,
             )
         )
     return rows

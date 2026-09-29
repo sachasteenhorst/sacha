@@ -22,18 +22,15 @@ Per Ponto's own documentation for a custom/private integration:
   a pending-transactions endpoint, if Ponto exposes one, is deliberately
   never called -- a pending amount can still change before it books.
 
-IMPORTANT -- same caveat as app/bank_import.py and app/basecone_client.py:
-this is built from Ponto Connect's publicly documented JSON:API shape
-(https://documentation.ponto.com), but has not been exercised against a
-real Ponto account yet. Endpoint paths and exact attribute names on the
-account/transaction resources may need small adjustments once tried
-against your own Integration -- the error messages here are written to say
-exactly what came back from Ponto so that's a quick fix, the same "try it,
-read the real error, adjust" loop used for the bank CSV parsers. The exact
+Tested against a real Integration on production: `list_accounts()`/
+`fetch_transactions()` work against `https://api.myponto.com` (NOT
+`api.ponto.com` -- an earlier, wrong assumption; both are overridable via
+PONTO_API_BASE_URL/PONTO_TOKEN_URL regardless). Still unverified: the exact
 header Ponto expects to identify the end user's IP on a manual
-synchronization request (see request_manual_synchronization) is one such
-unverified detail -- sent as "X-Forwarded-For" here as the closest
-convention; adjust if Ponto's error response says otherwise.
+synchronization request (see request_manual_synchronization) -- sent as
+"X-Forwarded-For" here as the closest convention; adjust if Ponto's error
+response says otherwise, the same "try it, read the real error, adjust"
+loop that caught the host mistake.
 
 Off entirely (never called, never scheduled with an effect) until both
 PONTO_CLIENT_ID and PONTO_CLIENT_SECRET are set.
@@ -49,16 +46,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.matcher import _normalize_company_name
 from app.models import Transaction
-
-PONTO_API_BASE_URL = "https://api.ponto.com"
-PONTO_TOKEN_URL = "https://api.ponto.com/oauth2/token"
 
 # Consent-expiry warning window -- Ponto surfaces an expected expiry per
 # account (see _account_consent_expiry); verify the exact attribute name
 # against your own account, since this is one of the pieces not yet tried
 # against a real Integration (see module docstring).
 CONSENT_EXPIRY_WARNING_DAYS = 14
+
+# A CSV/MT940-imported line and the SAME transaction as later fetched from
+# Ponto don't always land on the identical calendar date -- Ponto's
+# executionDate/valueDate and Rabobank's own "Datum" column can differ by a
+# day for the same booking. Matched within this window rather than exactly.
+DEDUPE_DATE_TOLERANCE_DAYS = 1
 
 
 class PontoError(RuntimeError):
@@ -72,6 +73,12 @@ def ponto_configured() -> bool:
 @dataclass
 class PontoSyncResult:
     new_transactions: int = 0
+    # A Ponto-fetched transaction that turned out to be the SAME real-world
+    # transaction as an existing (CSV/MT940-imported, or earlier Ponto) row
+    # -- no new Transaction row created; the existing one just gets its
+    # external_id filled in (see find_matching_transaction) so it's
+    # recognised on every later sync without ever creating a duplicate.
+    matched_existing: int = 0
     errors: list[str] = field(default_factory=list)
     consent_warning: str | None = None
 
@@ -107,7 +114,7 @@ class _PontoAuth:
             raise PontoError("PONTO_CLIENT_ID/PONTO_CLIENT_SECRET zijn niet ingesteld.")
 
         response = requests.post(
-            PONTO_TOKEN_URL,
+            settings.ponto_token_url,
             data={"grant_type": "client_credentials"},
             auth=(settings.ponto_client_id, settings.ponto_client_secret),
             timeout=30,
@@ -127,7 +134,7 @@ _auth = _PontoAuth()
 
 def _request(method: str, path: str, extra_headers: dict | None = None, **kwargs) -> dict:
     token = _auth.token()
-    url = PONTO_API_BASE_URL + path
+    url = path if path.startswith("http") else settings.ponto_api_base_url + path
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.api+json"}
     if extra_headers:
         headers.update(extra_headers)
@@ -155,13 +162,28 @@ def _account_consent_expiry(account: dict) -> date | None:
 
 
 def _account_synchronized_at(account: dict) -> datetime | None:
-    raw = (account.get("attributes") or {}).get("synchronizedAt")
+    """Corrected against a real account: this is NOT in `attributes` (that
+    read back None on production) -- Ponto reports it in the JSON:API
+    `meta` object instead. If a future account/API version moves it again,
+    falls back to `attributes.synchronizedAt` just in case."""
+    raw = (account.get("meta") or {}).get("synchronizedAt") or (account.get("attributes") or {}).get("synchronizedAt")
     if not raw:
         return None
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except (TypeError, ValueError):
         return None
+
+
+def _account_own_iban(account: dict) -> str:
+    """This account's OWN IBAN (e.g. "NL44RABO0199970777") -- used to scope
+    a Ponto-vs-CSV duplicate match to the same account (see
+    find_matching_transaction). `attributes.reference` per Ponto's docs on
+    the Account resource; unverified against production like the rest of
+    this module's field names (see module docstring) -- an empty result
+    here just means the own-account check in find_matching_transaction is
+    skipped for that sync, not a hard failure."""
+    return ((account.get("attributes") or {}).get("reference") or "").strip()
 
 
 def request_manual_synchronization(account_id: str, requester_ip: str) -> str:
@@ -247,36 +269,106 @@ def fetch_transactions(account_id: str, since: date) -> list[PontoTransaction]:
             parsed = _parse_ponto_transaction(row)
             if parsed is not None:
                 results.append(parsed)
-        next_link = (payload.get("links") or {}).get("next")
-        path = next_link.replace(PONTO_API_BASE_URL, "") if next_link else None
+        path = (payload.get("links") or {}).get("next")  # a full URL -- _request() passes it through as-is
     return results
 
 
-def _existing_dedupe_keys(session: Session) -> set[tuple]:
-    """Same identity Sacha's own CSV uploads use to skip a re-uploaded
-    overlapping period (datum+bedrag+tegenrekening+omschrijving) -- so a
-    Ponto-fetched transaction that was ALSO already imported by hand from a
-    downloaded statement doesn't get booked twice."""
-    keys = set()
-    for booking_date, amount_cents, iban, description in session.execute(
-        select(Transaction.booking_date, Transaction.amount_cents, Transaction.counterparty_iban, Transaction.description)
-    ):
-        keys.add((booking_date, amount_cents, (iban or "").strip().upper(), (description or "").strip()))
-    return keys
+def _normalize_iban(iban: str) -> str:
+    return (iban or "").replace(" ", "").upper()
+
+
+def find_matching_transaction(
+    session: Session,
+    *,
+    booking_date: date,
+    amount_cents: int,
+    counterparty_iban: str,
+    counterparty_name: str,
+    own_account_iban: str = "",
+    exclude_id: int | None = None,
+) -> Transaction | None:
+    """The SAME real-world bank transaction, already stored under a
+    different identity -- e.g. a CSV-imported line whose description reads
+    differently from how Ponto phrases the same payment (the original,
+    narrower dedupe only matched on an EXACT description too, which is why
+    227 Ponto/CSV pairs slipped through as false "new" transactions in
+    production).
+
+    Matches on: same amount exactly; booking_date within
+    DEDUPE_DATE_TOLERANCE_DAYS (Ponto's executionDate/valueDate vs.
+    Rabobank's own "Datum" column can differ by a day for one real booking);
+    same own account IF both sides know it (an empty own_account_iban --
+    true for every pre-existing row, that column being new -- is treated as
+    "unknown", never as a mismatch); and, for the counterparty, an exact
+    IBAN match when BOTH sides have one, falling back to a normalized-name
+    comparison whenever either side's IBAN is missing.
+
+    Used both by the Ponto sync itself (so a transaction already reconciled
+    this way is never fetched again as a duplicate next time -- its
+    external_id gets filled in) and by scripts/cleanup_ponto_duplicates.py
+    to pair up and merge the ones that already slipped through. Both
+    callers always search FROM a Ponto-side transaction outward, so
+    candidates are restricted to non-Ponto rows -- this must never pair two
+    Ponto rows with each other (a real risk for the backlog of pre-fix
+    duplicates, which all have an empty external_id just like a genuine
+    unreconciled CSV row does)."""
+    candidates = session.scalars(
+        select(Transaction).where(
+            Transaction.amount_cents == amount_cents,
+            Transaction.booking_date >= booking_date - timedelta(days=DEDUPE_DATE_TOLERANCE_DAYS),
+            Transaction.booking_date <= booking_date + timedelta(days=DEDUPE_DATE_TOLERANCE_DAYS),
+            Transaction.external_id == "",  # already-reconciled rows are never matched a second time
+            Transaction.source != "ponto",
+        )
+    )
+    norm_cp_iban = _normalize_iban(counterparty_iban)
+    norm_own_iban = _normalize_iban(own_account_iban)
+    norm_name = _normalize_company_name(counterparty_name)
+
+    for candidate in candidates:
+        if exclude_id is not None and candidate.id == exclude_id:
+            continue
+        candidate_own_iban = _normalize_iban(candidate.own_account_iban)
+        if norm_own_iban and candidate_own_iban and candidate_own_iban != norm_own_iban:
+            continue
+        candidate_cp_iban = _normalize_iban(candidate.counterparty_iban)
+        if norm_cp_iban and candidate_cp_iban:
+            if candidate_cp_iban != norm_cp_iban:
+                continue
+        else:
+            if _normalize_company_name(candidate.counterparty_name) != norm_name:
+                continue
+        return candidate
+    return None
 
 
 def _import_transactions(
-    session: Session, account_id: str, since: date,
-    existing_refs: set[str], dedupe_keys: set[tuple], result: PontoSyncResult,
+    session: Session, account_id: str, own_account_iban: str, since: date,
+    existing_refs: set[str], result: PontoSyncResult,
 ) -> None:
     transactions = fetch_transactions(account_id, since)
     for tx in transactions:
         external_ref = f"ponto:{tx.ponto_id}"
         if external_ref in existing_refs:
             continue
-        dedupe_key = (tx.booking_date, tx.amount_cents, tx.counterparty_iban.strip().upper(), tx.description.strip())
-        if dedupe_key in dedupe_keys:
+        existing = session.scalars(select(Transaction).where(Transaction.external_id == tx.ponto_id)).first()
+        if existing is not None:
+            continue  # already reconciled to an existing row on an earlier sync
+
+        match = find_matching_transaction(
+            session,
+            booking_date=tx.booking_date,
+            amount_cents=tx.amount_cents,
+            counterparty_iban=tx.counterparty_iban,
+            counterparty_name=tx.counterparty_name,
+            own_account_iban=own_account_iban,
+        )
+        if match is not None:
+            match.external_id = tx.ponto_id
+            session.flush()  # so a later tx in this same batch never re-matches this row
+            result.matched_existing += 1
             continue
+
         session.add(
             Transaction(
                 external_ref=external_ref,
@@ -288,10 +380,12 @@ def _import_transactions(
                 counterparty_iban=tx.counterparty_iban,
                 reference=tx.ponto_id,
                 raw_data=tx.raw,
+                own_account_iban=own_account_iban,
+                source="ponto",
+                external_id=tx.ponto_id,
             )
         )
         existing_refs.add(external_ref)
-        dedupe_keys.add(dedupe_key)
         result.new_transactions += 1
 
 
@@ -324,7 +418,6 @@ def run_ponto_sync(session: Session) -> PontoSyncResult:
         return result
 
     existing_refs = set(session.scalars(select(Transaction.external_ref)))
-    dedupe_keys = _existing_dedupe_keys(session)
     since = date.today() - timedelta(days=settings.sync_lookback_days)
     latest_ponto_sync: datetime | None = None
 
@@ -344,7 +437,7 @@ def run_ponto_sync(session: Session) -> PontoSyncResult:
             latest_ponto_sync = synced_at
 
         try:
-            _import_transactions(session, account_id, since, existing_refs, dedupe_keys, result)
+            _import_transactions(session, account_id, _account_own_iban(account), since, existing_refs, result)
         except PontoError as exc:
             result.errors.append(str(exc))
             continue
@@ -376,7 +469,6 @@ def run_manual_ponto_refresh(session: Session, requester_ip: str) -> PontoSyncRe
         return result
 
     existing_refs = set(session.scalars(select(Transaction.external_ref)))
-    dedupe_keys = _existing_dedupe_keys(session)
     since = date.today() - timedelta(days=settings.sync_lookback_days)
 
     for account in accounts:
@@ -386,7 +478,7 @@ def run_manual_ponto_refresh(session: Session, requester_ip: str) -> PontoSyncRe
         try:
             sync_id = request_manual_synchronization(account_id, requester_ip)
             wait_for_synchronization(sync_id)
-            _import_transactions(session, account_id, since, existing_refs, dedupe_keys, result)
+            _import_transactions(session, account_id, _account_own_iban(account), since, existing_refs, result)
         except PontoError as exc:
             result.errors.append(str(exc))
             continue

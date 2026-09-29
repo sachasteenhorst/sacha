@@ -387,7 +387,11 @@ de app nieuwe transacties uitlezen via **Ponto Connect**. Maak in het
 uit; je blijft dan gewoon op de handmatige upload hierboven werken.
 Authenticatie is voor een eigen/custom integratie kaal **OAuth2 Client
 Credentials** (client ID + secret, Basic Auth tegen het token-endpoint,
-token ~30 minuten geldig) -- geen certificaat, geen HTTP-signing.
+token ~30 minuten geldig) -- geen certificaat, geen HTTP-signing. Het
+juiste host is **`https://api.myponto.com`** (niet `api.ponto.com` -- dat
+bleek op productie fout), overschrijfbaar via `PONTO_API_BASE_URL`/
+`PONTO_TOKEN_URL` mocht Ponto dit ooit weer wijzigen of je een ander
+account gebruiken.
 
 **Belangrijk over hoe/wanneer gesynchroniseerd wordt** (dit is een harde
 regel uit Ponto's eigen voorwaarden, geen implementatiedetail):
@@ -412,26 +416,56 @@ regel uit Ponto's eigen voorwaarden, geen implementatiedetail):
   alleen het geboekte-transacties-endpoint wordt aangeroepen.
 
 Nieuwe transacties worden vergeleken met wat je al zelf via een CSV/
-CAMT.053/MT940-bestand hebt geüpload (op datum+bedrag+tegenrekening+
-omschrijving), zodat een overlappende periode nooit dubbel geboekt wordt.
+CAMT.053/MT940-bestand hebt geüpload, zodat een overlappende periode nooit
+dubbel geboekt wordt -- zie "Ponto/CSV-dedupe" hieronder voor hoe.
 Na elke import (automatisch gelezen of via "Nu verversen") draaien
 matching, regels en (indien aan) het automatisch doorsturen naar Basecone
 meteen mee, net als bij een gewone upload of e-mail-sync.
 
 **Belangrijke kanttekening** (zelfde soort als bij de CSV/CAMT.053/MT940-
 parsers en de Basecone API-client): `app/bank_ponto.py` is gebouwd op
-Ponto Connect's publiek gedocumenteerde JSON:API-vorm, maar nog niet tegen
-een echte Ponto-integratie geprobeerd. Endpoint-paden en veldnamen (zoals
-de exacte header die Ponto verwacht om bij een handmatige synchronisatie
-het IP van de eindgebruiker te identificeren -- hier verstuurd als
-`X-Forwarded-For`) kunnen een kleine aanpassing nodig hebben zodra je 'm
-met echte inloggegevens draait -- de foutmeldingen tonen exact wat Ponto
-terugstuurde.
+Ponto Connect's publiek gedocumenteerde JSON:API-vorm. Het host, de
+`synchronizedAt`-locatie en de dedupe hieronder zijn inmiddels tegen een
+echte productie-integratie geverifieerd; de exacte header die Ponto
+verwacht om bij een handmatige synchronisatie het IP van de eindgebruiker
+te identificeren (hier verstuurd als `X-Forwarded-For`) is dat nog niet --
+de foutmeldingen tonen exact wat Ponto terugstuurde als dat ooit misgaat.
 
 Het dashboard toont een statuschip **"Bank: Ponto"** met wanneer Ponto zelf
-voor het laatst heeft gesynchroniseerd (`synchronizedAt`). Verloopt de
-toestemming binnen 14 dagen, of mislukt het lezen, dan komt er een
-pushmelding (zie hieronder).
+voor het laatst heeft gesynchroniseerd (`synchronizedAt`, uitgelezen uit
+het `meta`-veld van het account -- niet `attributes`, waar het op
+productie altijd leeg terugkwam). Verloopt de toestemming binnen 14 dagen,
+of mislukt het lezen, dan komt er een pushmelding (zie hieronder).
+
+### Ponto/CSV-dedupe
+
+Een transactie die je al via een CSV/CAMT.053/MT940-upload had staan, mag
+nooit een tweede keer binnenkomen zodra Ponto 'm ook leest. De omschrijving
+verschilt vaak tussen Ponto en de Rabobank-CSV (andere bewoording/
+naam-formaat), dus die telt NIET mee. Twee transacties gelden als dezelfde
+boeking als ze overeenkomen op:
+
+- hetzelfde bedrag (exact),
+- de boekingsdatum binnen **1 dag** van elkaar (Ponto's `executionDate`/
+  `valueDate` wijkt soms een dag af van de datum in de Rabobank-CSV),
+- dezelfde eigen rekening (IBAN), als beide kanten die kennen,
+- de tegenrekening-IBAN (genormaliseerd: spaties eruit, hoofdletters), als
+  beide kanten een IBAN hebben -- anders valt de vergelijking terug op de
+  genormaliseerde tegenpartij-naam.
+
+Bij een match blijft de **bestaande (CSV-)regel staan** (die kan al een
+koppeling/status hebben) en krijgt hij Ponto's eigen id in de nieuwe kolom
+`external_id`, zodat een latere sync 'm herkent en nooit meer opnieuw
+importeert. Alleen als er geen tweeling gevonden wordt, komt er een nieuwe
+transactie bij met `source="ponto"`.
+
+**Opschonen van bestaande dubbelingen**: voordat deze robuustere dedupe
+er was, werd elke Ponto-transactie die al via CSV binnen was toch een
+tweede keer aangemaakt zodra de omschrijving net iets anders was
+geformuleerd. Draai eenmalig `scripts/cleanup_ponto_duplicates.py` om die
+op te ruimen -- zie de docstring bovenin dat bestand en de sectie
+"Scripts" hieronder. Standaard is het een dry-run (toont alleen wat er zou
+gebeuren); `--apply` voert het echt uit.
 
 ## Push-meldingen op je telefoon
 
@@ -627,6 +661,26 @@ Laat status en koppelingen die je al gemaakt hebt met rust; alleen een
 document dat nog gewoon openstond (UNMATCHED) en nu als "geen factuur"
 wordt herkend, wordt op genegeerd gezet. Rapporteert aan het eind hoeveel
 er nog zonder bedrag/factuurnummer zijn.
+
+### Dubbele Ponto-transacties opruimen
+
+Eenmalig nodig na de update die de Ponto/CSV-dedupe robuuster maakte (zie
+hierboven) -- ruimt transacties op die zowel via een CSV-upload als via
+Ponto binnenkwamen en daardoor dubbel in de administratie staan. Bekijk
+eerst wat het script zou doen (verandert niets):
+
+```bash
+python3 scripts/cleanup_ponto_duplicates.py
+```
+
+Ziet de lijst er goed uit, voer het dan echt uit:
+
+```bash
+python3 scripts/cleanup_ponto_duplicates.py --apply
+```
+
+Een Ponto-transactie zonder CSV-tweeling blijft altijd gewoon staan --
+dit script verwijdert nooit iets dat geen aantoonbare dubbeling is.
 
 ## Overdracht aan een hostingpartij
 

@@ -1,7 +1,7 @@
 """Tests app/db.py's manually_ignored backfill logic in isolation, by
 monkeypatching its SessionLocal to point at a throwaway in-memory database
 (the real module-level engine stays untouched)."""
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app import db as db_module
 from app.db import Base
-from app.models import DocumentKind, Invoice, MatchStatus
+from app.models import DocumentKind, Invoice, MatchStatus, Transaction
 
 
 @pytest.fixture()
@@ -125,3 +125,54 @@ def test_notified_new_invoice_backfill_runs_only_once(isolated_session_local, tm
     with Session() as session:
         inv = session.get(Invoice, inv_id)
         assert inv.notified_new_invoice is False
+
+
+# -- transaction source backfill (external_ref "ponto:" prefix -> source
+# ="ponto", since the new `source` column defaults to "csv" for every
+# pre-existing row via the plain ALTER TABLE, including the pre-fix Ponto
+# duplicate rows that scripts/cleanup_ponto_duplicates.py needs to find) --
+
+def make_transaction(**kwargs):
+    defaults = dict(
+        external_ref="csv:abc",
+        booking_date=date(2026, 9, 1),
+        amount_cents=-1000,
+        counterparty_name="Leverancier",
+        raw_data={},
+        source="csv",
+    )
+    defaults.update(kwargs)
+    return Transaction(**defaults)
+
+
+def test_backfill_transaction_source_recognises_ponto_prefixed_rows(isolated_session_local):
+    Session = isolated_session_local
+    with Session() as session:
+        # This is exactly the state of a pre-fix Ponto duplicate: created
+        # before the `source` column existed, so the migration's plain
+        # ALTER TABLE ... DEFAULT 'csv' left it saying "csv".
+        tx = make_transaction(external_ref="ponto:xyz", source="csv")
+        session.add(tx)
+        session.commit()
+        tx_id = tx.id
+
+    db_module._backfill_transaction_source()
+
+    with Session() as session:
+        tx = session.get(Transaction, tx_id)
+        assert tx.source == "ponto"
+
+
+def test_backfill_transaction_source_leaves_real_csv_rows_alone(isolated_session_local):
+    Session = isolated_session_local
+    with Session() as session:
+        tx = make_transaction(external_ref="csv:abc", source="csv")
+        session.add(tx)
+        session.commit()
+        tx_id = tx.id
+
+    db_module._backfill_transaction_source()
+
+    with Session() as session:
+        tx = session.get(Transaction, tx_id)
+        assert tx.source == "csv"

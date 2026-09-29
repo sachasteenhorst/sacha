@@ -196,6 +196,12 @@ class Settings(BaseSettings):
     # certificaat, geen HTTP-signing.
     ponto_client_id: str = ""
     ponto_client_secret: str = ""
+    # Op productie getest: de juiste host is api.myponto.com, NIET
+    # api.ponto.com (dat was een eerdere, foutieve aanname). Overschrijfbaar
+    # via env voor het geval Ponto dit ooit weer verandert of je een ander
+    # (sandbox-)account gebruikt.
+    ponto_api_base_url: str = "https://api.myponto.com"
+    ponto_token_url: str = "https://api.myponto.com/oauth2/token"
 
     # -- CycleSoftware (kassasysteem) --
     # Placeholder voor een toekomstige live koppeling (CS Connect) -- zie

@@ -50,6 +50,9 @@ _COLUMN_MIGRATIONS = {
     "transactions": [
         ("bank_code", "VARCHAR DEFAULT ''"),
         ("applied_rule_id", "INTEGER"),
+        ("own_account_iban", "VARCHAR DEFAULT ''"),
+        ("source", "VARCHAR DEFAULT 'csv'"),
+        ("external_id", "VARCHAR DEFAULT ''"),
     ],
 }
 
@@ -174,6 +177,28 @@ def _backfill_bank_code_from_raw_data() -> None:
             session.commit()
 
 
+def _backfill_transaction_source() -> None:
+    """The new `source` column defaults to 'csv' for every pre-existing row
+    (a plain ALTER TABLE can't know better) -- including the Ponto-imported
+    duplicate rows the OLD, narrower dedupe already created before this fix
+    shipped. `external_ref` (the "basecone_id" column) has ALWAYS been
+    "ponto:<id>" for a Ponto-fetched row, completely unaffected by this
+    migration, so that prefix -- not the new column -- is the real, reliable
+    way to identify one; this backfill makes `source` catch up to match it.
+    Idempotent: runs every startup, only ever touches a row that doesn't
+    already say "ponto" yet."""
+    from app.models import Transaction
+
+    with SessionLocal() as session:
+        rows = session.query(Transaction).filter(
+            Transaction.external_ref.like("ponto:%"), Transaction.source != "ponto"
+        ).all()
+        for row in rows:
+            row.source = "ponto"
+        if rows:
+            session.commit()
+
+
 def init_db() -> None:
     from app import models  # noqa: F401  (registers models on Base.metadata)
 
@@ -182,6 +207,7 @@ def init_db() -> None:
     _seed_default_rules()
     _backfill_bank_code_from_raw_data()
     _backfill_notified_new_invoice()
+    _backfill_transaction_source()
 
 
 def get_session():

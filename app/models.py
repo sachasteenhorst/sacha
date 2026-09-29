@@ -123,6 +123,27 @@ class Transaction(Base):
     # Added after the first release -- see app/db.py's startup migration.
     applied_rule_id: Mapped[int | None] = mapped_column(ForeignKey("rules.id"), nullable=True)
 
+    # -- Ponto/CSV dedupe (added after the first release -- see
+    # app/db.py's startup migration) --
+    # Which of OUR OWN accounts this line belongs to (e.g.
+    # "NL44RABO0199970777") -- lets a Ponto-vs-CSV duplicate check scope its
+    # comparison to the same account instead of accidentally matching across
+    # two different accounts. Populated for Rabobank CSV/MT940 imports and
+    # for every Ponto-fetched transaction; empty ("") for CAMT.053 imports
+    # (not extracted there yet) and any row from before this column existed
+    # -- an empty value is treated as "unknown", never as a mismatch.
+    own_account_iban: Mapped[str] = mapped_column(String, default="")
+    # "csv" (any manual CSV/CAMT.053/MT940 upload) or "ponto" (fetched via
+    # Ponto Connect) -- lets scripts/cleanup_ponto_duplicates.py and the
+    # Ponto sync's own dedupe tell which rows came from where.
+    source: Mapped[str] = mapped_column(String, default="csv")
+    # The Ponto transaction id, once this row is known to correspond to one
+    # (either because a fresh Ponto sync created it, or because
+    # app.bank_ponto's dedupe/scripts/cleanup_ponto_duplicates.py matched it
+    # to an existing CSV-imported row) -- checked on every later Ponto sync
+    # so the same bank transaction is never re-imported as a second row.
+    external_id: Mapped[str] = mapped_column(String, default="", index=True)
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
