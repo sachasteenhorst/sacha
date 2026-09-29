@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     # (see graph_mailboxes) is always treated as "ourselves" too, with no
     # config needed.
     own_company_names: str = "Van der Linden Tweewielers,Hing B.V."
+    # Suppliers/afzenders (kommagescheiden, hoofdletterongevoelig) wier
+    # documenten NOOIT naar Basecone mogen, zelfs niet als extractie ze
+    # herkent als een gewone uitgaande inkoopfactuur -- ze gaan al via een
+    # ander kanaal de boekhouding in. Standaard: de Lease a Bike-"facturen"
+    # (Mobility Services/VWPFS) zijn kopieën van onze eigen kassaverkoop via
+    # CycleSoftware, die al automatisch via Twinfield wordt geboekt --
+    # nogmaals doorsturen zou een dubbele boeking veroorzaken.
+    basecone_exclude_suppliers: str = "Mobility Services,Lease a Bike,VWPFS,CycleSoftware"
     # Every inkoopfactuur must be forwarded here so it reaches Basecone/the
     # boekhouder -- a matched invoice that never got forwarded is still
     # effectively a vraagpost. Empty disables the whole Basecone-forward
@@ -111,6 +119,10 @@ class Settings(BaseSettings):
     @property
     def own_mail_domains(self) -> set[str]:
         return {m.split("@", 1)[1].lower() for m in self.graph_mailboxes if "@" in m}
+
+    @property
+    def basecone_exclude_supplier_names(self) -> list[str]:
+        return [s.strip().lower() for s in self.basecone_exclude_suppliers.split(",") if s.strip()]
 
     # -- Sync scheduling --
     sync_interval_minutes: int = 60

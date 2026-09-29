@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
-from app.basecone_forward import is_confident, is_forwardable, send_invoice_to_basecone
+from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
 from app.db import get_session, init_db
 from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE, GraphApiError, GraphAuthError
@@ -108,6 +108,7 @@ templates.env.filters["dutch_date"] = _dutch_date
 templates.env.filters["method_label"] = _method_label
 templates.env.filters["transaction_direction"] = _transaction_direction
 templates.env.filters["rule_action_label"] = _rule_action_label
+templates.env.filters["basecone_status_label"] = basecone_status_label
 
 
 def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:

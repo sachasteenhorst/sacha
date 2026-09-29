@@ -33,7 +33,7 @@ from app.email_client import (
     list_sent_items_since,
     send_mail,
 )
-from app.models import BaseconeForwardStatus, DocumentKind, Invoice
+from app.models import BaseconeForwardStatus, Direction, DocumentKind, Invoice
 
 AUTO_FORWARD_MARKER_FILE = "./data/auto_forward_since.txt"
 
@@ -64,8 +64,41 @@ def is_confident(invoice: Invoice) -> bool:
     return bool(invoice.invoice_number) and invoice.amount_cents is not None
 
 
+def not_applicable_reason(invoice: Invoice) -> str | None:
+    """Why this document must NEVER be sent to Basecone, however confident
+    extraction is about its number/amount -- distinct from "not yet sent":
+    it already reaches the accountant through another channel (or isn't a
+    purchase at all), so forwarding it would be a duplicate booking. Real
+    example: Mobility Services' Lease a Bike "factuur" is a copy of a sale
+    this shop's own till (CycleSoftware) already booked into Twinfield."""
+    if invoice.direction == Direction.INCOMING.value:
+        return "inkomend document, geen inkoopfactuur"
+    supplier_lower = (invoice.supplier_name or "").lower()
+    if any(name and name in supplier_lower for name in settings.own_company_name_list):
+        return "eigen verkoopfactuur"
+    if any(name and name in supplier_lower for name in settings.basecone_exclude_supplier_names):
+        return "via CycleSoftware/Twinfield"
+    return None
+
+
 def is_forwardable(invoice: Invoice) -> bool:
-    return invoice.document_kind in FORWARDABLE_DOCUMENT_KINDS and invoice.in_basecone != BaseconeForwardStatus.YES.value
+    return (
+        invoice.document_kind in FORWARDABLE_DOCUMENT_KINDS
+        and invoice.in_basecone != BaseconeForwardStatus.YES.value
+        and not_applicable_reason(invoice) is None
+    )
+
+
+def basecone_status_label(invoice: Invoice) -> str:
+    """Dashboard display text for an invoice's Basecone status: "ja" once
+    sent, "n.v.t. (...)" when it must never be sent (see
+    not_applicable_reason), otherwise "nee" (a real vraagpost)."""
+    reason = not_applicable_reason(invoice)
+    if reason is not None:
+        return f"n.v.t. ({reason})"
+    if invoice.in_basecone == BaseconeForwardStatus.YES.value:
+        return "ja"
+    return "nee"
 
 
 def resolve_auto_forward_since() -> date:

@@ -175,6 +175,16 @@ heeft daarom een status **In Basecone: ja/nee/onbekend**:
   Basecone"** (met een selectievakje per rij + knop "Stuur geselecteerde
   naar Basecone", en een knop per rij) of, als het factuurnummer/bedrag
   niet goed herkend is, onder **"Controleer eerst"**.
+- **n.v.t. (...)** -- dit document mag NOOIT naar Basecone, ook niet als
+  het er als gewone inkoopfactuur uitziet, dus het staat niet bij "Niet
+  naar Basecone" en ook niet bij Vraagposten. Drie gevallen: het is een
+  inkomend document (`direction=incoming`, bijv. ENRA/HelloRider), het is
+  een eigen verkoopfactuur (`OWN_COMPANY_NAMES`), of de afzender/leverancier
+  staat op `BASECONE_EXCLUDE_SUPPLIERS` (standaard: Mobility Services/Lease
+  a Bike/VWPFS/CycleSoftware -- hun "factuur" is een kopie van een
+  kassaverkoop die al automatisch via CycleSoftware/Twinfield geboekt
+  wordt; nogmaals doorsturen zou een dubbele boeking veroorzaken). Te zien
+  in de kolom "Basecone" bij "Recent gekoppeld".
 
 **Automatisch doorsturen** (`AUTO_FORWARD_BASECONE=true`, standaard uit):
 bij elke sync stuurt de app zelf elk nieuw, herkenbaar document (heeft een

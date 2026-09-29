@@ -84,6 +84,36 @@ def test_is_forwardable_excludes_other_and_already_sent(tmp_path):
     assert bf.is_forwardable(make_invoice(tmp_path, in_basecone=BaseconeForwardStatus.YES.value)) is False
 
 
+def test_is_forwardable_excludes_incoming_documents(tmp_path):
+    # ENRA/HelloRider/Mobility Services -- money coming IN, never a bill this
+    # shop needs to pay, so it must never be auto-forwarded to Basecone.
+    incoming = make_invoice(tmp_path, supplier_name="ENRA", direction="incoming")
+    assert bf.is_forwardable(incoming) is False
+    assert bf.not_applicable_reason(incoming) is not None
+    assert bf.basecone_status_label(incoming).startswith("n.v.t.")
+
+
+def test_is_forwardable_excludes_own_company_sales_invoices(tmp_path):
+    own = make_invoice(tmp_path, supplier_name="Van der Linden Tweewielers")
+    assert bf.is_forwardable(own) is False
+
+
+def test_is_forwardable_excludes_configured_suppliers(tmp_path):
+    # Real production case: Mobility Services' Lease a Bike "factuur" is a
+    # copy of a sale this shop's own till (CycleSoftware) already booked
+    # into Twinfield -- forwarding it too would double-book it.
+    for supplier in ("Mobility Services", "Lease a Bike", "VWPFS B.V.", "CycleSoftware"):
+        excluded = make_invoice(tmp_path, supplier_name=supplier)
+        assert bf.is_forwardable(excluded) is False, supplier
+        assert "CycleSoftware/Twinfield" in bf.basecone_status_label(excluded)
+
+
+def test_is_forwardable_true_for_normal_outgoing_supplier_invoice(tmp_path):
+    normal = make_invoice(tmp_path, supplier_name="Kruitbosch", invoice_number="F-123", amount_cents=12345)
+    assert bf.is_forwardable(normal) is True
+    assert bf.basecone_status_label(normal) == "nee"
+
+
 # -- resolve_auto_forward_since --
 
 def test_resolve_auto_forward_since_records_today_once(monkeypatch):

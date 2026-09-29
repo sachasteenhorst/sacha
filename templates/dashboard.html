@@ -226,7 +226,7 @@
   <div class="table-scroll">
   <table class="muted">
     <thead>
-      <tr><th>Datum</th><th>Bedrag</th><th>Document(en)</th><th>Methode</th><th>Korting</th></tr>
+      <tr><th>Datum</th><th>Bedrag</th><th>Document(en)</th><th>Methode</th><th>Korting</th><th>Basecone</th></tr>
     </thead>
     <tbody>
       {% for group in recent_groups %}
@@ -237,6 +237,7 @@
         <td>{{ group|map(attribute="invoice")|map(attribute="invoice_number")|select|join(", ") or group[0].invoice.attachment_filename }}</td>
         <td>{{ group[0].method|method_label }}{% if group|length > 1 %} ({{ group|length }} documenten){% endif %}</td>
         <td class="amount">{% if group[0].discount_cents %}{{ group[0].discount_cents|euros }}{% else %}-{% endif %}</td>
+        <td><small class="muted-text">{{ group[0].invoice|basecone_status_label }}</small></td>
       </tr>
       {% endfor %}
     </tbody>
