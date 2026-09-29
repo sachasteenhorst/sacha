@@ -1,111 +1,71 @@
 {
- "bijgewerkt": "2026-09-29T21:08:26Z",
+ "bijgewerkt": "2026-09-29T22:30:34Z",
  "winkels": {
   "Jumbo": {
    "status": "ok",
-   "geldig": "wo 23 t/m di 29 sep",
+   "geldig": "wo 30 sep t/m di 6 okt",
    "bron": "https://www.jumbo.com/aanbiedingen/nu",
-   "aantal": 44,
+   "aantal": 40,
    "items": [
     {
-     "k": "kaas",
-     "titel": "Jumbo Goudse kaas plakken",
-     "actie": "OP=OP",
-     "prijs": null,
+     "k": "stoofvlees",
+     "titel": "Sukadelappen",
+     "actie": "voor 4,49",
+     "prijs": 4.49,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "wortel",
-     "titel": "Wortelen",
-     "actie": "voor 1,49",
-     "prijs": 1.49,
+     "k": "blauwe-bessen",
+     "titel": "Blauwe bessen",
+     "actie": "voor 4,99",
+     "prijs": 4.99,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "sperziebonen",
-     "titel": "Sperziebonen",
-     "actie": "voor 3,49",
-     "prijs": 3.49,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "appel",
-     "titel": "Conference peren of Jonagold appels",
-     "actie": "voor 1,29",
-     "prijs": 1.29,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "peer",
-     "titel": "Conference peren of Jonagold appels",
-     "actie": "voor 1,29",
-     "prijs": 1.29,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "rode-biet",
-     "titel": "Biologische gekookte bietjes",
-     "actie": "Alleen online",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "broccoli",
-     "titel": "Broccoli",
-     "actie": "voor 2,19",
-     "prijs": 2.19,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "prei",
-     "titel": "Prei",
+     "k": "mango",
+     "titel": "Mango",
      "actie": "voor 2,49",
      "prijs": 2.49,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "paprika",
-     "titel": "Zoete punt paprika",
-     "actie": "1+1 gratis",
-     "prijs": null,
+     "k": "avocado",
+     "titel": "Avocado",
+     "actie": "voor 1,99",
+     "prijs": 1.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "zoete-aardappel",
+     "titel": "Zoete aardappelen",
+     "actie": "2 voor 1,49",
+     "prijs": 0.74,
      "perKg": null,
      "eenheid": ""
     },
     {
      "k": "aardappel",
-     "titel": "Aardappelen",
-     "actie": "voor 3,29",
-     "prijs": 3.29,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "aardbeien",
-     "titel": "Nederlandse aardbeien",
+     "titel": "Mini krieltjes",
      "actie": "1+1 gratis",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "zalm",
-     "titel": "Zalmfilet",
-     "actie": "1,19 per 100 gram",
+     "k": "pasta",
+     "titel": "Alle Jumbo's verse pasta's of pastasauzen",
+     "actie": "25% korting",
      "prijs": null,
-     "perKg": 11.9,
+     "perKg": null,
      "eenheid": ""
     },
     {
      "k": "gehakt",
-     "titel": "Slagersgehakt",
+     "titel": "Runder-, kip- of gemengd gehakt",
      "actie": "2 voor 5,00",
      "prijs": 2.5,
      "perKg": null,
@@ -115,33 +75,41 @@
   },
   "Dirk": {
    "status": "ok",
-   "geldig": "t/m di 29 sep",
+   "geldig": "t/m di 6 okt",
    "bron": "https://www.dirk.nl/aanbiedingen",
-   "aantal": 103,
+   "aantal": 105,
    "items": [
     {
-     "k": "aardappel",
-     "titel": "Stamppot groente of aardappelen",
-     "actie": "€ 0,99 (was € 1,59)",
-     "prijs": 0.99,
-     "perKg": null,
-     "eenheid": "Per stuk"
-    },
-    {
-     "k": "pompoen",
-     "titel": "Flespompoen of oranje pompoen",
-     "actie": "€ 0,99 (was € 1,99)",
-     "prijs": 0.99,
-     "perKg": null,
-     "eenheid": "Per stuk"
-    },
-    {
-     "k": "aardappel",
-     "titel": "1 de Beste Aardappelen",
-     "actie": "€ 1,09 (was € 1,19)",
-     "prijs": 1.09,
-     "perKg": 1.09,
+     "k": "appel",
+     "titel": "BIO+ Gala appels",
+     "actie": "€ 2,49 (was € 2,99)",
+     "prijs": 2.49,
+     "perKg": 2.49,
      "eenheid": "Zak 1 kilo"
+    },
+    {
+     "k": "peer",
+     "titel": "Hollandse peren",
+     "actie": "€ 0,99 (was € 1,79)",
+     "prijs": 0.99,
+     "perKg": null,
+     "eenheid": "Per bak"
+    },
+    {
+     "k": "paprika",
+     "titel": "Hollandse rode paprika ",
+     "actie": "€ 0,49 (was € 0,85)",
+     "prijs": 0.49,
+     "perKg": null,
+     "eenheid": "Per stuk"
+    },
+    {
+     "k": "sperziebonen",
+     "titel": "Hollandse sperziebonen",
+     "actie": "€ 0,99 (was € 1,49)",
+     "prijs": 0.99,
+     "perKg": null,
+     "eenheid": "Los"
     },
     {
      "k": "avocado",
@@ -160,74 +128,74 @@
      "eenheid": "Per bak"
     },
     {
+     "k": "ui",
+     "titel": "Hollandse uien ",
+     "actie": "€ 1,49 (was € 1,69)",
+     "prijs": 1.49,
+     "perKg": null,
+     "eenheid": "Per net"
+    },
+    {
      "k": "aardbeien",
      "titel": "Hollandse aardbeien",
-     "actie": "€ 3,49",
-     "prijs": 3.49,
-     "perKg": 8.72,
+     "actie": "€ 2,99",
+     "prijs": 2.99,
+     "perKg": 7.48,
      "eenheid": "Bak 400 gram"
     },
     {
-     "k": "broccoli",
-     "titel": "Hollandse broccoli",
-     "actie": "€ 0,99 (was € 1,15)",
-     "prijs": 0.99,
+     "k": "zalm",
+     "titel": "Zalmfilet met huid",
+     "actie": "€ 8,99 (was € 11,25)",
+     "prijs": 8.99,
      "perKg": null,
-     "eenheid": "Los"
-    },
-    {
-     "k": "appel",
-     "titel": "Hollandse Elstar appels",
-     "actie": "€ 2,49",
-     "prijs": 2.49,
-     "perKg": null,
-     "eenheid": "Per zak"
-    },
-    {
-     "k": "pastinaak",
-     "titel": "Biologische pastinaak",
-     "actie": "€ 1,19",
-     "prijs": 1.19,
-     "perKg": 2.97,
-     "eenheid": "Zak 400 gram"
-    },
-    {
-     "k": "appel",
-     "titel": "Cosmic crisp appels",
-     "actie": "€ 1,89",
-     "prijs": 1.89,
-     "perKg": null,
-     "eenheid": "Schaal 4 stuks"
+     "eenheid": "Pak 4 stuks"
     },
     {
      "k": "kaas",
-     "titel": "Finest Selection kaas",
-     "actie": "€ 1,99 (was € 3,49)",
-     "prijs": 1.99,
-     "perKg": 13.27,
-     "eenheid": "Pak 150 gram"
+     "titel": "Beemster kaas 48+",
+     "actie": "€ 4,99 (was € 8,99)",
+     "prijs": 4.99,
+     "perKg": 12.47,
+     "eenheid": "Per stuk 400 gram. OP=OP"
     },
     {
      "k": "kaas",
-     "titel": "Goudse jonge kaas 48+",
-     "actie": "€ 5,99",
-     "prijs": 5.99,
+     "titel": "Vergeer Gouda kaas jong 48+",
+     "actie": "€ 3,99",
+     "prijs": 3.99,
      "perKg": null,
-     "eenheid": "XXL voordeelstuk. OP=OP"
+     "eenheid": "XXL-pak 25 plakken. OP=OP"
+    },
+    {
+     "k": "yoghurt",
+     "titel": "Zuivelhoeve Boer'n yoghurt",
+     "actie": "€ 1,49 (was € 2,85)",
+     "prijs": 1.49,
+     "perKg": null,
+     "eenheid": "Per emmer. OP=OP"
     },
     {
      "k": "pasta",
-     "titel": "De Cecco pasta",
-     "actie": "€ 1,29 (was € 3,19)",
-     "prijs": 1.29,
-     "perKg": 2.58,
-     "eenheid": "Zak 250 of 500 gram (m.u.v. Cannelloni)"
+     "titel": "Knorr Good Noodles of Pasta",
+     "actie": "€ 0,79 (was € 2,09)",
+     "prijs": 0.79,
+     "perKg": 8.88,
+     "eenheid": "Beker 62 - 89 gram"
+    },
+    {
+     "k": "gehakt",
+     "titel": "Verspakket gehakt stroganoff",
+     "actie": "€ 4,69 (was € 4,99)",
+     "prijs": 4.69,
+     "perKg": null,
+     "eenheid": "Per pakket"
     }
    ]
   },
   "Aldi": {
    "status": "ok",
-   "geldig": "t/m di 29 sep",
+   "geldig": "t/m di 6 okt",
    "bron": "https://www.aldi.nl/aanbiedingen.html",
    "aantal": 154,
    "items": [
@@ -505,13 +473,105 @@
     }
    ]
   },
+  "Lidl": {
+   "status": "ok",
+   "geldig": "t/m zo 4 okt",
+   "bron": "https://www.lidl.nl/c/aanbiedingen/a10008785",
+   "aantal": 97,
+   "items": [
+    {
+     "k": "zalm",
+     "titel": "Zalmfilet met huid",
+     "actie": "€ 15,49 31% volumevoordeel",
+     "prijs": 15.49,
+     "perKg": 15.49,
+     "eenheid": "8 x 125 g"
+    },
+    {
+     "k": "komkommer",
+     "titel": "Komkommer",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pompoen",
+     "titel": "Diverse bio pompoenen",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "aardbeien",
+     "titel": "Hollandse aardbeien",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "appel",
+     "titel": "Jonagold appels",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "wortel",
+     "titel": "Wortelen",
+     "actie": "€ 0,99 (was € 1,29) -23%",
+     "prijs": 0.99,
+     "perKg": 0.99,
+     "eenheid": "Zak 1 kg"
+    },
+    {
+     "k": "prei",
+     "titel": "Bio prei",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "aardappel",
+     "titel": "Stamppot aardappelen",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "room",
+     "titel": "Verse slagroom 35% weidemelk",
+     "actie": "€ 1,09 (was € 1,34)",
+     "prijs": 1.09,
+     "perKg": null,
+     "eenheid": "250-500 ml"
+    },
+    {
+     "k": "kipfilet",
+     "titel": "Kipfilet pittig of tuinkruiden",
+     "actie": "In de aanbieding",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pindakaas",
+     "titel": "CALVÉ Pindakaas",
+     "actie": "€ 3,49 (was € 4,35) -20%",
+     "prijs": 3.49,
+     "perKg": 5.37,
+     "eenheid": "650 g"
+    }
+   ]
+  },
   "Albert Heijn": {
    "status": "handmatig",
    "melding": "ah.nl blokkeert automatisch ophalen. Zet de bonus met de hand aan."
-  },
-  "Lidl": {
-   "status": "handmatig",
-   "melding": "Lidl laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan."
   },
   "Plus": {
    "status": "handmatig",

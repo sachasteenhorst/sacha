@@ -8,9 +8,10 @@ Gebruik:
 Schrijft standaard naar recepten-app/aanbiedingen.json. Het resultaat is
 precies het document dat de app leest uit de opslag `folders/actueel`.
 
-Albert Heijn blokkeert geautomatiseerde verzoeken (Akamai-botbescherming);
-Lidl en Plus laden hun aanbiedingen pas in de browser. Die winkels krijgen
-daarom een status en blijven in de app handmatig aan te vullen.
+Albert Heijn blokkeert geautomatiseerde verzoeken (Akamai-botbescherming) en
+Plus laadt de aanbiedingen pas in de browser via een interne koppeling. Die
+winkels krijgen daarom een status en blijven in de app handmatig aan te vullen.
+Lidl zet de aanbiedingen als gegevens in de openbare aanbiedingenpagina.
 """
 from __future__ import annotations
 
@@ -89,7 +90,7 @@ UITSLUITEN = re.compile(
     r"toast|borrel|kroket|frikandel|chocola|siroop|limonade|vla|pudding|dessert|"
     r"schnitzel|gerookt|haring|sushi|nuggets|pannenkoek|ontbijt|muesli|granola|"
     r"cruesli|babyvoeding|knijpfruit|parfum|wasmiddel|luier|croissant|salami|broodje|"
-    r"\bham\b|beleg|vleeswaren|plakjes|spread|bami|nasi|tonight|aardappel anders",
+    r"\bham\b|beleg|vleeswaren|plakjes|spread|bami|nasi|tonight|aardappel anders|worst|cordon bleu|decoratie",
     re.I,
 )
 _WOORD = "a-zà-ÿ"
@@ -153,11 +154,13 @@ def per_kg(prijs, omschrijving: str):
         return None
     if re.search(r"bijv|\bà\b|\bper\s+\d+\b|\d+\s*(bakken|zakken|pakken|stuks)", omschrijving, re.I):
         return None  # combinatieactie (bijv. 3 bakken à 1 kilo): de kiloprijs is niet betrouwbaar te bepalen
-    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|kilo|gram|gr|g)\b", omschrijving, re.I)
+    keer = re.search(r"(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|kilo|gram|gr|g)\b", omschrijving, re.I)   # '8 x 125 g'
+    m = keer or re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|kilo|gram|gr|g)\b", omschrijving, re.I)
     if not m:
         return None
-    n = float(m.group(1).replace(",", "."))
-    kg = n if m.group(2).lower() in ("kg", "kilo") else n / 1000
+    n = int(keer.group(1)) * float(keer.group(2).replace(",", ".")) if keer else float(m.group(1).replace(",", "."))
+    eenheid = (keer.group(3) if keer else m.group(2)).lower()
+    kg = n if eenheid in ("kg", "kilo") else n / 1000
     return round(prijs / kg, 2) if kg > 0 else None
 
 
@@ -278,10 +281,46 @@ def vomar() -> dict:
     return {"geldig": f"week {week.group(1)}" if week else "", "items": items, "bron": folder + "/"}
 
 
-WINKELS = {"Jumbo": jumbo, "Dirk": dirk, "Aldi": aldi, "DekaMarkt": dekamarkt, "Vomar": vomar}
+# Lidl zet elk product als JSON in het attribuut data-grid-data van de openbare aanbiedingenpagina
+LIDL_START = "https://www.lidl.nl/c/aanbiedingen/a10008785"
+
+
+def lidl() -> dict:
+    try:
+        s = haal(LIDL_START, browser=True)
+    except Exception:  # het adres van de aanbiedingenpagina kan wijzigen: zoek het op via de voorpagina
+        m = re.search(r'href="(/c/aanbiedingen/a\d+)"', haal("https://www.lidl.nl/", browser=True))
+        if not m:
+            raise
+        s = haal("https://www.lidl.nl" + m.group(1), browser=True)
+    items, eind = [], 0
+    for raw in re.findall(r'data-grid-data="([^"]*)"', s):
+        try:
+            d = json.loads(html.unescape(raw))
+        except ValueError:
+            continue
+        soort = ((d.get("keyfacts") or {}).get("wonCategoryPrimary") or "")
+        if d.get("category") != "Food" or (soort and "Eten" not in soort):
+            continue
+        pr = d.get("price") or {}
+        prijs = pr.get("price") if isinstance(pr.get("price"), (int, float)) and pr.get("price") > 0 else None
+        oud = pr.get("oldPrice") if isinstance(pr.get("oldPrice"), (int, float)) and pr.get("oldPrice") > 0 else None
+        korting = ((pr.get("discount") or {}).get("discountText") or "").strip()
+        eenheid = ((pr.get("packaging") or {}).get("text") or "").strip()
+        actie = " ".join(x for x in [euro(prijs), f"(was {euro(oud)})" if oud else "", korting if korting and not korting.startswith("Elders") else ""] if x) or "In de aanbieding"
+        eind = max(eind, int(d.get("storeEndDate") or 0))
+        titel = html.unescape(d.get("fullTitle") or d.get("title") or "").strip()
+        if titel:
+            items.append({"titel": titel, "actie": actie, "prijs": prijs, "perKg": per_kg(prijs, eenheid), "eenheid": eenheid})
+    if not items:
+        raise RuntimeError("geen producten gevonden op de aanbiedingenpagina")
+    geldig = tm(datetime.fromtimestamp(eind, timezone.utc).strftime("%Y-%m-%d")) if eind else ""
+    return {"geldig": geldig, "items": items, "bron": LIDL_START}
+
+
+WINKELS = {"Jumbo": jumbo, "Dirk": dirk, "Aldi": aldi, "DekaMarkt": dekamarkt, "Vomar": vomar, "Lidl": lidl}
 NIET_AUTOMATISCH = {
     "Albert Heijn": "ah.nl blokkeert automatisch ophalen. Zet de bonus met de hand aan.",
-    "Lidl": "Lidl laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan.",
     "Plus": "Plus laadt de folder pas in de browser. Zet de aanbiedingen met de hand aan.",
 }
 

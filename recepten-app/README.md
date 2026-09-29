@@ -81,7 +81,7 @@ knoppen zodat de app voor elke leeftijd goed te lezen en te bedienen is.
 Bovenaan kies je van welke winkels je de aanbiedingen wilt zien (Jumbo, Dirk,
 Aldi, Vomar, DekaMarkt, Albert Heijn, Lidl, Plus). Bij elk ingrediënt staat de goedkoopste actie
 in jouw winkels; tik erop voor de vergelijking met alle winkels, op prijs per
-kilo als die bekend is. Aanbiedingen van Albert Heijn, Lidl en Plus voeg je
+kilo als die bekend is. Aanbiedingen van Albert Heijn en Plus voeg je
 zelf toe onder "Zelf aanbiedingen toevoegen".
 - **Etenstijd en agenda**: kies op het weekmenu hoe laat jullie eten. Bij elk
   gerecht staat dan hoe laat je moet beginnen (etenstijd min kooktijd). Met
@@ -142,8 +142,9 @@ verpakking en waar mogelijk de prijs per kilo uit.
 | Aldi | productgegevens in de pagina | prijs, korting en geldigheid |
 | DekaMarkt | zelfde opzet als Dirk (Detailresult) | alle acties, met actie- en normale prijs; vraagt browser-headers |
 | Vomar | tekstlaag van de Publitas-bladerfolder | alleen welke producten in de folder staan, zonder prijs (de tekstlaag staat door elkaar) |
-| Albert Heijn | niet automatisch | ah.nl blokkeert scripts (Akamai) |
-| Lidl, Plus | niet automatisch | de folder laadt pas in de browser |
+| Lidl | productgegevens (data-grid-data) in de openbare aanbiedingenpagina | prijs, oude prijs, korting en verpakking; niet alle acties hebben een prijs |
+| Albert Heijn | niet automatisch | ah.nl blokkeert scripts (Akamai); de interne app-koppeling gebruiken we bewust niet |
+| Plus | niet automatisch | de aanbiedingen laden pas in de browser via een interne koppeling |
 
 ```
 python3 recepten-app/folders/ophalen.py            # schrijft recepten-app/aanbiedingen.json
