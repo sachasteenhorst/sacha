@@ -723,6 +723,16 @@
   .wwijzig { font-weight: 700; color: var(--green); flex: none; }
   ul.shop li { font-size: 16px; }
   .agendakaart { display: grid; gap: 12px; }
+  .card.samen { display: grid; gap: 12px; }
+  .samenkop { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+  .samenkop > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+  .samenkop b { font-family: var(--display); font-size: 19px; }
+  .samenicoon { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; background: var(--olive-soft); color: var(--olive); }
+  .samenicoon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .samenknoppen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .gcodeform { display: grid; gap: 4px; }
+  .gcoderij { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .gcoderij input { min-height: 48px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 18px; letter-spacing: .08em; text-transform: uppercase; min-width: 0; }
   .card.extra { display: grid; gap: 10px; }
   .card.extra h3 { font-size: 20px; }
   .snelknoppen { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
@@ -2034,8 +2044,11 @@ function viewList() {
   <section>
     <div class="eyebrow">Boodschappen</div>
     <h2 style="font-size:28px;margin-top:4px">Boodschappenlijst</h2>
-    <div class="syncnote ${lijstSync === 'account' ? '' : 'local'}" style="margin-top:6px"><span class="dot"></span>${lijstSync === 'account' ? 'Bewaard bij je account, op al je apparaten gelijk.' : 'Alleen op dit apparaat bewaard.'}</div>
+    <div class="syncnote ${lijstSync === 'account' || gedeeldStatus === 'live' ? '' : 'local'}" style="margin-top:6px"><span class="dot"></span>${
+      gedeeld ? (gedeeldStatus === 'live' ? 'Gedeeld: wijzigingen komen direct binnen.' : gedeeldStatus === 'laden' ? 'Gedeelde lijst wordt geladen…' : 'Gedeeld, maar nu zonder verbinding.')
+      : lijstSync === 'account' ? 'Bewaard bij je account, op al je apparaten gelijk.' : 'Alleen op dit apparaat bewaard.'}</div>
   </section>
+  ${gedeeldKaart()}
   ${lijst.length ? `<article class="card weekbar">
     <div><div class="eyebrow">Nog te halen</div><div class="bigeur">≈ ${fmtEur(sum(open))}</div><div class="small muted">${open.length} van ${lijst.length} producten</div></div>
     <div class="small muted" style="align-self:end;text-align:right">Actieprijs waar bekend,<br>anders richtprijs</div>
@@ -2408,6 +2421,140 @@ async function plaatsRecept() {
   }
 }
 
+/* ---------- Gedeelde boodschappenlijst (Supabase) ---------- */
+// Elk product is een eigen rij, zodat twee mensen tegelijk kunnen afvinken zonder elkaars werk te overschrijven.
+// Weghalen = markeren met 'weg'; zulke rijen worden na een week echt opgeruimd.
+let gedeeld = store.get('gedeeld', null);                 // { id, code }
+let gSynced = store.get('gedeeldSynced', {});             // id -> laatst bekende JSON op de server
+let gedeeldStatus = gedeeld ? 'laden' : 'uit';            // uit | laden | live | fout
+let gedeeldFout = '', gTimer = null, gKanaal = null, gWachtCode = '';
+const kanDelen = () => !inClaude && !!SUPA.url;
+const codeTekst = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
+const bewaarSynced = () => store.set('gedeeldSynced', gSynced);
+const lijstHertekenen = () => { if (tab === 'lijst' && !typing() && !lEdit) render(); };
+function gedeeldFoutTekst(e) {
+  const m = String((e && (e.message || e.code)) || e);
+  if (/42P01|PGRST20[25]|does not exist|Could not find/i.test(m)) return 'De gedeelde lijst is nog niet ingesteld in Supabase (supabase/gedeelde-lijst.sql).';
+  if (/onbekende code/i.test(m)) return 'Deze code kennen we niet. Controleer de 8 tekens.';
+  return 'Geen verbinding. Je wijzigingen worden verstuurd zodra je weer online bent.';
+}
+async function gedeeldLaden() {
+  if (!gedeeld || !kanDelen()) return;
+  try {
+    await sbInit();
+    const { data, error } = await sb.from('lijst_items').select('id,data,updated_at').eq('lijst_id', gedeeld.id);
+    if (error) throw error;
+    const remote = new Set(data.map(r => r.id));
+    const lokaalNieuw = lijst.filter(i => !remote.has(i.id) && !(i.id in gSynced));   // offline toegevoegd
+    gSynced = {};
+    const volgorde = new Map(lijst.map((i, n) => [i.id, n]));
+    const opServer = data.filter(r => !r.data.weg).map(r => r.data).sort((a, b) => (volgorde.get(a.id) ?? 1e9) - (volgorde.get(b.id) ?? 1e9));
+    data.forEach(r => { gSynced[r.id] = JSON.stringify(r.data); });
+    lijst = [...opServer, ...lokaalNieuw];
+    store.set('boodschappen', lijst); bewaarSynced();
+    gedeeldStatus = 'live'; gedeeldFout = '';
+    if (lokaalNieuw.length) gedeeldSync();
+    const oud = data.filter(r => r.data.weg && Date.now() - new Date(r.updated_at) > 7 * 864e5).map(r => r.id);
+    if (oud.length) sb.from('lijst_items').delete().eq('lijst_id', gedeeld.id).in('id', oud).then(() => {}, () => {});
+    gedeeldLuister();
+  } catch (e) { gedeeldStatus = 'fout'; gedeeldFout = gedeeldFoutTekst(e); }
+  lijstHertekenen();
+}
+function gedeeldSync() {
+  if (!gedeeld || !kanDelen()) return;
+  clearTimeout(gTimer);
+  gTimer = setTimeout(async () => {
+    const nu = new Map(lijst.map(i => [i.id, i])), stamp = new Date().toISOString(), rows = [];
+    nu.forEach((i, id) => { if (gSynced[id] !== JSON.stringify(i)) rows.push({ lijst_id: gedeeld.id, id, data: i, updated_at: stamp }); });
+    Object.keys(gSynced).forEach(id => { if (!nu.has(id) && !JSON.parse(gSynced[id]).weg) rows.push({ lijst_id: gedeeld.id, id, data: { id, weg: true }, updated_at: stamp }); });
+    if (!rows.length) return;
+    try {
+      await sbInit();
+      const { error } = await sb.from('lijst_items').upsert(rows);
+      if (error) throw error;
+      rows.forEach(r => { gSynced[r.id] = JSON.stringify(r.data); }); bewaarSynced();
+      if (gedeeldStatus !== 'live') { gedeeldStatus = 'live'; gedeeldFout = ''; lijstHertekenen(); }
+    } catch (e) { gedeeldStatus = 'fout'; gedeeldFout = gedeeldFoutTekst(e); lijstHertekenen(); }
+  }, 350);
+}
+function gedeeldLuister() {
+  if (gKanaal || !sb || !gedeeld) return;
+  gKanaal = sb.channel('lijst-' + gedeeld.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lijst_items', filter: `lijst_id=eq.${gedeeld.id}` }, p => {
+      const r = p.new; if (!r || !r.id || !r.data) return;
+      const j = JSON.stringify(r.data); if (gSynced[r.id] === j) return;   // onze eigen wijziging
+      gSynced[r.id] = j; bewaarSynced();
+      const n = lijst.findIndex(i => i.id === r.id);
+      if (r.data.weg) { if (n >= 0) lijst.splice(n, 1); }
+      else if (n >= 0) lijst[n] = r.data; else lijst.push(r.data);
+      store.set('boodschappen', lijst); lijstHertekenen();
+    })
+    .subscribe();
+}
+function gedeeldStoppenLuisteren() { if (gKanaal && sb) sb.removeChannel(gKanaal); gKanaal = null; }
+async function gedeeldMaken() {
+  try {
+    await sbInit();
+    const { data, error } = await sb.rpc('lijst_maken');
+    if (error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    gedeeld = { id: r.lijst_id, code: r.lijst_code }; store.set('gedeeld', gedeeld);
+    gSynced = {}; bewaarSynced(); gedeeldStatus = 'live'; gedeeldFout = '';
+    gedeeldSync(); gedeeldLuister(); render();
+    toast('Je lijst is nu gedeeld. Tik op Uitnodigen om de code te sturen.');
+  } catch (e) { gedeeldFout = gedeeldFoutTekst(e); render(); }
+}
+async function gedeeldMeedoen(code) {
+  const c = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length !== 8) { gedeeldFout = 'Een code bestaat uit 8 tekens, bijvoorbeeld ABCD-EF23.'; render(); return; }
+  try {
+    await sbInit();
+    const { data, error } = await sb.rpc('lijst_deelnemen', { p_code: c });
+    if (error) throw error;
+    gedeeldStoppenLuisteren();
+    gedeeld = { id: data, code: c }; store.set('gedeeld', gedeeld);
+    gSynced = {}; bewaarSynced(); gedeeldStatus = 'laden'; gedeeldFout = ''; gWachtCode = '';
+    render(); await gedeeldLaden();
+    toast('Je doet mee met de gedeelde lijst.');
+  } catch (e) { gedeeldFout = gedeeldFoutTekst(e); render(); }
+}
+async function gedeeldStoppen() {
+  const oud = gedeeld; gedeeldStoppenLuisteren();
+  gedeeld = null; store.set('gedeeld', null); gSynced = {}; bewaarSynced(); gedeeldStatus = 'uit'; gedeeldFout = '';
+  render();
+  try { await sbInit(); await sb.from('lijst_leden').delete().eq('lijst_id', oud.id).eq('user_id', sbUid); } catch (e) {}
+  toast('Je deelt deze lijst niet meer. Je houdt een eigen kopie.');
+}
+async function gedeeldUitnodigen() {
+  const link = (location.protocol === 'https:' ? location.origin + location.pathname : 'https://sachasteenhorst.github.io/sacha/recepten-app/') + '?lijst=' + gedeeld.code;
+  const tekst = `Doe mee met onze boodschappenlijst in de Aanbiedingskeuken. Open de link, of vul bij Boodschappen de code ${codeTekst(gedeeld.code)} in.`;
+  try { if (navigator.share) { await navigator.share({ title: 'Onze boodschappenlijst', text: tekst, url: link }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(tekst + ' ' + link); toast('Uitnodiging gekopieerd. Plak hem in een appje.'); }
+  catch (e) { toast('Stuur deze code: ' + codeTekst(gedeeld.code)); }
+}
+function gedeeldKaart() {
+  if (!kanDelen()) return '';
+  if (gedeeld) return `
+  <article class="card samen">
+    <div class="samenkop"><span class="samenicoon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a2.5 2.5 0 1 0 0-5M16 14.5a5 5 0 0 1 5 5.5"/></svg></span>
+      <span><b>Gedeelde lijst</b><span class="small muted">Code ${esc(codeTekst(gedeeld.code))}</span></span></div>
+    ${gedeeldFout ? `<p class="small" style="margin:0;color:var(--no)">${esc(gedeeldFout)}</p>` : ''}
+    <div class="samenknoppen"><button class="btn primary" data-guitnodigen>Uitnodigen</button><button class="btn" data-gstop>Stoppen met delen</button></div>
+  </article>`;
+  return `
+  <article class="card samen">
+    <div class="samenkop"><span class="samenicoon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a2.5 2.5 0 1 0 0-5M16 14.5a5 5 0 0 1 5 5.5"/></svg></span>
+      <span><b>Samen boodschappen doen</b><span class="small muted">Wat de een toevoegt of afvinkt, ziet de ander meteen.</span></span></div>
+    ${gWachtCode ? `<p style="margin:0">Je bent uitgenodigd voor een gedeelde lijst (code <b>${esc(codeTekst(gWachtCode))}</b>).</p>
+      <button class="btn primary" data-gmeedoen="${esc(gWachtCode)}">Meedoen</button>` : '<button class="btn primary" data-gmaak>Deel deze lijst</button>'}
+    <form class="gcodeform" id="gcodeform" novalidate>
+      <label for="gcode" class="flabel2">Code gekregen?</label>
+      <div class="gcoderij"><input type="text" id="gcode" maxlength="9" placeholder="ABCD-EF23" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn" type="submit">Meedoen</button></div>
+    </form>
+    ${gedeeldFout ? `<p class="small" style="margin:0;color:var(--no)">${esc(gedeeldFout)}</p>` : ''}
+  </article>`;
+}
+
 /* ---------- Spaarkaarten ---------- */
 const CARD_TYPES = ['Albert Heijn (Bonuskaart)', "Jumbo (Extra's)", 'Vomar (KIK-kaart)', 'DekaMarkt', 'Plus', 'Lidl', 'Dirk', 'Aldi', 'Kruidvat', 'Etos', 'Andere kaart'];
 const cleanNum = v => String(v || '').replace(/[\s-]/g, '');
@@ -2569,7 +2716,7 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
   if (t.dataset.like) {
     const p = (feed || []).find(x => x.id === t.dataset.like); if (!p) return;
@@ -2663,6 +2810,10 @@ app.addEventListener('click', e => {
   else if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
   else if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
   else if (t.hasAttribute('data-agenda')) zetInAgenda();
+  else if (t.hasAttribute('data-gmaak')) gedeeldMaken();
+  else if (t.dataset.gmeedoen) gedeeldMeedoen(t.dataset.gmeedoen);
+  else if (t.hasAttribute('data-guitnodigen')) gedeeldUitnodigen();
+  else if (t.hasAttribute('data-gstop')) { if (confirm('Stoppen met delen? Je houdt een eigen kopie van de lijst; de anderen blijven de gedeelde lijst houden.')) gedeeldStoppen(); }
   else if (t.dataset.snel) {
     const n = t.dataset.snel, pv = prijsVoor(n);
     voegExtraToe(n, 1, pv.prijs, pv.bron); render();
@@ -2757,6 +2908,7 @@ app.addEventListener('submit', e => {
     schermnaam = v; store.set('schermnaam', v); render(); return;
   }
   if (e.target.id === 'deelform') { e.preventDefault(); plaatsRecept(); return; }
+  if (e.target.id === 'gcodeform') { e.preventDefault(); gedeeldMeedoen(document.getElementById('gcode').value); return; }
   if (e.target.id !== 'addfree') return;
   e.preventDefault();
   const v = document.getElementById('freetext').value.trim().slice(0, 60);
@@ -2783,6 +2935,17 @@ app.addEventListener('submit', e => {
   kaarten = [...kaarten, { id: Date.now().toString(36), type, naam, nummer }];
   persistCards(); render();
 });
+
+// Uitnodigingslink ?lijst=CODE: bied meedoen aan op het boodschappenscherm
+(() => {
+  const q = new URLSearchParams(location.search).get('lijst');
+  if (!q) return;
+  const c = q.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (c.length === 8 && kanDelen() && (!gedeeld || gedeeld.code !== c)) { gWachtCode = c; tab = 'lijst'; }
+})();
+if (gedeeld && kanDelen()) gedeeldLaden();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gedeeld && kanDelen()) gedeeldLaden(); });
 
 render();
 
@@ -2830,6 +2993,7 @@ function setLive(d) {
 /* Privédeel van de opslag (data/users/<jouw id>): spaarkaarten en boodschappenlijst, op elk apparaat gelijk */
 function persistList() {
   store.set('boodschappen', lijst);
+  if (gedeeld) gedeeldSync();
   if (saveList) saveList(lijst).catch(() => { lijstSync = 'lokaal'; render(); });
 }
 const typing = () => { const a = document.activeElement; return a && app.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.type !== 'checkbox'; };

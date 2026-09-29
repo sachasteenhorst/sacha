@@ -46,6 +46,22 @@ van anderen verwijder je als beheerder via **Table Editor → recepten**.
 De tijdlijn werkt in de telefoonversie; binnen claude.ai blokkeert de pagina
 verbindingen met andere servers.
 
+### Gedeelde boodschappenlijst
+
+Plak ook `supabase/gedeelde-lijst.sql` in de SQL Editor en klik **Run**. Daarna
+kan iemand bij **Boodschappen → Deel deze lijst** een lijst delen; de ander doet
+mee via de uitnodigingslink of de code van 8 tekens. Elk product is een eigen
+rij, zodat afvinken en toevoegen door twee mensen tegelijk goed gaat, en
+wijzigingen komen live binnen (Supabase Realtime). Alleen leden van een lijst
+kunnen die lijst zien of veranderen.
+
+### Folders automatisch ophalen
+
+Op de hoofdbranch staat `.github/workflows/folders.yml`. Die draait elke maandag
+en donderdag vroeg in de ochtend `folders/ophalen.py` op deze branch, commit
+`aanbiedingen.json` en vraagt een nieuwe Pages-build aan. Handmatig starten kan
+via **Actions → Folders ophalen → Run workflow**.
+
 ## Onderdelen
 
 De onderbalk heeft vier grote knoppen: **Weekmenu**, **Recepten**,
