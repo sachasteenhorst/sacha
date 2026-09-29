@@ -760,6 +760,15 @@
   .knav .btn { min-height: 60px; font-size: 19px; }
   .knav .btn:disabled { opacity: .4; }
   .card.samen { display: grid; gap: 12px; }
+  .pill.huis { background: var(--olive-soft); color: var(--olive); }
+  .voorraadsom { display: grid; gap: 12px; }
+  .vchips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vchip {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 6px 14px 6px 8px; border-radius: 14px; cursor: pointer;
+    border: 1px solid var(--tile-edge); background: var(--surface); color: var(--ink); font-size: 16px; font-weight: 700; box-shadow: 0 2px 0 var(--tile-edge);
+  }
+  .vchip[aria-pressed="true"] { background: var(--olive-soft); border-color: var(--olive); color: var(--olive); box-shadow: 0 2px 0 var(--olive); }
+  .vchip[aria-pressed="true"]::after { content: "✓"; margin-left: 2px; }
   .inweek { display: grid; gap: 6px; margin-top: 14px; }
   .inweekrij { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .inweekrij select { min-height: 48px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; min-width: 0; }
@@ -1373,8 +1382,12 @@ function allowed(r) {
 }
 const allowedRecipes = () => { const a = RECIPES.filter(allowed); return a.length ? a : RECIPES; };
 const filtersOn = () => allergieen.length > 0 || voorkeuren.some(v => !v.endsWith(':normaal'));
+// Voorraad: producten die je al in huis hebt. Gerechten die ze opmaken krijgen voorrang; ze gaan niet op de boodschappenlijst.
+let voorraad = store.get('voorraad', []);
+const inHuis = k => !!k && voorraad.includes(k);
+const voorraadHits = r => [...new Set(r.ingr.filter(i => inHuis(i.k)).map(i => i.k))];
 function prefBonus(r) {
-  let b = 0;
+  let b = voorraadHits(r).length * 9;
   if (voorkeur(r.soort) === 'vaker') b += 12;
   if (r.comfort && voorkeur('Comfortfood') === 'vaker') b += 12;
   if (voorkeuren.includes('snel') && r.tijd <= 30) b += 6;
@@ -1758,7 +1771,7 @@ function recipeBody(r, dayIndex) {
         <button class="omit back" data-omit="${esc(omitKey(r, i))}" aria-label="${esc(i.n)} terugzetten">Terug</button></li>` : `
       <li class="itile">${artIcon(i.k, i.n, 30)}<span class="ibody"><span class="iname">${esc(i.n)}</span><span class="qty">${esc(fmtQ(i))}</span></span>
         <button class="omit" data-omit="${esc(omitKey(r, i))}" aria-label="${esc(i.n)} weglaten">Laat weg</button>
-        <span class="marks">${priceBtn(i.k)}${forbidders(i).length ? `<span class="pill no">niet voor ${esc(opsomming(forbidders(i).map(naamVan)))}</span>` : ''}${i.baby ? `<span class="pill baby">${esc(babyNames())}</span>` : ''}</span></li>`).join('')}
+        <span class="marks">${inHuis(i.k) ? '<span class="pill ok">in huis</span>' : priceBtn(i.k)}${forbidders(i).length ? `<span class="pill no">niet voor ${esc(opsomming(forbidders(i).map(naamVan)))}</span>` : ''}${i.baby ? `<span class="pill baby">${esc(babyNames())}</span>` : ''}</span></li>`).join('')}
     </ul>
     ${weg.length ? `<p class="small muted" style="margin:10px 0 0">${weg.length} ingrediënt${weg.length > 1 ? 'en' : ''} weggelaten. Die tellen niet mee voor de kosten, de boodschappenlijst en de allergenen.</p>` : ''}
     ${recipeAllergens(r).length ? `<p class="small muted" style="margin:10px 0 0">Bevat: ${recipeAllergens(r).map(a => esc(a.naam.toLowerCase())).join(', ')}</p>` : ''}
@@ -2017,7 +2030,7 @@ function viewWeek() {
       <summary>
         ${plate(r)}
         <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]} · begin ${startTijd(r)}</span><span class="rname">${esc(r.naam)}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
-        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
+        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
       </summary>
       <div class="inner">
         ${r.foto ? photoBlock(r, 'rowphoto') : ''}
@@ -2045,7 +2058,7 @@ function recipeRow(r) {
         ${plate(r)}
         <span class="dtext"><span class="rname">${esc(r.naam)}${isFav(r) ? ' <span class="heart" aria-label="Favoriet">♥</span>' : ''}</span>
           <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
-        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span></span>
+        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}</span>
       </summary>
       <div class="inner">${r.foto ? photoBlock(r, 'rowphoto') : ''}${recipeBody(r, null)}</div>
     </details>`;
@@ -2177,9 +2190,11 @@ function voegExtraToe(naam, aantal, prijs, bron) {
 let fAantal = 1, lEdit = null;
 
 /* ---------- Boodschappenlijst ---------- */
+let overgeslagen = 0;
 function addToList(ingrs, bron) {
   ingrs.forEach(i => {
     if (i.q == null || i.u === 'el' || i.u === 'tl') return; // voorraadkast
+    if (inHuis(i.k)) { overgeslagen++; return; }            // heb je al in huis
     const q = scaledQ(i);
     const ex = lijst.find(x => !x.gekocht && x.n === i.n && x.u === i.u && x.k === i.k);
     if (ex) { ex.q += q; if (!ex.bron.includes(bron)) ex.bron.push(bron); }
@@ -2887,10 +2902,30 @@ const MEER = [
   ['vandaag', 'Vandaag koken', 'Het recept van vandaag, stap voor stap', 'M12 3v2M5.6 5.6l1.4 1.4M3 12h2M18.4 5.6 17 7M21 12h-2M7 16a5 5 0 1 1 10 0zM4 19h16'],
   ['aanbiedingen', 'Aanbiedingen', 'Wat er deze week in de aanbieding is en waar', 'M3 12V4h8l10 10-8 8zM7.5 8.5h.01'],
   ['tijdlijn', 'Tijdlijn', 'Recepten die andere gebruikers delen', 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5'],
+  ['voorraad', 'Voorraad', 'Wat je nog in huis hebt, eerst opmaken', 'M4 7h16v13H4zM4 7l2-3h12l2 3M9 11h6'],
   ['kaarten', 'Spaarkaarten', 'Je klantenkaarten altijd bij de hand', 'M3 6h18v13H3zM7 10v5M10 10v5M12.5 10v5M16 10v5'],
   ['gezin', 'Gezin en baby', 'Voor hoeveel personen je kookt', 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a2.5 2.5 0 1 0 0-5M16 14.5a5 5 0 0 1 5 5.5'],
 ];
 let terugNaar = 'meer';
+function viewVoorraad() {
+  const cats = [...new Set(CATALOG.map(c => c[2]))];
+  const gebruik = RECIPES.filter(r => !r.eigen && allowed(r) && voorraadHits(r).length).sort((a, b) => voorraadHits(b).length - voorraadHits(a).length).slice(0, 3);
+  return `
+  <section>
+    <h2 class="ptitle">Voorraad</h2>
+    <p class="muted" style="margin:6px 0 0">Tik aan wat je nog in huis hebt. Het weekmenu kiest dan eerder gerechten die het opmaken, en het komt niet op je boodschappenlijst.</p>
+  </section>
+  ${voorraad.length ? `<article class="card voorraadsom">
+    <div><b>${voorraad.length} ${voorraad.length === 1 ? 'product' : 'producten'} in huis</b>
+    ${gebruik.length ? `<p class="small muted" style="margin:4px 0 0">Goed om op te maken in: ${gebruik.map(r => esc(r.naam)).join(', ')}.</p>` : ''}</div>
+    <button class="btn" data-voorraadleeg>Alles leegmaken</button>
+  </article>` : ''}
+  ${cats.map(c => `
+    <section>
+      <h3 class="section-title">${esc(c)}</h3>
+      <div class="vchips">${CATALOG.filter(x => x[2] === c).map(([k, n]) => `<button class="vchip" data-voorraad="${k}" aria-pressed="${inHuis(k)}">${artIcon(k, n, 26)}<span>${esc(n)}</span></button>`).join('')}</div>
+    </section>`).join('')}`;
+}
 function viewMeer() {
   return `
   <section>
@@ -2911,7 +2946,7 @@ function viewMeer() {
   </div>`;
 }
 function render() {
-  const views = { vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, gezin: viewGezin, kaarten: viewCards, tijdlijn: viewTijdlijn, meer: viewMeer };
+  const views = { voorraad: viewVoorraad, vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, gezin: viewGezin, kaarten: viewCards, tijdlijn: viewTijdlijn, meer: viewMeer };
   renderStoreBar();
   document.querySelector('.storebar-wrap').hidden = !['lijst', 'aanbiedingen'].includes(tab);
   const gc = document.getElementById('gezin-count'); if (gc) gc.textContent = `${gezin.volw + gezin.kind + babys().length} pers.`;
@@ -2952,7 +2987,7 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-postbewaar],[data-inweek],[data-eigenweg],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-postbewaar],[data-inweek],[data-eigenweg],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-voorraad],[data-voorraadleeg],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
   if (t.dataset.postbewaar) { bewaarPost(t.dataset.postbewaar); return; }
   if (t.dataset.inweek) { const sel = document.getElementById('wd-' + t.dataset.inweek); zetInWeek(t.dataset.inweek, Number(sel ? sel.value : dayIdx)); return; }
@@ -3026,10 +3061,12 @@ app.addEventListener('click', e => {
   }
   else if (t.hasAttribute('data-resetfilters')) { allergieen = []; voorkeuren = []; persistPrefs(); render(); openFilters(); }
   else if (t.dataset.card) openCard(t.dataset.card);
-  else if (t.dataset.addrecipe) { const r = RMAP[t.dataset.addrecipe]; addToList(effIngr(r), r.naam); render(); }
+  else if (t.dataset.addrecipe) { const r = RMAP[t.dataset.addrecipe]; overgeslagen = 0; addToList(effIngr(r), r.naam); render(); if (overgeslagen) toast(`${overgeslagen} ${overgeslagen === 1 ? 'product heb' : 'producten heb'} je al in huis; die staan niet op de lijst.`); }
   else if (t.hasAttribute('data-addweek')) {
+    overgeslagen = 0;
     plan().forEach(r => { if (!onList(r)) addToList(effIngr(r), r.naam); });
     go('lijst');
+    if (overgeslagen) toast(`${overgeslagen}× een product overgeslagen dat je al in huis hebt.`);
   }
   else if (t.dataset.lrm) { lijst = lijst.filter(i => i.id !== t.dataset.lrm); persistList(); render(); }
   else if (t.hasAttribute('data-lclean')) { lijst = lijst.filter(i => !i.gekocht); persistList(); render(); }
@@ -3051,6 +3088,11 @@ app.addEventListener('click', e => {
   else if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
   else if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
   else if (t.hasAttribute('data-agenda')) zetInAgenda();
+  else if (t.dataset.voorraad) {
+    const k = t.dataset.voorraad; voorraad = inHuis(k) ? voorraad.filter(x => x !== k) : [...voorraad, k];
+    store.set('voorraad', voorraad); const y = window.scrollY; render(); window.scrollTo(0, y);
+  }
+  else if (t.hasAttribute('data-voorraadleeg')) { if (confirm('Je hele voorraad leegmaken?')) { voorraad = []; store.set('voorraad', voorraad); render(); } }
   else if (t.hasAttribute('data-gmaak')) gedeeldMaken();
   else if (t.dataset.gmeedoen) gedeeldMeedoen(t.dataset.gmeedoen);
   else if (t.hasAttribute('data-guitnodigen')) gedeeldUitnodigen();
