@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2FB06C"/><stop offset="1" stop-color="#17663E"/></linearGradient>
-    <linearGradient id="mand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF6B4A"/><stop offset="1" stop-color="#D9412A"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D66A42"/><stop offset="1" stop-color="#A63F22"/></linearGradient>
+    <linearGradient id="mand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6E9444"/><stop offset="1" stop-color="#4E6E2E"/></linearGradient>
     <radialGradient id="tom" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#FF7A5C"/><stop offset="1" stop-color="#D62F22"/></radialGradient>
     <clipPath id="mandclip"><path d="M104 262h304l-30 142a26 26 0 0 1-25 20H159a26 26 0 0 1-25-20z"/></clipPath>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <circle cx="256" cy="250" r="190" fill="#FFFFFF" opacity=".08"/>
+  <circle cx="256" cy="262" r="196" fill="#FBEFE3"/>
   <!-- hengsel -->
-  <path d="M150 262c0-92 48-150 106-150s106 58 106 150" fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" opacity=".95"/>
+  <path d="M150 262c0-92 48-150 106-150s106 58 106 150" fill="none" stroke="#8E3517" stroke-width="18" stroke-linecap="round"/>
   <!-- prei / loof achteraan -->
   <path d="M300 262c6-60 22-104 50-132" stroke="#3E8E2F" stroke-width="22" stroke-linecap="round" fill="none"/>
   <path d="M300 262c14-50 38-84 72-102" stroke="#6BBF4A" stroke-width="16" stroke-linecap="round" fill="none"/>
@@ -31,9 +31,9 @@
   <circle cx="148" cy="232" r="10" fill="#FFFFFF" opacity=".35"/>
   <!-- mand -->
   <path d="M104 262h304l-30 142a26 26 0 0 1-25 20H159a26 26 0 0 1-25-20z" fill="url(#mand)"/>
-  <g clip-path="url(#mandclip)" stroke="#FFFFFF" stroke-width="10" opacity=".28">
+  <g clip-path="url(#mandclip)" stroke="#FFFFFF" stroke-width="10" opacity=".22">
     <path d="M190 262v170M256 262v170M322 262v170M100 330h320"/>
   </g>
-  <rect x="84" y="244" width="344" height="40" rx="20" fill="#FFFFFF"/>
-  <rect x="84" y="270" width="344" height="14" rx="7" fill="#000000" opacity=".06"/>
+  <rect x="84" y="244" width="344" height="40" rx="20" fill="#3F5A24"/><rect x="84" y="244" width="344" height="30" rx="15" fill="#7FA653"/>
+  
 </svg>
