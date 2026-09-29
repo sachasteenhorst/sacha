@@ -760,6 +760,9 @@
   .knav .btn { min-height: 60px; font-size: 19px; }
   .knav .btn:disabled { opacity: .4; }
   .card.samen { display: grid; gap: 12px; }
+  .inweek { display: grid; gap: 6px; margin-top: 14px; }
+  .inweekrij { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .inweekrij select { min-height: 48px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; min-width: 0; }
   .meldlink { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 10px 4px; min-height: 44px; }
   .meldvak { display: grid; gap: 6px; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--tile); border: 1px solid var(--tile-edge); }
   .meldreden { display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 16px; cursor: pointer; }
@@ -1225,6 +1228,9 @@ const RECIPES = [
     baby: { stappen: ["Maak de soep dikker met de geprakte wortel en geef hem lauw met een lepel.", "Geen tosti: geef zachte stukjes wortel als vingervoedsel."], allergenen: ["melk (room)"] } },
 ];
 const RMAP = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+// Recepten die je van de tijdlijn hebt bewaard: ze staan tussen je recepten, maar komen alleen in het weekmenu als je ze er zelf in zet
+let eigenRecepten = store.get('eigenRecepten', []);
+eigenRecepten.forEach(r => { if (!RMAP[r.id]) { RECIPES.push(r); RMAP[r.id] = r; } });
 
 /* ---------- Tussendoortjes voor de baby (graanvrij) ---------- */
 const SNACKS = [
@@ -1379,7 +1385,7 @@ function prefBonus(r) {
 function basePlan() {
   const seed = Number(iso(monday).replace(/-/g, '')) + [...offerSet()].sort().join().length * 7919;
   const rand = rng(seed);
-  const scored = allowedRecipes().map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) + rand() * 7 }));
+  const scored = allowedRecipes().filter(r => !r.eigen).map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) + rand() * 7 }));
   const plan = [];
   let nitr = 0, fish = 0;
   for (let d = 0; d < 7; d++) {
@@ -1515,7 +1521,7 @@ function recipeArt(r, max = 3) {
 const plate = r => r.foto
   ? `<span class="plate photo" aria-hidden="true"><img src="${r.foto.src}" alt="" loading="lazy" decoding="async"></span>`
   : `<span class="plate" aria-hidden="true">${recipeArt(r, 3).map((a, i) => art(a, 30, 'p' + i)).join('')}</span>`;
-const credit = f => `${f.soort === 'sfeer' ? 'Sfeerfoto' : 'Foto'}: <a href="${esc(f.bron)}" target="_blank" rel="noopener">${esc(f.auteur)}</a>, ${f.licurl ? `<a href="${esc(f.licurl)}" target="_blank" rel="noopener">${esc(f.licentie)}</a>` : esc(f.licentie)}`;
+const credit = f => `${f.soort === 'sfeer' ? 'Sfeerfoto' : 'Foto'}: ${f.bron ? `<a href="${esc(f.bron)}" target="_blank" rel="noopener">${esc(f.auteur)}</a>` : esc(f.auteur)}${f.licentie ? ', ' + (f.licurl ? `<a href="${esc(f.licurl)}" target="_blank" rel="noopener">${esc(f.licentie)}</a>` : esc(f.licentie)) : ''}`;
 function photoBlock(r, cls) {
   const f = r.foto;
   return `<figure class="${cls}">
@@ -1769,6 +1775,11 @@ function recipeBody(r, dayIndex) {
     <ol class="steps cook">${r.stappen.map(adultStep).filter(Boolean).map((t, n) => `<li><button class="stepbtn" data-step aria-pressed="false"><span class="snum">${n + 1}</span><span class="stext">${esc(t)}</span></button></li>`).join('')}</ol>
     ${r.tip ? `<div class="tipbox"><b>Tip</b> ${esc(r.tip)}</div>` : ''}
     ${hasBaby() ? babyBlock(r, ing) : ''}
+    ${dayIndex == null ? `<div class="inweek">
+      <label for="wd-${r.id}" class="flabel2">Zet in weekmenu</label>
+      <div class="inweekrij"><select id="wd-${r.id}">${weekDates.map((_, d) => d).filter(d => d >= dayIdx).map(d => `<option value="${d}">${d === dayIdx ? 'Vandaag' : DAYS[d].charAt(0).toUpperCase() + DAYS[d].slice(1)}</option>`).join('')}</select><button class="btn" data-inweek="${r.id}">Zet erin</button></div>
+    </div>` : ''}
+    ${r.eigen && dayIndex == null ? `<div class="actions"><button class="btn danger" data-eigenweg="${r.id}">Verwijder uit mijn recepten</button></div>` : ''}
     ${dayIndex != null ? `<div class="actions">
       <button class="btn" data-swap="${dayIndex}">Ander recept</button>
       ${overrides[iso(weekDates[dayIndex])] ? `<button class="btn" data-reset="${dayIndex}">Terug naar voorstel</button>` : ''}
@@ -2056,6 +2067,11 @@ function viewRecipes() {
       : '<article class="card empty">' + produceRow(['aardbei', 'avocado', 'tomaat', 'peer']) + '<p style="margin:0" class="muted">Nog geen favorieten. Tik bij een recept op <b>♡ Bewaar als favoriet</b>. Favorieten komen vaker in je weekmenu.</p></article>'}
     ${favBlocked.length ? `<p class="small muted" style="margin:8px 0 0">${favBlocked.length} favoriet${favBlocked.length > 1 ? 'en vallen' : ' valt'} weg door je filters.</p>` : ''}
   </section>
+
+  ${eigenRecepten.length ? `<section>
+    <h3 class="section-title" style="margin-top:0">Bewaard van de tijdlijn</h3>
+    <div style="display:grid;gap:10px">${RECIPES.filter(r => r.eigen).map(recipeRow).join('')}</div>
+  </section>` : ''}
 
   <details class="card filters"${filtersOn() ? '' : ' open'}>
     <summary><span>Filters</span><span class="small muted">${filtersOn() ? esc(filterSummary()) : 'Geen filters'}</span></summary>
@@ -2474,6 +2490,55 @@ function verklein(file) {
     img.onerror = () => rej(new Error('foto')); img.src = url;
   });
 }
+// Een ingrediëntregel zoals '400 g pompoen' of '2 el olie' omzetten naar de vorm van de eigen recepten
+function leesRegel(t) {
+  t = String(t).trim();
+  const m = t.match(/^(\d+(?:[.,]\d+)?|½|¼|¾)\s*(kg|kilo|gram|gr|g|liter|l|ml|eetlepels?|el|theelepels?|tl|blikken|blikje|blik|stuks?|teentjes?|tenen|teen)?\.?\s+(.+)$/i);
+  if (!m) return I(null, '', t, detectKey(t));
+  let q = { '½': .5, '¼': .25, '¾': .75 }[m[1]] || parseFloat(m[1].replace(',', '.')), u = (m[2] || '').toLowerCase(), n = m[3].trim();
+  if (/^(kg|kilo)$/.test(u)) { q *= 1000; u = 'g'; }
+  else if (/^(gram|gr|g)$/.test(u)) u = 'g';
+  else if (/^(liter|l)$/.test(u)) { q *= 1000; u = 'ml'; }
+  else if (/^(eetlepels?|el)$/.test(u)) u = 'el';
+  else if (/^(theelepels?|tl)$/.test(u)) u = 'tl';
+  else if (/^blik/.test(u)) u = 'blik';
+  else if (/^stuks?$/.test(u)) u = '';
+  else if (/^(teen|tenen|teentjes?)$/.test(u)) { n = n + ' (teentjes)'; u = ''; }
+  return I(q, u, n, detectKey(n));
+}
+const PERSONEN_TIJDLIJN = 4;   // gedeelde recepten vermelden geen aantal personen; we gaan uit van 4 (de eigen recepten zijn voor 2)
+function postNaarRecept(p) {
+  const ingr = p.ingredienten.map(leesRegel).map(i => i.q == null ? i : { ...i, q: i.q * 2 / PERSONEN_TIJDLIJN });
+  const soort = SOORTEN.includes(p.soort) ? p.soort
+    : ingr.some(i => ['zalm', 'witvis'].includes(i.k)) ? 'Vis' : ingr.some(i => ['kipfilet', 'kippendij', 'kalkoen'].includes(i.k)) ? 'Kip'
+    : ingr.some(i => ['gehakt', 'spek', 'stoofvlees'].includes(i.k)) ? 'Vlees' : 'Vega';
+  return {
+    id: 'tl-' + p.id, eigen: true, auteur: p.auteur, naam: p.titel, tijd: p.tijd || 30, soort,
+    foto: p.foto_pad ? { src: fotoUrl(p.foto_pad), auteur: p.auteur, licentie: '', bron: '', licurl: '', soort: 'gerecht' } : null,
+    ingr, gerei: null, stappen: p.bereiding,
+    tip: `Gedeeld door ${p.auteur} op de tijdlijn. De hoeveelheden zijn omgerekend alsof het recept voor ${PERSONEN_TIJDLIJN} personen was; controleer ze even.`,
+    baby: { stappen: ['Kijk zelf of dit gerecht geschikt is voor {baby}: neem een portie apart vóór je zout of pittige kruiden toevoegt, en prak of snijd het fijn.'], allergenen: [] },
+  };
+}
+function bewaarPost(id) {
+  const p = (feed || []).find(x => x.id === id); if (!p) return;
+  const r = postNaarRecept(p);
+  if (RMAP[r.id]) { go('recepten'); return; }
+  eigenRecepten = [...eigenRecepten, r]; store.set('eigenRecepten', eigenRecepten);
+  RECIPES.push(r); RMAP[r.id] = r; render();
+  toast(`${p.titel} staat nu bij je recepten. Zet het er in je weekmenu in via "Zet in weekmenu".`);
+}
+function verwijderEigen(id) {
+  eigenRecepten = eigenRecepten.filter(r => r.id !== id); store.set('eigenRecepten', eigenRecepten);
+  const n = RECIPES.findIndex(r => r.id === id); if (n >= 0) RECIPES.splice(n, 1); delete RMAP[id];
+  for (const k of Object.keys(overrides)) if (overrides[k] === id) delete overrides[k];
+  store.set('overrides', overrides); render(); toast('Verwijderd uit je recepten.');
+}
+function zetInWeek(id, d) {
+  overrides[iso(weekDates[d])] = id; store.set('overrides', overrides); render();
+  toast(`${RMAP[id].naam} staat ${d === dayIdx ? 'vandaag' : 'op ' + DAYS[d]} in je weekmenu.`);
+}
+
 // Melden en blokkeren: wat je meldt of blokkeert, zie je op dit toestel direct niet meer
 let verborgenPosts = store.get('verborgenPosts', []), geblokkeerd = store.get('geblokkeerd', []), meldOpen = null;
 const zichtbaarInFeed = p => !verborgenPosts.includes(p.id) && !geblokkeerd.some(g => g.id === p.user_id);
@@ -2508,6 +2573,7 @@ function postCard(p) {
     <div class="actions">
       <button class="btn fav${mine ? ' on' : ''}" data-like="${p.id}" aria-pressed="${mine}">${mine ? '♥' : '♡'} ${likes.length}</button>
       <button class="btn" data-postlist="${p.id}">Op boodschappenlijst</button>
+      <button class="btn" data-postbewaar="${p.id}">${RMAP['tl-' + p.id] ? 'In mijn recepten ✓' : 'Bewaar bij mijn recepten'}</button>
       ${eigen ? `<button class="btn danger" data-postdel="${p.id}">Verwijderen</button>` : `<button class="meldlink" data-meld="${p.id}" aria-expanded="${meldOpen === p.id}">Melden</button>`}
     </div>
     ${meldOpen === p.id ? `<form class="meldvak" data-meldform="${p.id}">
@@ -2886,8 +2952,11 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-postbewaar],[data-inweek],[data-eigenweg],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
+  if (t.dataset.postbewaar) { bewaarPost(t.dataset.postbewaar); return; }
+  if (t.dataset.inweek) { const sel = document.getElementById('wd-' + t.dataset.inweek); zetInWeek(t.dataset.inweek, Number(sel ? sel.value : dayIdx)); return; }
+  if (t.dataset.eigenweg) { if (confirm('Dit recept verwijderen uit je recepten?')) verwijderEigen(t.dataset.eigenweg); return; }
   if (t.dataset.meld) { meldOpen = meldOpen === t.dataset.meld ? null : t.dataset.meld; render(); return; }
   if (t.hasAttribute('data-deblok')) { geblokkeerd = []; verborgenPosts = []; store.set('geblokkeerd', []); store.set('verborgenPosts', []); render(); toast('Iedereen is weer zichtbaar.'); return; }
   if (t.dataset.like) {
