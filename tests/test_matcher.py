@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.matcher import _name_similarity, run_matching
-from app.models import Direction, Invoice, MatchStatus, Transaction
+from app.models import Direction, DocumentKind, Invoice, MatchStatus, Transaction
 
 
 @pytest.fixture()
@@ -431,3 +431,27 @@ def test_combination_match_finds_exact_sum(session):
     assert inv_b.status == MatchStatus.SUGGESTED
     assert inv_c.status == MatchStatus.UNMATCHED
     assert len(tx.matches) == 2
+
+
+def test_cyclesoftware_sales_invoice_matches_incoming_customer_payment(session):
+    # A CycleSoftware verkoopfactuur (document_kind=SALES_INVOICE) is stored
+    # like any other Invoice but with direction=incoming -- an ordinary
+    # customer bijschrijving referencing the invoice number should match it
+    # exactly the same way a real inkoopfactuur matches an outgoing payment.
+    tx = make_transaction(
+        amount_cents=9950, description="Betaling factuur CS-XL-1", counterparty_name="Jan de Klant",
+        counterparty_iban="NL00BANK0999999999",
+    )
+    inv = make_invoice(
+        invoice_number="CS-XL-1", supplier_name="Jan de Klant", amount_cents=9950,
+        document_kind=DocumentKind.SALES_INVOICE.value, direction=Direction.INCOMING.value,
+    )
+    session.add_all([tx, inv])
+    session.commit()
+
+    summary = run_matching(session)
+    session.commit()
+
+    assert summary.auto_matched == 1
+    assert tx.status == MatchStatus.MATCHED
+    assert inv.status == MatchStatus.MATCHED

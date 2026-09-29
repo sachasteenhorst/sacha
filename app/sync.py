@@ -17,6 +17,7 @@ from app.config import settings
 from app.email_client import fetch_invoice_attachments, invoice_dedup_key
 from app.matcher import MatchingSummary, run_matching
 from app.models import DocumentKind, Invoice, MatchStatus, Transaction
+from app.payments import determine_payment_method
 from app.rules import apply_rules
 from app import sync_state
 
@@ -146,6 +147,9 @@ def _sync_invoices(session: Session, since: date, result: SyncResult) -> None:
                 basecone_forwarded_at=datetime.utcnow() if inv.basecone_forward_method == "original" else None,
                 basecone_forwarded_to=settings.basecone_forward_address if inv.basecone_forward_method == "original" else "",
                 status=status,
+                due_date=inv.due_date,
+                due_date_estimated=inv.due_date_estimated,
+                payment_method=determine_payment_method(session, inv.supplier_name, inv.incasso_hint),
             )
         )
         result.new_invoices += 1

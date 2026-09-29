@@ -37,6 +37,11 @@ _COLUMN_MIGRATIONS = {
         ("basecone_forward_method", "VARCHAR DEFAULT ''"),
         ("basecone_forwarded_to", "VARCHAR DEFAULT ''"),
         ("manually_ignored", "BOOLEAN DEFAULT 0"),
+        ("due_date", "DATE"),
+        ("due_date_estimated", "BOOLEAN DEFAULT 0"),
+        ("payment_method", "VARCHAR DEFAULT 'onbekend'"),
+        ("paid_at", "DATETIME"),
+        ("notified_new_invoice", "BOOLEAN DEFAULT 0"),
     ],
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),

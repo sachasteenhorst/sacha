@@ -245,9 +245,61 @@ eerst), dan op bedrag. Per rij een concrete voorgestelde actie:
   kant-en-klare `mailto:`-link om die specifieke factu(u)r(en) bij de
   leverancier op te vragen, in plaats van "er klopt iets niet" te moeten
   uitzoeken.
+- **Te betalen, over termijn -- N dagen te laat** -- een factuur uit "Nog
+  te betalen" (zie hieronder) waarvan de vervaldatum al voorbij is en die
+  nog niet gekoppeld of betaald is. Heeft geen bankregel (er is nog geen
+  betaling), dus de knoppen "Betaald"/"Loopt via incasso" en de PDF staan
+  er direct bij.
+
+Elke rij toont in de kolom "Gekoppelde factuur/betaling" ook welk document
+er (mogelijk) bij hoort, waar van toepassing.
 
 Rechtsboven staat een **CSV-export** (`/vraagposten/export.csv`) om de
 lijst door te nemen of naar de boekhouder te sturen.
+
+## Nog te betalen
+
+Het blok **"Nog te betalen"** bovenaan het dashboard (`#nog-te-betalen`)
+toont elke openstaande, uitgaande inkoopfactuur die je zelf moet overmaken
+-- dus expliciet NIET: facturen die via automatische incasso worden
+afgeschreven, creditnota's, factuurbedragen van EUR 0, inkomende
+documenten (ENRA/HelloRider/CycleSoftware-verkoopfacturen) en alles wat al
+gekoppeld of handmatig op "Betaald" gezet is. Gesorteerd op vervaldatum;
+een vervaldatum met een "~" ervoor is een schatting (zie hieronder), geen
+letterlijk van de factuur gelezen datum.
+
+**Vervaldatum lezen**: de tekst wordt doorzocht op een label als
+"Vervaldatum", "Vervalt", "Uiterste betaaldatum", "Te betalen voor/vóór" of
+"Due date". Staat dat er niet, dan wordt gekeken naar een genoemde
+betalingstermijn ("Betalingstermijn: 30 dagen" / "binnen 14 dagen") en
+wordt die bij de factuurdatum opgeteld. Staat ook dát er niet, dan wordt
+factuurdatum (of, als die ontbreekt, de ontvangstdatum) + 30 dagen
+aangehouden als redelijke standaard -- in dat geval staat de datum met een
+"~" in het dashboard.
+
+**Incasso herkennen** (zodat een factuur NIET in dit blok komt te staan,
+want die betaalt zichzelf al): een combinatie van vier signalen --
+1. de facturtekst zelf noemt "incasso", "automatisch afgeschreven",
+   "wordt afgeschreven" of "machtiging";
+2. er bestaat al een banktransactie van een naam-gelijkende tegenpartij die
+   zelf een incasso blijkt (Rabobank CSV-code `ei`/`id`, of een ingevuld
+   Machtigingskenmerk/Incassant ID);
+3. de leverancier staat op `PAY_INCASSO_SUPPLIERS` (standaard: Accell,
+   Gazelle, Pon, Giant, Kruitbosch, Odido, Exact, ENRA);
+4. je hebt ooit op **"Loopt via incasso"** geklikt voor deze leverancier --
+   dat wordt onthouden (`LearnedIncassoSupplier`) en past meteen ook alle
+   nog openstaande facturen van die leverancier aan.
+
+`PAY_MANUAL_SUPPLIERS` is de uitzondering: een leverancier daarop is NOOIT
+incasso, ook niet als een van bovenstaande signalen wél afgaat (voor het
+zeldzame geval dat een leverancier overstapt van incasso naar factuur).
+
+Bij elke rij: knop **"Betaald"** (zet 'm direct van de lijst af, ongeacht
+of de bankregel al binnen is) en **"Loopt via incasso"** (voor als de
+detectie een leverancier gemist heeft).
+
+Bestaande facturen (van vóór deze functie) krijgen hun vervaldatum via
+`scripts/reparse_invoices.py` -- draai dat script eenmalig na een upgrade.
 
 ## Bankafschriften uploaden
 
@@ -281,6 +333,103 @@ overige `BASECONE_*`-instellingen -- de endpoint-paden en veldnamen in
 `app/basecone_client.py` zijn een aanname op basis van de gangbare OAuth2
 client-credentials flow en moeten dan geverifieerd worden tegen de
 documentatie die je van Basecone krijgt.
+
+## Automatische bankkoppeling via Ponto Connect
+
+In plaats van steeds zelf een afschrift te downloaden en te uploaden, kan
+de app zelf elke 4 uur nieuwe transacties ophalen via **Ponto Connect**.
+Maak in het [Ponto-dashboard](https://myponto.com) een **Integration** aan
+(OAuth2 Client Credentials, voor je EIGEN rekening -- dit is niet de
+multi-tenant PSD2-AISP-flow voor boekhoudpakketten die bij klanten
+inloggen) en vul `PONTO_CLIENT_ID`/`PONTO_CLIENT_SECRET` in. Leeg laten
+zet de koppeling uit; je blijft dan gewoon op de handmatige upload
+hierboven werken.
+
+Nieuwe transacties worden vergeleken met wat je al zelf via een CSV/
+CAMT.053/MT940-bestand hebt geüpload (op datum+bedrag+tegenrekening+
+omschrijving), zodat een overlappende periode nooit dubbel geboekt wordt.
+Na elke Ponto-sync draaien matching, regels en (indien aan) het
+automatisch doorsturen naar Basecone meteen mee, net als bij een gewone
+upload of e-mail-sync.
+
+**Belangrijke kanttekening** (zelfde soort als bij de CSV/CAMT.053/MT940-
+parsers en de Basecone API-client): `app/bank_ponto.py` is gebouwd op
+Ponto Connect's publiek gedocumenteerde JSON:API-vorm, maar nog niet tegen
+een echte Ponto-integratie geprobeerd. Endpoint-paden en veldnamen kunnen
+een kleine aanpassing nodig hebben zodra je 'm met echte inloggegevens
+draait -- de foutmeldingen tonen exact wat Ponto terugstuurde. Twee dingen
+zijn bewust nog niet (volledig) geïmplementeerd omdat ze per Integration
+kunnen verschillen en gokken hier meer kwaad dan goed zou doen:
+- **mTLS-clientcertificaat** (`PONTO_CERT_PATH`/`PONTO_KEY_PATH`) werkt
+  alleen met een NIET-versleutelde sleutel; is `PONTO_KEY_PASSWORD`
+  ingevuld, ontsleutel de sleutel dan eenmalig zelf (`openssl rsa -in
+  key.pem -out key-plain.pem`) en wijs `PONTO_KEY_PATH` naar het
+  ontsleutelde bestand.
+- **HTTP message signatures** (`PONTO_SIGNATURE_KEY_ID`) -- als jouw
+  Integration dit vereist, geeft de app een duidelijke foutmelding in
+  plaats van een gegokte (en dus mogelijk verkeerde) implementatie.
+
+De meeste Client Credentials-integraties hebben geen van beide nodig.
+
+Het dashboard toont een statuschip **"Bank: Ponto"** met wanneer voor het
+laatst is opgehaald. Verloopt de toestemming binnen 14 dagen, of mislukt
+een sync, dan komt er een pushmelding (zie hieronder).
+
+## Push-meldingen op je telefoon
+
+Via [ntfy](https://ntfy.sh) (of je eigen ntfy-server) krijg je een melding
+zonder dat je het dashboard hoeft te openen. Installeer de ntfy-app,
+abonneer 'm op jouw `NTFY_TOPIC` (verzin iets geheims/willekeurigs, bijv.
+`vdlg-facturen-8f3k2m9x` -- topics zijn wereldwijd uniek en zonder
+authenticatie leesbaar voor wie de naam raadt) en vul die naam in als
+`NTFY_TOPIC`. Leeg = geen meldingen.
+
+Je krijgt een melding:
+- **Bij een nieuwe factuur** (niet-incasso, dus iets voor "Nog te
+  betalen"): "Nieuwe factuur: Leverancier EUR x, uiterlijk dd-mm". Elke
+  factuur meldt maar één keer, ook na een reparse.
+- **Dagelijks om 08:00** (Europe/Amsterdam), maar ALLEEN als er iets te
+  laat is of binnen 7 dagen vervalt: aantal, totaalbedrag en de top 5,
+  met hoge prioriteit als er iets te laat is.
+- **Bij een probleem**: de Microsoft Graph-login is verlopen, doorsturen
+  naar Basecone mislukt, of de Ponto-banksync mislukt -- maximaal één keer
+  per dag per soort probleem, zodat een aanhoudend probleem je telefoon
+  niet elk uur opnieuw laat piepen.
+
+Elke melding heeft een "Click"-link naar `/dashboard#nog-te-betalen`
+(instelbaar via `DASHBOARD_PUBLIC_URL`). Test de koppeling met de knop
+**"Stuur testmelding"** op de Regels-pagina.
+
+## CycleSoftware-verkoopfacturen
+
+De kassasoftware CycleSoftware is de bron voor twee dingen die dit
+dashboard raken: (1) de Lease a Bike/HelloRider/VWPFS-"facturen" die via
+e-mail binnenkomen zijn kopieën van kassaverkoop die al automatisch via
+Twinfield wordt geboekt (zie "Basecone doorsturen" hierboven -- die gaan
+dus nooit naar Basecone), en (2) een gewone verkoopfactuur aan een klant
+kan ook los bij een bijschrijving horen in plaats van alleen bij een
+generieke "omzet"-regel.
+
+Upload op de knop **"CycleSoftware verkoopfacturen uploaden"** (naast de
+bankafschrift-upload) de facturenexport uit het kassasysteem, als CSV of
+Excel (.xlsx). Kolomnamen worden flexibel herkend (bijv. "Factuurnummer"
+of "Factuur nr", "Bedrag" of "Totaal", "Klant" of "Customer") omdat het
+exportsjabloon per versie kan verschillen. Is er een kolom "Openstaand",
+dan wordt op dát bedrag gematcht (niet het oorspronkelijke factuurbedrag)
+-- een klant maakt immers alleen over wat nog openstaat. Een factuurnummer
+dat al eerder geüpload is, wordt overgeslagen (veilig om een export
+opnieuw te uploaden).
+
+Deze verkoopfacturen matchen op dezelfde manier als een inkoopfactuur
+(factuurnummer/bedrag+datum), maar tellen nooit mee als iets dat JIJ moet
+betalen en gaan nooit naar Basecone.
+
+Een toekomstige live koppeling (CS Connect of hoe CycleSoftware's eigen
+API ook heet) staat als duidelijk gemarkeerd skelet in
+`app/cyclesoftware_api.py` -- het exacte API-formaat is niet gepubliceerd,
+dus is bewust nog niet geraden; zodra je daar toegang toe hebt is het een
+kwestie van die ene module invullen, de rest van de matching-logica blijft
+hetzelfde.
 
 ## Azure AD app-registratie voor de mailbox (Microsoft Graph)
 
@@ -457,20 +606,25 @@ hostingpartij nodig heeft om dit blijvend te laten draaien:
 
 ```
 app/
-  config.py          instellingen uit .env
-  db.py               SQLAlchemy setup + startup-migratie voor nieuwe kolommen
-  models.py           Transaction / Invoice / Match / Rule, Direction, DocumentKind
-  bank_import.py       Rabobank CSV / CAMT.053 / MT940-parsers
-  basecone_client.py   optioneel: ophalen documenten/boekingen via Basecone API
-  email_client.py      ophalen + parsen factuur-PDF's via Microsoft Graph
-  matcher.py           matching-logica (richting, specificaties, combinaties)
+  config.py             instellingen uit .env
+  db.py                 SQLAlchemy setup + startup-migratie voor nieuwe kolommen
+  models.py             Transaction / Invoice / Match / Rule / LearnedIncassoSupplier / NotificationLog
+  bank_import.py        Rabobank CSV / CAMT.053 / MT940-parsers
+  bank_ponto.py          automatische bankkoppeling via Ponto Connect
+  basecone_client.py    optioneel: ophalen documenten/boekingen via Basecone API
+  email_client.py       ophalen + parsen factuur-PDF's via Microsoft Graph
+  matcher.py            matching-logica (richting, specificaties, combinaties)
   rules.py              regels die betalingen automatisch afhandelen (voor de matcher draait)
+  payments.py            "Nog te betalen"-logica: vervaldatum, incasso-detectie
+  notify.py               push-meldingen via ntfy
+  cyclesoftware_upload.py  CSV/XLSX-import van CycleSoftware-verkoopfacturen
+  cyclesoftware_api.py     skelet voor een toekomstige live CS-koppeling (nog niet geimplementeerd)
   basecone_forward.py   Basecone-doorstuurcontrole + versturen (sendMail via Graph)
   vraagposten.py         bouwt de Vraagposten-lijst + voorgestelde acties
-  sync.py              orchestreert e-mailsync + bankupload, draait de matcher
-  sync_state.py         laatste-sync-info in geheugen, voor de statusbalk
-  scheduler.py          periodieke achtergrondtaak (e-mail)
-  main.py               FastAPI-dashboard
+  sync.py               orchestreert e-mailsync + bankupload, draait de matcher
+  sync_state.py          laatste-sync-info in geheugen, voor de statusbalk
+  scheduler.py           periodieke achtergrondtaken (e-mail, Ponto, dagelijkse samenvatting)
+  main.py                FastAPI-dashboard
 templates/, static/      dashboard front-end
 scripts/                  eenmalige/onderhoudsscripts (login, reparse)
 tests/                    unit tests

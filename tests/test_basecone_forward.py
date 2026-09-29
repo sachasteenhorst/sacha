@@ -136,6 +136,16 @@ def test_is_forwardable_true_for_normal_outgoing_supplier_invoice(tmp_path):
     assert bf.basecone_status_label(normal) == "nee"
 
 
+def test_is_forwardable_false_for_cyclesoftware_sales_invoice(tmp_path):
+    # A CycleSoftware verkoopfactuur (this shop's own sale) must never reach
+    # Basecone -- FORWARDABLE_DOCUMENT_KINDS simply never includes
+    # SALES_INVOICE, so this holds even for an outgoing-looking direction.
+    sales = make_invoice(
+        tmp_path, supplier_name="Jan de Klant", document_kind=DocumentKind.SALES_INVOICE.value, direction="incoming",
+    )
+    assert bf.is_forwardable(sales) is False
+
+
 # -- resolve_auto_forward_since --
 
 def test_resolve_auto_forward_since_records_today_once(monkeypatch):

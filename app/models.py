@@ -63,6 +63,22 @@ class DocumentKind(str, enum.Enum):
     # no amount -- not proof of a payment, so it shouldn't count as an open
     # invoice waiting to be matched.
     OTHER = "other"
+    # This shop's OWN sales invoice (e.g. a CycleSoftware export row) --
+    # money coming IN, matched like any other incoming Invoice, but never a
+    # bill to pay and never forwarded to Basecone (see
+    # basecone_forward.FORWARDABLE_DOCUMENT_KINDS, an allowlist that simply
+    # never includes this kind).
+    SALES_INVOICE = "sales_invoice"
+
+
+class PaymentMethod(str, enum.Enum):
+    """How an outgoing inkoopfactuur actually gets paid -- only INCASSO
+    invoices are excluded from the "Nog te betalen" worklist, since those
+    settle themselves; everything else needs Sacha to actively transfer the
+    money before the due date."""
+    INCASSO = "incasso"
+    OVERMAKEN = "overmaken"
+    ONBEKEND = "onbekend"
 
 
 class BaseconeForwardStatus(str, enum.Enum):
@@ -176,6 +192,23 @@ class Invoice(Base):
     # release -- see app/db.py's startup migration.
     manually_ignored: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # -- "Nog te betalen" (added after the first release -- see
+    # app/db.py's startup migration) --
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # True when due_date is a guess (invoice_date/received_at + 30 dagen)
+    # rather than something actually read off the document -- shown in the
+    # dashboard with a "~" so Sacha knows not to take it as gospel.
+    due_date_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_method: Mapped[str] = mapped_column(String, default=PaymentMethod.ONBEKEND.value)
+    # Set only by the dashboard's "Betaald" button -- distinct from being
+    # MATCHED (a real bijschrijving may take days to show up on the bank
+    # statement after Sacha actually paid), so "Nog te betalen" can drop it
+    # immediately instead of waiting for the next bank sync.
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Push-notification dedupe: "a new non-incasso invoice came in" is only
+    # ever sent once per invoice, however many sync runs it survives.
+    notified_new_invoice: Mapped[bool] = mapped_column(Boolean, default=False)
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -243,3 +276,32 @@ class Rule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="applied_rule")
+
+
+class LearnedIncassoSupplier(Base):
+    """A supplier Sacha told the dashboard ("Loopt via incasso") settles by
+    direct debit -- checked (case-insensitive substring, like every other
+    supplier-name list in this app) on every future invoice from that
+    supplier so it never has to be told twice."""
+
+    __tablename__ = "learned_incasso_suppliers"
+    __table_args__ = (UniqueConstraint("supplier_name_lower", name="uq_learned_incasso_supplier"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_name_lower: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class NotificationLog(Base):
+    """Generic push-notification dedupe for anything that isn't naturally
+    tied to one Invoice row (the daily 08:00 summary, a "Graph login
+    expired"/"bank-sync failed" warning) -- keyed by an arbitrary string the
+    caller controls, e.g. "daily-summary:2026-09-29" or "warning:graph_login".
+    """
+
+    __tablename__ = "notification_log"
+    __table_args__ = (UniqueConstraint("key", name="uq_notification_log_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String, index=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

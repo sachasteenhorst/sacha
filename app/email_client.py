@@ -22,7 +22,7 @@ import re
 import time
 from base64 import b64decode
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pdfplumber
 import requests
@@ -121,6 +121,30 @@ DATE_DUTCH_RE = re.compile(
 )
 INVOICE_DATE_LABEL_RE = re.compile(r"factuurdatum\D{0,10}", re.IGNORECASE)
 
+# -- Due date ("Nog te betalen") --
+# "Te betalen voor/vóór" tolerates the accented vowel some suppliers use.
+DUE_DATE_LABEL_RE = re.compile(
+    r"vervaldatum|vervalt(?:\s*op)?|uiterste\s*betaaldatum|te\s*betalen\s*v[oó][oó]r|due\s*date",
+    re.IGNORECASE,
+)
+# "Betaaltermijn: 30 dagen" / "Betalingstermijn 14 dagen" / "binnen 14 dagen
+# na factuurdatum" -- group(1) is whichever branch matched.
+PAYMENT_TERM_DAYS_RE = re.compile(
+    r"betal(?:ings)?termijn\D{0,10}(\d{1,3})\s*dagen|binnen\s*(\d{1,3})\s*dagen",
+    re.IGNORECASE,
+)
+# Default when no due date is found at all anywhere -- common Dutch B2B
+# payment term when a supplier doesn't state one explicitly.
+DEFAULT_DUE_DAYS = 30
+
+# -- Incasso detection --
+# Text-only signal (no DB access here) -- app/payments.py combines this with
+# supplier-name lists and existing-bank-transaction evidence to decide the
+# final payment_method.
+INCASSO_TEXT_RE = re.compile(
+    r"\bincasso\b|automatisch\s*afgeschreven|wordt\s*afgeschreven|\bmachtiging\b", re.IGNORECASE
+)
+
 # -- Supplier name --
 # Domains we already know the proper company name for -- the automatic
 # domain-to-name fallback below can't reliably split concatenated Dutch
@@ -217,6 +241,9 @@ class InvoiceAttachment:
     graph_message_id: str = ""
     in_basecone: str = "unknown"
     basecone_forward_method: str = ""
+    due_date: date | None = None
+    due_date_estimated: bool = False
+    incasso_hint: bool = False
 
     def __post_init__(self):
         if self.referenced_invoice_numbers is None:
@@ -524,6 +551,44 @@ def _parse_invoice_date(text: str) -> date | None:
     return None
 
 
+def _extract_due_date(text: str, invoice_date: date | None, received_at: datetime | None) -> tuple[date, bool]:
+    """(due_date, due_date_estimated). Tries an explicit vervaldatum label
+    first, then a stated payment term ("betaaltermijn/binnen N dagen") added
+    to the invoice date, and only falls back to a flat +30 dagen guess
+    (flagged estimated) when the document says nothing at all."""
+    label_match = DUE_DATE_LABEL_RE.search(text)
+    if label_match:
+        window = text[label_match.end(): label_match.end() + 30]
+        numeric = DATE_NUMERIC_RE.search(window)
+        if numeric:
+            day, month, year = (int(g) for g in numeric.groups())
+            try:
+                return date(year, month, day), False
+            except ValueError:
+                pass
+        dutch = DATE_DUTCH_RE.search(window)
+        if dutch:
+            day = int(dutch.group(1))
+            month = DUTCH_MONTHS[dutch.group(2).lower()]
+            year = int(dutch.group(3))
+            try:
+                return date(year, month, day), False
+            except ValueError:
+                pass
+
+    base = invoice_date or (received_at.date() if received_at else date.today())
+    term_match = PAYMENT_TERM_DAYS_RE.search(text)
+    if term_match:
+        days = int(term_match.group(1) or term_match.group(2))
+        return base + timedelta(days=days), False
+
+    return base + timedelta(days=DEFAULT_DUE_DAYS), True
+
+
+def _text_suggests_incasso(text: str) -> bool:
+    return INCASSO_TEXT_RE.search(text or "") is not None
+
+
 def _extract_enra_saldo_reference(text: str) -> tuple[str, int] | None:
     m = ENRA_SALDO_RC_RE.search(text)
     if not m:
@@ -534,7 +599,8 @@ def _extract_enra_saldo_reference(text: str) -> tuple[str, int] | None:
 
 
 def _extract_fields(
-    text: str, address: str, display_name: str = "", subject: str = "", filename: str = ""
+    text: str, address: str, display_name: str = "", subject: str = "", filename: str = "",
+    received_at: datetime | None = None,
 ) -> dict:
     supplier_name = _derive_supplier_name(address, display_name)
     direction = _assign_direction(supplier_name)
@@ -552,14 +618,19 @@ def _extract_fields(
     referenced_invoice_numbers = (
         _extract_all_invoice_numbers(text) if document_kind == DocumentKind.SPECIFICATION.value else []
     )
+    invoice_date = _parse_invoice_date(text)
+    due_date, due_date_estimated = _extract_due_date(text, invoice_date, received_at)
     return {
         "invoice_number": invoice_number,
-        "invoice_date": _parse_invoice_date(text),
+        "invoice_date": invoice_date,
         "amount_cents": amount_cents,
         "supplier_name": supplier_name,
         "direction": direction,
         "document_kind": document_kind,
         "referenced_invoice_numbers": referenced_invoice_numbers,
+        "due_date": due_date,
+        "due_date_estimated": due_date_estimated,
+        "incasso_hint": _text_suggests_incasso(text),
     }
 
 
@@ -841,7 +912,7 @@ def fetch_invoice_attachments(since: date) -> list[InvoiceAttachment]:
                     # Corrupt/unreadable PDF -- keep the file, leave fields empty.
                     extracted_text = ""
 
-                fields = _extract_fields(extracted_text, from_addr, from_name, subject, filename)
+                fields = _extract_fields(extracted_text, from_addr, from_name, subject, filename, received_at)
                 dedup_key = invoice_dedup_key(content_hash, fields["supplier_name"], fields["invoice_number"], fields["amount_cents"])
                 if dedup_key is not None and dedup_key in seen_dedup_keys:
                     os.remove(pdf_path)  # the copy we just wrote is the duplicate -- don't keep it on disk

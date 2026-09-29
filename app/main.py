@@ -23,12 +23,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
+from app.bank_ponto import get_state as get_ponto_state
+from app.bank_ponto import ponto_configured
 from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
+from app.cyclesoftware_upload import CycleSoftwareImportError, import_sales_invoices
 from app.db import get_session, init_db
 from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE, GraphApiError, GraphAuthError
-from app.matcher import _transaction_direction
+from app.matcher import _transaction_direction, run_matching
 from app.models import BaseconeForwardStatus, Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
+from app.notify import send_test_notification
+from app.payments import days_until_due, is_payable_invoice, learn_incasso_supplier, mark_paid
 from app.rules import apply_rules
 from app.scheduler import start_scheduler
 from app.sync import import_bank_file, run_sync
@@ -109,6 +114,7 @@ templates.env.filters["method_label"] = _method_label
 templates.env.filters["transaction_direction"] = _transaction_direction
 templates.env.filters["rule_action_label"] = _rule_action_label
 templates.env.filters["basecone_status_label"] = basecone_status_label
+templates.env.filters["days_until_due"] = days_until_due
 
 
 def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:
@@ -314,6 +320,12 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         oldest = min(t.booking_date for t in unmatched_transactions_all)
         oldest_unmatched_days = (date.today() - oldest).days
 
+    # -- Nog te betalen: never filtered by q/maand, its own worklist --
+    te_betalen = sorted(
+        (inv for inv in session.scalars(select(Invoice)) if is_payable_invoice(inv)),
+        key=lambda inv: inv.due_date,
+    )
+
     # -- Counters (always totals, unaffected by the active filter) --
     now_ams = datetime.now(ZoneInfo("Europe/Amsterdam"))
     confirmed_dates = session.scalars(select(Match.created_at).where(Match.confirmed.is_(True))).all()
@@ -323,6 +335,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "te_controleren": len({m.group_id for m in suggested_matches_all}),
         "betalingen_zonder_factuur": len(unmatched_transactions_all),
         "facturen_niet_betaald": len(unmatched_invoices_all),
+        "nog_te_betalen": len(te_betalen),
         "gekoppeld_deze_maand": matched_this_month,
         "automatisch_afgehandeld": len(rule_handled_all),
         "niet_naar_basecone": len(basecone_todo),
@@ -344,6 +357,12 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     latest_statement_date = session.scalar(select(func.max(Transaction.booking_date)))
     bank_error = last.basecone_error if settings.basecone_enabled else None
 
+    ponto_state = get_ponto_state()
+    ponto_last_synced_label = (
+        ponto_state.last_synced_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
+        if ponto_state.last_synced_at else None
+    )
+
     status_bar = {
         "email_status": _dot_status(email_configured, last.email_error),
         "last_sync_label": last_sync_label,
@@ -354,6 +373,9 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             if last_upload_at else None
         ),
         "latest_statement_label": _dutch_date(latest_statement_date) if latest_statement_date else None,
+        "ponto_enabled": ponto_configured(),
+        "ponto_status": _dot_status(ponto_state.last_synced_at is not None, ponto_state.last_error),
+        "ponto_last_synced_label": ponto_last_synced_label,
     }
 
     # -- Month dropdown options --
@@ -393,6 +415,10 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "basecone_review": basecone_review,
             "forward_error": request.query_params.get("forward_error"),
             "forward_ok": request.query_params.get("forward_ok"),
+            "te_betalen": te_betalen,
+            "cs_upload_new": request.query_params.get("cs_upload_new"),
+            "cs_upload_matched": request.query_params.get("cs_upload_matched"),
+            "cs_upload_error": request.query_params.get("cs_upload_error"),
         },
     )
 
@@ -570,6 +596,65 @@ def ignore_invoice(
     return _dashboard_redirect(q, maand)
 
 
+@app.post("/invoices/{invoice_id}/mark-paid")
+def mark_invoice_paid(
+    invoice_id: int,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "Factuur niet gevonden")
+    mark_paid(invoice)
+    session.commit()
+    return _dashboard_redirect(q, maand)
+
+
+@app.post("/invoices/{invoice_id}/mark-incasso")
+def mark_invoice_incasso(
+    invoice_id: int,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "Factuur niet gevonden")
+    learn_incasso_supplier(session, invoice.supplier_name)
+    session.commit()
+    return _dashboard_redirect(q, maand)
+
+
+@app.post("/notify/test")
+def notify_test(user: str = Depends(require_auth)):
+    sent = send_test_notification()
+    return RedirectResponse(
+        url=f"/regels?notify_test={'ok' if sent else 'error'}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/cyclesoftware/upload")
+async def upload_cyclesoftware_export(
+    file: UploadFile,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    content = await file.read()
+    try:
+        result = import_sales_invoices(session, file.filename or "upload", content)
+    except CycleSoftwareImportError as exc:
+        return _dashboard_redirect(q, maand, cs_upload_error=str(exc))
+    session.flush()
+    run_matching(session)
+    session.commit()
+    return _dashboard_redirect(q, maand, cs_upload_new=str(result.new_invoices))
+
+
 @app.post("/transactions/{transaction_id}/undo-rule")
 def undo_rule(
     transaction_id: int,
@@ -610,6 +695,8 @@ def rules_page(request: Request, user: str = Depends(require_auth), session: Ses
             "rules": rules,
             "rule_counts": rule_counts,
             "prefill": prefill,
+            "notify_test": request.query_params.get("notify_test"),
+            "ntfy_configured": bool(settings.ntfy_topic),
         },
     )
 
@@ -729,12 +816,22 @@ def vraagposten_csv(user: str = Depends(require_auth), session: Session = Depend
     writer = csv.writer(buf, delimiter=";")
     writer.writerow(["Leeftijd (dagen)", "Datum", "Bedrag", "Tegenpartij", "Omschrijving", "Voorgestelde actie", "Factuur/leverancier"])
     for item in items:
+        if item.transaction is not None:
+            row_date = item.transaction.booking_date
+            row_amount = item.transaction.amount_cents
+            row_counterparty = item.transaction.counterparty_name
+            row_description = item.transaction.description
+        else:
+            row_date = item.invoice.due_date if item.invoice else None
+            row_amount = -item.invoice.amount_cents if item.invoice and item.invoice.amount_cents else 0
+            row_counterparty = item.invoice.supplier_name if item.invoice else ""
+            row_description = ""
         writer.writerow([
             item.age_days,
-            item.transaction.booking_date.strftime("%d-%m-%Y"),
-            f"{item.transaction.amount_cents / 100:.2f}".replace(".", ","),
-            item.transaction.counterparty_name,
-            item.transaction.description,
+            row_date.strftime("%d-%m-%Y") if row_date else "",
+            f"{row_amount / 100:.2f}".replace(".", ","),
+            row_counterparty,
+            row_description,
             item.label,
             item.invoice.supplier_name if item.invoice else "",
         ])

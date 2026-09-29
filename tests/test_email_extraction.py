@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from app.config import settings
 from app.email_client import (
     _assign_direction,
@@ -5,6 +7,7 @@ from app.email_client import (
     _derive_supplier_name,
     _domain_to_supplier_name,
     _extract_all_invoice_numbers,
+    _extract_due_date,
     _extract_fields,
     _extract_invoice_number,
     _extract_invoice_number_from_filename,
@@ -12,6 +15,7 @@ from app.email_client import (
     _is_own_company,
     _parse_amount_literal,
     _parse_amount_to_cents,
+    _text_suggests_incasso,
     invoice_dedup_key,
 )
 from app.models import Direction, DocumentKind
@@ -461,3 +465,64 @@ def test_extract_fields_falls_back_to_subject_when_text_has_no_number():
     subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/23162)"
     fields = _extract_fields(text, "notifications@tenways.com", "", subject, "invoice.pdf")
     assert fields["invoice_number"] == "INV/2026/23162"
+
+
+# -- Due date ("Nog te betalen") --
+
+def test_due_date_from_explicit_vervaldatum_label():
+    text = "Factuurnummer: F-1\nFactuurdatum: 01-09-2026\nVervaldatum: 15-09-2026\nTotaal incl. BTW: EUR 40,00"
+    due, estimated = _extract_due_date(text, date(2026, 9, 1), datetime(2026, 9, 1))
+    assert due == date(2026, 9, 15)
+    assert estimated is False
+
+
+def test_due_date_from_te_betalen_voor_label_with_accent():
+    text = "Te betalen vóór 20-10-2026\nTotaal: EUR 40,00"
+    due, estimated = _extract_due_date(text, date(2026, 10, 1), datetime(2026, 10, 1))
+    assert due == date(2026, 10, 20)
+    assert estimated is False
+
+
+def test_due_date_from_payment_term_days_adds_to_invoice_date():
+    text = "Betalingstermijn: 14 dagen\nTotaal: EUR 40,00"
+    due, estimated = _extract_due_date(text, date(2026, 1, 1), datetime(2026, 1, 1))
+    assert due == date(2026, 1, 15)
+    assert estimated is False
+
+
+def test_due_date_from_binnen_n_dagen_phrasing():
+    text = "Gelieve te betalen binnen 30 dagen na factuurdatum.\nTotaal: EUR 40,00"
+    due, estimated = _extract_due_date(text, date(2026, 3, 1), datetime(2026, 3, 1))
+    assert due == date(2026, 3, 31)
+    assert estimated is False
+
+
+def test_due_date_falls_back_to_plus_30_days_and_is_flagged_estimated():
+    text = "Geen vervaldatum of betalingstermijn hier.\nTotaal: EUR 40,00"
+    due, estimated = _extract_due_date(text, date(2026, 6, 1), datetime(2026, 6, 1))
+    assert due == date(2026, 7, 1)
+    assert estimated is True
+
+
+def test_due_date_falls_back_to_received_at_when_no_invoice_date():
+    text = "Totaal: EUR 40,00"
+    due, estimated = _extract_due_date(text, None, datetime(2026, 6, 1))
+    assert due == date(2026, 7, 1)
+    assert estimated is True
+
+
+def test_extract_fields_includes_due_date_and_incasso_hint():
+    text = "Factuurnummer: F-1\nVervaldatum: 10-09-2026\nDeze factuur wordt automatisch afgeschreven.\nTotaal: EUR 40,00"
+    fields = _extract_fields(text, "noreply@kruitbosch.nl", "", "", "f.pdf", datetime(2026, 9, 1))
+    assert fields["due_date"] == date(2026, 9, 10)
+    assert fields["due_date_estimated"] is False
+    assert fields["incasso_hint"] is True
+
+
+# -- Incasso text hint --
+
+def test_text_suggests_incasso_variants():
+    assert _text_suggests_incasso("Dit bedrag wordt automatisch afgeschreven van uw rekening.") is True
+    assert _text_suggests_incasso("Betaling via automatische incasso.") is True
+    assert _text_suggests_incasso("Machtiging tot incasso: NL68ZZZ010542980000") is True
+    assert _text_suggests_incasso("Gewone factuur, graag overmaken binnen 30 dagen.") is False

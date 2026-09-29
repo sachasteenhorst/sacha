@@ -171,6 +171,7 @@ select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
 /* -- Tables -- */
 .table-scroll { overflow-x: auto; }
 .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.overdue { color: var(--danger); font-weight: 600; }
 .muted-text { color: var(--muted); }
 .pdf-link {
   display: inline-block;

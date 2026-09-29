@@ -28,7 +28,8 @@ import pdfplumber
 
 from app.db import SessionLocal
 from app.email_client import _extract_fields, invoice_dedup_key
-from app.models import DocumentKind, Invoice, MatchStatus
+from app.models import DocumentKind, Invoice, MatchStatus, PaymentMethod
+from app.payments import determine_payment_method
 
 
 def _reparse_fields(session) -> tuple[int, int, int, int, int]:
@@ -59,7 +60,7 @@ def _reparse_fields(session) -> tuple[int, int, int, int, int]:
             unreadable += 1
             continue
 
-        fields = _extract_fields(text, inv.email_from, "", inv.email_subject, inv.attachment_filename)
+        fields = _extract_fields(text, inv.email_from, "", inv.email_subject, inv.attachment_filename, inv.received_at)
         inv.extracted_text = text
         inv.invoice_number = fields["invoice_number"]
         inv.invoice_date = fields["invoice_date"]
@@ -68,6 +69,13 @@ def _reparse_fields(session) -> tuple[int, int, int, int, int]:
         inv.direction = fields["direction"]
         inv.document_kind = fields["document_kind"]
         inv.referenced_invoice_numbers = fields["referenced_invoice_numbers"]
+        inv.due_date = fields["due_date"]
+        inv.due_date_estimated = fields["due_date_estimated"]
+        # Never overwrite a payment_method already set by the dashboard's
+        # "Loopt via incasso" button or an earlier reparse run -- only ever
+        # fills in the still-default "onbekend".
+        if inv.payment_method == PaymentMethod.ONBEKEND.value:
+            inv.payment_method = determine_payment_method(session, fields["supplier_name"], fields["incasso_hint"])
 
         if fields["document_kind"] == DocumentKind.OTHER.value:
             if inv.status == MatchStatus.UNMATCHED:

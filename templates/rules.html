@@ -3,6 +3,22 @@
 
 <p><a href="/dashboard" class="clear-filter">&larr; Terug naar dashboard</a></p>
 
+{% if notify_test == "ok" %}
+<div class="banner banner-ok">✅ Testmelding verstuurd -- check je telefoon.</div>
+{% elif notify_test == "error" %}
+<div class="banner banner-error">⚠️ Testmelding versturen mislukt (NTFY_TOPIC ingesteld? Zie README).</div>
+{% endif %}
+
+<section id="meldingen">
+  <h2>Push-meldingen</h2>
+  <p class="hint">
+    {% if ntfy_configured %}Ingesteld via ntfy -- je krijgt een melding bij een nieuwe factuur, dagelijks om 08:00 een samenvatting als er iets te laat is of binnen 7 dagen vervalt, en bij problemen met e-mail/Basecone/bank-sync.{% else %}Nog niet ingesteld -- vul NTFY_TOPIC in (zie README) om pushmeldingen te ontvangen.{% endif %}
+  </p>
+  <form method="post" action="/notify/test">
+    <button type="submit" class="btn btn-secondary">Stuur testmelding</button>
+  </form>
+</section>
+
 <section id="nieuwe-regel">
   <h2>Nieuwe regel</h2>
   <p class="hint">Een regel handelt een betaling automatisch af (geen factuur nodig, of omzet) zonder dat je hem hoeft te koppelen. Vul minstens één kenmerk in; alleen betalingen die aan ALLE ingevulde kenmerken voldoen worden afgehandeld. Na opslaan wordt de regel meteen toegepast op alle openstaande betalingen.</p>

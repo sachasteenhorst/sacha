@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.basecone_forward import is_forwardable
 from app.matcher import MIN_REFERENCE_SUFFIX_LENGTH, _name_similarity, _transaction_direction
 from app.models import Direction, Invoice, MatchStatus, Transaction
+from app.payments import days_until_due, is_payable_invoice
 
 # A payment this small is more likely a personal/small cash-type expense
 # (parking, coffee for a supplier visit, ...) than something worth chasing a
@@ -34,10 +35,12 @@ ACCELL_DESCR_MARKER_RE = re.compile(r"descr\.?\s*(.+?)\s*kenmerk\s*machtiging", 
 @dataclass
 class Vraagpost:
     key: str
-    transaction: Transaction
-    kind: str  # "controleren" | "regel" | "bon" | "opvragen" | "doorsturen"
+    kind: str  # "controleren" | "regel" | "bon" | "opvragen" | "doorsturen" | "te_betalen_te_laat"
     label: str
     age_days: int
+    # None for "te_betalen_te_laat" -- that kind is about an invoice with no
+    # matching bank transaction yet, not the other way around.
+    transaction: Transaction | None = None
     invoice: Invoice | None = None
     mailto: str | None = None
 
@@ -159,6 +162,36 @@ def _suggest_for_unmatched(
     return "opvragen", "Geen factuur in mail -- opvragen bij leverancier", None, _mailto_for_request(transaction)
 
 
+def _overdue_payable_vraagposten(all_invoices: list[Invoice], today: date) -> list[Vraagpost]:
+    """A "Nog te betalen" invoice (see app.payments.is_payable_invoice) that
+    is actually past its due date -- distinct from merely "due soon", which
+    isn't a vraagpost yet, just something to plan for. Has no transaction:
+    that's exactly the point -- nobody has paid it yet."""
+    items = []
+    for inv in all_invoices:
+        if not is_payable_invoice(inv):
+            continue
+        days_overdue = -days_until_due(inv, today)
+        if days_overdue <= 0:
+            continue
+        items.append(Vraagpost(
+            key=f"inv-{inv.id}-te-laat",
+            kind="te_betalen_te_laat",
+            label=f"Te betalen, over termijn -- {days_overdue} dagen te laat",
+            age_days=days_overdue,
+            invoice=inv,
+        ))
+    return items
+
+
+def _vraagpost_amount_cents(item: Vraagpost) -> int:
+    if item.transaction is not None:
+        return abs(item.transaction.amount_cents)
+    if item.invoice is not None and item.invoice.amount_cents is not None:
+        return abs(item.invoice.amount_cents)
+    return 0
+
+
 def build_vraagposten(session: Session) -> list[Vraagpost]:
     unmatched = list(session.scalars(select(Transaction).where(Transaction.status == MatchStatus.UNMATCHED)))
     matched = list(session.scalars(select(Transaction).where(Transaction.status == MatchStatus.MATCHED)))
@@ -188,5 +221,7 @@ def build_vraagposten(session: Session) -> list[Vraagpost]:
             age_days=(today - t.booking_date).days, invoice=pending_invoice,
         ))
 
-    items.sort(key=lambda v: (-v.age_days, -abs(v.transaction.amount_cents)))
+    items.extend(_overdue_payable_vraagposten(all_invoices, today))
+
+    items.sort(key=lambda v: (-v.age_days, -_vraagpost_amount_cents(v)))
     return items

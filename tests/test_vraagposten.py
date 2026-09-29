@@ -217,6 +217,42 @@ def test_ignored_and_rule_handled_transactions_are_not_vraagposten(session):
     assert items == []
 
 
+def test_overdue_payable_invoice_becomes_te_betalen_te_laat_vraagpost(session):
+    inv = make_invoice(due_date=date(2026, 1, 1), amount_cents=5000)
+    session.add(inv)
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.kind == "te_betalen_te_laat"
+    assert item.transaction is None
+    assert item.invoice.id == inv.id
+    assert "over termijn" in item.label
+
+
+def test_incasso_invoice_never_becomes_te_betalen_te_laat_vraagpost(session):
+    from app.models import PaymentMethod
+    inv = make_invoice(due_date=date(2026, 1, 1), payment_method=PaymentMethod.INCASSO.value)
+    session.add(inv)
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert items == []
+
+
+def test_not_yet_due_payable_invoice_is_not_a_vraagpost(session):
+    inv = make_invoice(due_date=date(2099, 1, 1))
+    session.add(inv)
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert items == []
+
+
 def test_sorted_oldest_first_then_largest_amount(session):
     old_small = make_transaction(external_ref="tx-1", booking_date=date(2026, 1, 1), amount_cents=-1000, counterparty_name="A")
     old_large = make_transaction(external_ref="tx-2", booking_date=date(2026, 1, 1), amount_cents=-90000, counterparty_name="B")

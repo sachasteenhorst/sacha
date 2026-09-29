@@ -14,17 +14,25 @@
   <div class="table-scroll">
   <table>
     <thead>
-      <tr><th>Leeftijd</th><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Voorgestelde actie</th><th>Actie</th></tr>
+      <tr><th>Leeftijd</th><th>Datum</th><th>Bedrag</th><th>Tegenpartij</th><th>Omschrijving</th><th>Gekoppelde factuur/betaling</th><th>Voorgestelde actie</th><th>Actie</th></tr>
     </thead>
     <tbody>
       {% for item in items %}
       {% set tx = item.transaction %}
+      {% set inv = item.invoice %}
       <tr>
         <td>{{ item.age_days }} dagen</td>
-        <td>{{ tx.booking_date|dutch_date }}</td>
-        <td class="amount">{{ tx.amount_cents|euros }}</td>
-        <td>{{ tx.counterparty_name or "?" }}</td>
-        <td><small class="muted-text">{{ tx.description }}</small></td>
+        <td>{% if tx %}{{ tx.booking_date|dutch_date }}{% elif inv %}~{{ inv.due_date|dutch_date }}{% endif %}</td>
+        <td class="amount">{% if tx %}{{ tx.amount_cents|euros }}{% elif inv %}{{ (-inv.amount_cents)|euros }}{% endif %}</td>
+        <td>{{ (tx.counterparty_name if tx else (inv.supplier_name if inv else "")) or "?" }}</td>
+        <td><small class="muted-text">{{ tx.description if tx else "" }}</small></td>
+        <td>
+          {% if inv %}
+          {{ inv.supplier_name }} &ndash; {{ inv.invoice_number or "geen nr" }} ({{ inv.amount_cents|euros }})
+          {% else %}
+          <span class="muted-text">-</span>
+          {% endif %}
+        </td>
         <td>{{ item.label }}</td>
         <td class="actions">
           {% if item.kind == "controleren" %}
@@ -37,10 +45,18 @@
           </form>
           {% elif item.kind == "opvragen" %}
           <a class="btn btn-secondary" href="{{ item.mailto }}">Opvragen per mail</a>
-          {% elif item.kind == "doorsturen" and item.invoice %}
-          <form method="post" action="/invoices/{{ item.invoice.id }}/forward-to-basecone">
+          {% elif item.kind == "doorsturen" and inv %}
+          <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone">
             <button class="btn btn-secondary">Stuur naar Basecone</button>
           </form>
+          {% elif item.kind == "te_betalen_te_laat" and inv %}
+          <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
+            <button class="btn btn-secondary">Betaald</button>
+          </form>
+          <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
+            <button class="btn btn-secondary">Loopt via incasso</button>
+          </form>
+          {% if inv.pdf_path %}<a class="btn btn-secondary" href="/invoices/{{ inv.id }}/pdf" target="_blank">PDF</a>{% endif %}
           {% endif %}
         </td>
       </tr>

@@ -2,6 +2,10 @@
 {% block content %}
 
 <section class="stats-row" aria-label="Overzicht">
+  <a href="#nog-te-betalen" class="stat-tile{% if counters.nog_te_betalen > 0 %} stat-open{% endif %}">
+    <span class="stat-number">{{ counters.nog_te_betalen }}</span>
+    <span class="stat-label">Nog te betalen</span>
+  </a>
   <a href="#te-controleren" class="stat-tile{% if counters.te_controleren > 0 %} stat-open{% endif %}">
     <span class="stat-number">{{ counters.te_controleren }}</span>
     <span class="stat-label">Te controleren</span>
@@ -43,6 +47,16 @@
       &mdash; nog geen afschrift geüpload
     {% endif %}
   </span>
+  {% if status_bar.ponto_enabled %}
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.ponto_status }}"></span> Bank: Ponto
+    {% if status_bar.ponto_last_synced_label %}
+      &mdash; laatst opgehaald {{ status_bar.ponto_last_synced_label }}
+    {% else %}
+      &mdash; nog niet gesynchroniseerd
+    {% endif %}
+  </span>
+  {% endif %}
 </section>
 
 <section class="upload-box">
@@ -57,6 +71,60 @@
     <button type="submit" class="btn btn-primary">Bankafschrift uploaden</button>
     <span class="hint" style="margin:0;">Rabobank CSV, CAMT.053 (.xml) of MT940 Structured (.swi)</span>
   </form>
+  {% if cs_upload_error %}
+  <div class="banner banner-error">⚠️ Upload mislukt: {{ cs_upload_error }}</div>
+  {% elif cs_upload_new is not none %}
+  <div class="banner banner-ok">✅ {{ cs_upload_new }} verkoopfactu(u)r(en) toegevoegd.</div>
+  {% endif %}
+  <form method="post" action="/cyclesoftware/upload" enctype="multipart/form-data" class="filter-form">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+    <input type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
+    <button type="submit" class="btn btn-secondary">CycleSoftware verkoopfacturen uploaden</button>
+    <span class="hint" style="margin:0;">Export uit het kassasysteem (CSV of Excel)</span>
+  </form>
+</section>
+
+<section id="nog-te-betalen">
+  <h2>Nog te betalen ({{ te_betalen|length }})</h2>
+  <p class="hint">Openstaande inkoopfacturen die je zelf moet overmaken (geen incasso) -- gesorteerd op vervaldatum. Een vervaldatum met "~" is geschat (niet letterlijk op de factuur gevonden).</p>
+  {% if te_betalen %}
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>Vervaldatum</th><th>Resterend</th><th>PDF</th><th>Actie</th></tr>
+    </thead>
+    <tbody>
+      {% for inv in te_betalen %}
+      {% set dagen = inv|days_until_due %}
+      <tr>
+        <td>{{ inv.supplier_name or "?" }}</td>
+        <td>{{ inv.invoice_number or "?" }}</td>
+        <td class="amount">{{ inv.amount_cents|euros }}</td>
+        <td>{% if inv.due_date_estimated %}~{% endif %}{{ inv.due_date|dutch_date }}</td>
+        <td{% if dagen < 0 %} class="overdue"{% endif %}>
+          {% if dagen < 0 %}{{ -dagen }} dagen te laat{% else %}nog {{ dagen }} dagen{% endif %}
+        </td>
+        <td>
+          {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
+        </td>
+        <td class="actions">
+          <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-confirm">Betaald</button>
+          </form>
+          <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-secondary">Loopt via incasso</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Niets om over te maken. 🎉</p>
+  {% endif %}
 </section>
 
 {% if oldest_unmatched_days and oldest_unmatched_days > 30 %}

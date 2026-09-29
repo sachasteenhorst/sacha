@@ -143,6 +143,64 @@ class Settings(BaseSettings):
     # -- Dashboard auth --
     dashboard_username: str = "sacha"
     dashboard_password: str = "changeme"
+    # Used only to build the "Click" link in a push notification -- never
+    # called by the app itself.
+    dashboard_public_url: str = "https://srv2014936.hstgr.cloud"
+
+    # -- "Nog te betalen" --
+    # Suppliers (kommagescheiden, hoofdletterongevoelig) who are known to
+    # settle by automatic incasso -- their invoices never show up in "Nog te
+    # betalen" (nothing to actively transfer). A supplier is ALSO treated as
+    # incasso the moment one of its own bank transactions looks like a
+    # direct debit (Rabobank code ei/id, or a filled-in
+    # Machtigingskenmerk/Incassant ID -- see app/payments.py), or once Sacha
+    # clicks "Loopt via incasso" in the dashboard (see
+    # LearnedIncassoSupplier).
+    pay_incasso_suppliers: str = "Accell,Gazelle,Pon,Giant,Kruitbosch,Odido,Exact,ENRA"
+    # Override: suppliers here are NEVER treated as incasso, even if they're
+    # on PAY_INCASSO_SUPPLIERS or a matching bank transaction looks like a
+    # direct debit -- for the rare case a supplier switched from incasso to
+    # invoiced payment.
+    pay_manual_suppliers: str = ""
+
+    # -- Push-meldingen (ntfy.sh, of je eigen ntfy-server) --
+    ntfy_url: str = "https://ntfy.sh"
+    # Geheim en lang/willekeurig -- ntfy-topics zijn wereldwijd uniek en
+    # zonder toegangscontrole leesbaar voor wie de naam raadt.
+    ntfy_topic: str = ""
+    # Alleen nodig voor een ntfy-server met authenticatie aan; leeg = geen
+    # Authorization-header.
+    ntfy_token: str = ""
+
+    # -- Ponto Connect (bankkoppeling) --
+    # Leeg = uit; de app valt dan terug op handmatige CSV/CAMT.053/MT940-
+    # upload. Zie README voor het aanmaken van een "Integration" in het
+    # Ponto-dashboard (OAuth2 Client Credentials, voor je EIGEN rekening --
+    # geen PSD2-multi-tenant AISP-flow).
+    ponto_client_id: str = ""
+    ponto_client_secret: str = ""
+    # Alleen invullen als Ponto voor jouw integratie mTLS/HTTP-signatures
+    # eist (zie hun documentatie/dashboard) -- de meeste Client Credentials-
+    # integraties hebben dit niet nodig.
+    ponto_cert_path: str = ""
+    ponto_key_path: str = ""
+    ponto_key_password: str = ""
+    ponto_signature_key_id: str = ""
+
+    # -- CycleSoftware (kassasysteem) --
+    # Placeholder voor een toekomstige live koppeling (CS Connect) -- zie
+    # app/cyclesoftware_api.py. Vooralsnog wordt de verkoopfacturen-export
+    # handmatig geupload (CSV/XLSX) via de uploadpagina.
+    cs_api_key: str = ""
+    cs_api_base_url: str = ""
+
+    @property
+    def pay_incasso_supplier_names(self) -> list[str]:
+        return [s.strip().lower() for s in self.pay_incasso_suppliers.split(",") if s.strip()]
+
+    @property
+    def pay_manual_supplier_names(self) -> list[str]:
+        return [s.strip().lower() for s in self.pay_manual_suppliers.split(",") if s.strip()]
 
 
 settings = Settings()
