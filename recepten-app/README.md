@@ -90,6 +90,12 @@ zelf toe onder "Zelf aanbiedingen toevoegen".
   aanbieding is, met de actie erbij) en toont per product en per winkel wat het
   ongeveer kost. Losse producten voeg je zelf toe. De lijst wordt net als de
   kaarten bij je account bewaard.
+- **Extra boodschappen**: op de lijst staan snelknoppen voor dagelijkse
+  boodschappen (melk, brood, eieren, koffie, wc-papier …) met prijs; één tik zet
+  het op de lijst, nog een tik telt er één bij. Bij *Iets anders toevoegen* zie
+  je tijdens het typen een actieprijs uit de folders of een richtprijs (lijst
+  `EXTRA` in `index.html`), kies je het aantal en kun je de prijs aanpassen.
+  Tik op de lijst op het bedrag om prijs of aantal later te veranderen.
 - **Kosten per gerecht**: onder de ingrediënten staat wat het gerecht ongeveer
   kost, per ingrediënt uitgesplitst. Stel een budget per maaltijd in en kies
   goedkopere alternatieven (koolvis in plaats van zalm, de helft van het gehakt

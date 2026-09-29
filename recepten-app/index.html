@@ -723,6 +723,33 @@
   .wwijzig { font-weight: 700; color: var(--green); flex: none; }
   ul.shop li { font-size: 16px; }
   .agendakaart { display: grid; gap: 12px; }
+  .card.extra { display: grid; gap: 10px; }
+  .card.extra h3 { font-size: 20px; }
+  .snelknoppen { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .snelitem {
+    display: grid; justify-items: center; gap: 2px; padding: 10px 1px 8px; min-height: 92px; border-radius: 16px; cursor: pointer;
+    border: 1px solid var(--tile-edge); background: var(--tile); box-shadow: 0 3px 0 var(--tile-edge); color: var(--ink);
+  }
+  .snelitem:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tile-edge); }
+  .snaam { font-weight: 700; font-size: 14px; letter-spacing: -.01em; line-height: 1.2; text-align: center; hyphens: auto; }
+  .sprijs { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sprijs.actie { background: var(--tag); color: var(--tag-ink); border-radius: 6px; padding: 0 6px; font-weight: 700; }
+  .flabel2 { font-weight: 700; font-size: 15px; }
+  .card.extra input[type=text] { width: 100%; min-height: 48px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; }
+  .fprijs:empty { display: none; }
+  .fprijs { margin-top: -4px; color: var(--muted); }
+  .fprijs.actie { color: var(--ink); font-weight: 700; }
+  .frij { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+  .fveld { display: grid; gap: 4px; min-width: 0; }
+  .card.extra .stepper, .ledit .stepper { justify-self: start; }
+  .card.extra .stepper button, .ledit .stepper button { width: 44px; height: 44px; }
+  .eurveld { display: flex; align-items: center; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding-left: 12px; }
+  .eurveld > span { font-weight: 700; color: var(--muted); }
+  .card.extra .eurveld input, .ledit .eurveld input { border: 0 !important; min-height: 46px; padding: 8px 8px 8px 0 !important; width: 100%; min-width: 0; background: none; font-size: 17px; }
+  .leur.leeg { color: var(--green); font-weight: 700; text-decoration: none; }
+  .ledit { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; margin-top: 4px; }
+  .ledit .btn { grid-column: 1 / -1; min-height: 48px; }
+
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: 520px; margin: 0 auto;
@@ -1396,6 +1423,10 @@ const ART = {
   vlees: '<path d="M6 12c2-6 12-8 18-4 4 3 3 10-2 13-6 4-14 3-16-2-1-2-1-4 0-7z" fill="#B5533C"/><path d="M9 13c2-4 9-5 13-2" stroke="#E7A08C" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="20" cy="16" r="2.5" fill="#F3E3D8"/>',
   rodekool: '<circle cx="16" cy="17" r="11.5" fill="#6D2E6B"/><path d="M16 6c-3 5-3 16 0 22M16 6c3 5 3 16 0 22M6 14c5 2 15 2 20 0" stroke="#A35FA0" stroke-width="1.4" fill="none"/>',
   komkommer: '<rect x="3" y="12.5" width="26" height="8" rx="4" transform="rotate(-35 16 16)" fill="#4E9B3E"/><g fill="#8BC77A"><circle cx="11" cy="20" r=".9"/><circle cx="15" cy="17" r=".9"/><circle cx="19" cy="14" r=".9"/><circle cx="23" cy="11" r=".9"/></g>',
+  koffie: '<path d="M6 12h16v7a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z" fill="#8A5A3B"/><path d="M22 14h2.5a3 3 0 0 1 0 6H21" stroke="#8A5A3B" stroke-width="2.4" fill="none"/><path d="M11 5c-1 2 1 3 0 5M16 5c-1 2 1 3 0 5" stroke="#C9A58A" stroke-width="1.8" stroke-linecap="round" fill="none"/><ellipse cx="14" cy="12.5" rx="7" ry="1.6" fill="#5C3A24"/>',
+  fles: '<rect x="12" y="3" width="8" height="5" rx="1.5" fill="#3F7FC1"/><path d="M11 8h10l2 5v14a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V13z" fill="#8FC3EC"/><rect x="9" y="15" width="14" height="7" fill="#FFFFFF" opacity=".85"/>',
+  rol: '<ellipse cx="11" cy="16" rx="6" ry="10" fill="#E9E4DC"/><path d="M11 6h11a6 10 0 0 1 0 20H11" fill="#FFFFFF" stroke="#E0D8CC" stroke-width="1"/><ellipse cx="11" cy="16" rx="6" ry="10" fill="#F4F0EA" stroke="#E0D8CC" stroke-width="1"/><ellipse cx="11" cy="16" rx="2.2" ry="3.6" fill="#C9B9A4"/>',
+  tas: '<path d="M6 11h20l-1.6 14.4A2 2 0 0 1 22.4 27H9.6a2 2 0 0 1-2-1.6z" fill="#E28A5C"/><path d="M11 11V9a5 5 0 0 1 10 0v2" stroke="#B8582E" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
   citroen: '<ellipse cx="16" cy="16" rx="11" ry="8.5" transform="rotate(-25 16 16)" fill="#F7D640"/><ellipse cx="12" cy="13" rx="3" ry="2" transform="rotate(-25 12 13)" fill="#FBE98A"/>',
   knoflook: '<path d="M16 5c-2 4-9 6-9 14 0 6 4 9 9 9s9-3 9-9c0-8-7-10-9-14z" fill="#F4EEE3" stroke="#DCCFB8" stroke-width="1.2"/><path d="M16 9c-2 5-3 10-2 18M16 9c2 5 3 10 2 18" stroke="#DCCFB8" stroke-width="1.1" fill="none"/>',
 };
@@ -1768,6 +1799,7 @@ function icsTekst(p) {
   return { aantal: events.length, tekst: ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Aanbiedingskeuken//Weekmenu//NL', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     ...events.flat(), 'END:VCALENDAR'].map(vouw).join('\r\n') + '\r\n' };
 }
+const leesEuro = t => { const v = parseFloat(String(t || '').replace(/[€\s]/g, '').replace(',', '.')); return isFinite(v) && v >= 0 && v < 10000 ? rond(v) : null; };
 // Korte melding onderin beeld
 function toast(tekst) {
   let el = document.getElementById('toast');
@@ -1896,6 +1928,82 @@ function viewRecipes() {
   </section>`;
 }
 
+/* ---------- Extra boodschappen met prijs ---------- */
+// [naam, verpakking, richtprijs in euro, productsleutel of null, zoekwoorden, icoon]. Richtprijzen zijn gemiddelden; per winkel kan het verschillen.
+const EXTRA = [
+  ['Melk', '1 liter', 1.19, null, ['melk', 'halfvolle melk', 'volle melk', 'karnemelk'], 'room'],
+  ['Brood', 'heel brood', 2.49, 'brood', ['brood', 'bruinbrood', 'witbrood', 'volkorenbrood'], 'graan'],
+  ['Eieren', '10 stuks', 3.29, 'eieren', ['eieren', 'eitjes'], 'ei'],
+  ['Bananen', '1 kilo', 1.69, 'banaan', ['bananen', 'banaan'], 'banaan'],
+  ['Appels', '1 kilo', 2.49, 'appel', ['appels', 'appel'], 'appel'],
+  ['Kaas', 'plakken, 190 g', 2.99, 'kaas', ['kaas', 'kaasplakken', 'plakjes kaas'], 'kaas'],
+  ['Boter', '250 g', 2.79, null, ['boter', 'roomboter', 'margarine', 'halvarine'], 'potje'],
+  ['Yoghurt', '1 liter', 1.69, 'yoghurt', ['yoghurt', 'kwark', 'vla'], 'yoghurt'],
+  ['Koffie', '500 g', 6.49, null, ['koffie', 'koffiebonen', 'koffiepads', 'koffiecups'], 'koffie'],
+  ['Thee', '20 zakjes', 1.99, null, ['thee', 'theezakjes'], 'koffie'],
+  ['Suiker', '1 kilo', 1.39, null, ['suiker'], 'potje'],
+  ['Pindakaas', '350 g', 2.49, null, ['pindakaas'], 'pinda'],
+  ['Hagelslag', '400 g', 2.79, null, ['hagelslag', 'chocoladehagel', 'vlokken'], 'potje'],
+  ['Jam', '450 g', 2.29, null, ['jam', 'confituur'], 'potje'],
+  ['Vleeswaren', '150 g', 2.29, null, ['vleeswaren', 'ham', 'salami', 'rookvlees', 'boterhamworst', 'filet americain'], 'vlees'],
+  ['Sap', '1 liter', 2.19, null, ['sap', 'sinaasappelsap', 'appelsap', "jus d'orange"], 'fles'],
+  ['Frisdrank', '1,5 liter', 1.79, null, ['frisdrank', 'cola', 'fanta', 'sinas', 'limonade', 'ranja', 'siroop'], 'fles'],
+  ['Water', '1,5 liter', 0.79, null, ['water', 'bronwater', 'spa'], 'fles'],
+  ['Bier', '6 blikjes', 5.99, null, ['bier', 'pils'], 'fles'],
+  ['Wijn', 'fles', 5.49, null, ['wijn'], 'fles'],
+  ['Chips', 'zak 225 g', 1.99, null, ['chips', 'nootjes', 'borrelnootjes'], 'tas'],
+  ['Koekjes', 'pak', 1.89, null, ['koekjes', 'koek', 'biscuits', 'stroopwafels', 'ontbijtkoek'], 'graan'],
+  ['Chocolade', 'reep 200 g', 2.49, null, ['chocolade', 'chocoladereep', 'snoep', 'drop'], 'tas'],
+  ['Ontbijtgranen', 'pak', 2.99, null, ['ontbijtgranen', 'muesli', 'cruesli', 'cornflakes', 'havermout'], 'graan'],
+  ['Diepvriespizza', 'per stuk', 3.29, null, ['pizza', 'diepvriespizza'], 'tas'],
+  ['Friet', 'diepvries, 1 kilo', 2.49, null, ['friet', 'patat', 'frites'], 'aardappel'],
+  ['Mayonaise', '500 ml', 2.29, null, ['mayonaise', 'mayo', 'ketchup', 'curry', 'fritessaus'], 'potje'],
+  ['Wc-papier', '8 rollen', 4.49, null, ['wc-papier', 'wc papier', 'toiletpapier', 'closetpapier'], 'rol'],
+  ['Keukenrol', '2 rollen', 2.29, null, ['keukenrol', 'keukenpapier'], 'rol'],
+  ['Afwasmiddel', '500 ml', 1.99, null, ['afwasmiddel'], 'fles'],
+  ['Vaatwastabletten', '30 stuks', 5.99, null, ['vaatwastabletten', 'vaatwasblokjes', 'vaatwasmiddel'], 'fles'],
+  ['Wasmiddel', '20 wasbeurten', 6.49, null, ['wasmiddel', 'waspoeder', 'wasverzachter'], 'fles'],
+  ['Schoonmaakmiddel', 'fles', 2.49, null, ['schoonmaakmiddel', 'allesreiniger', 'wc-reiniger', 'bleek'], 'fles'],
+  ['Vuilniszakken', '20 stuks', 2.49, null, ['vuilniszakken', 'afvalzakken', 'pedaalemmerzakken'], 'rol'],
+  ['Tandpasta', 'tube', 1.99, null, ['tandpasta', 'tandenborstel'], 'tas'],
+  ['Shampoo', 'fles', 2.99, null, ['shampoo', 'douchegel', 'zeep', 'handzeep', 'deodorant'], 'fles'],
+  ['Luiers', 'pak', 12.99, null, ['luiers', 'luier', 'pampers'], 'tas'],
+  ['Billendoekjes', 'pak', 2.49, null, ['billendoekjes', 'babydoekjes', 'vochtige doekjes'], 'tas'],
+  ['Babyhapje', 'potje', 1.29, null, ['babyhapje', 'fruithapje', 'groentehapje', 'babyvoeding'], 'potje'],
+  ['Dierenvoer', 'pak', 3.99, null, ['dierenvoer', 'kattenvoer', 'hondenvoer', 'kattenbakvulling'], 'tas'],
+  ['Batterijen', '4 stuks', 4.99, null, ['batterijen'], 'tas'],
+];
+const woordIn = (w, t) => new RegExp('(^|[^a-zà-ÿ])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-zà-ÿ])').test(t);
+const rond = v => Math.round(v * 100) / 100;
+function zoekExtra(naam) {
+  const t = naam.toLowerCase();
+  let hit = null, len = 0;   // langste treffer wint ('pindakaas' boven 'kaas')
+  EXTRA.forEach(e => [e[0].toLowerCase(), ...e[4]].forEach(w => { if (w.length > len && woordIn(w, t)) { hit = e; len = w.length; } }));
+  return hit;
+}
+// Prijs voor een extra product: eerst een actie uit de folders, dan de richtprijs
+function prijsVoor(naam) {
+  const ex = zoekExtra(naam), k = detectKey(naam) || (ex && ex[3]);
+  if (k) {
+    const o = where(k).filter(o => o.winkel !== 'Voorbeeld' && o.prijs != null).sort((a, b) => a.prijs - b.prijs)[0];
+    if (o) return { prijs: o.prijs, bron: 'actie', winkel: o.winkel, per: o.titel || '', k, icoon: ex && ex[5] };
+  }
+  if (ex) return { prijs: ex[2], bron: 'richt', per: ex[1], k, icoon: ex[5] };
+  if (k && EST[k]) return EST[k][1] ? { prijs: rond(EST[k][0] * EST[k][1] / 1000), bron: 'richt', per: 'per stuk', k } : { prijs: rond(EST[k][0] / 2), bron: 'richt', per: 'per 500 g', k };
+  return { prijs: null, bron: null, k };
+}
+const SNEL = () => ['Melk', 'Brood', 'Eieren', 'Bananen', 'Kaas', 'Koffie', 'Boter', 'Wc-papier', 'Afwasmiddel', hasBaby() ? 'Luiers' : 'Frisdrank'];
+const extraIcoon = (i, size) => { const a = artFor(i.k, i.n) || i.icoon || (zoekExtra(i.n) || [])[5]; return a ? art(a, size) : art('tas', size); };
+function voegExtraToe(naam, aantal, prijs, bron) {
+  const pv = prijsVoor(naam);
+  const ex = lijst.find(x => !x.gekocht && x.q == null && x.n.toLowerCase() === naam.toLowerCase());
+  if (ex) { ex.aantal = (ex.aantal || 1) + aantal; if (prijs != null) { ex.prijs = prijs; ex.prijsBron = bron; } }
+  else lijst.push({ id: Math.random().toString(36).slice(2, 10), n: naam, k: pv.k || null, q: null, u: '', bron: [], gekocht: false,
+    aantal, prijs, prijsBron: bron, icoon: pv.icoon || null });
+  persistList();
+}
+let fAantal = 1, lEdit = null;
+
 /* ---------- Boodschappenlijst ---------- */
 function addToList(ingrs, bron) {
   ingrs.forEach(i => {
@@ -1918,7 +2026,7 @@ function viewList() {
   const groups = new Map();
   lijst.forEach(i => { const w = listStore(i) || ''; if (!groups.has(w)) groups.set(w, []); groups.get(w).push(i); });
   const order = [...mijnWinkels.filter(w => groups.has(w)), ...[...groups.keys()].filter(w => w && !mijnWinkels.includes(w)), ...(groups.has('') ? [''] : [])];
-  const cost = i => costOf(i.k, i.n, i.q, i.u);
+  const cost = i => i.prijs != null ? { eur: i.prijs * (i.aantal || 1) } : costOf(i.k, i.n, i.q, i.u);
   const sum = arr => arr.reduce((s, i) => s + ((cost(i) || {}).eur || 0), 0);
   const open = lijst.filter(i => !i.gekocht);
   const rest = standaardWinkel || mijnWinkels[0] || 'een winkel naar keuze';
@@ -1933,9 +2041,21 @@ function viewList() {
     <div class="small muted" style="align-self:end;text-align:right">Actieprijs waar bekend,<br>anders richtprijs</div>
   </article>` : `<article class="card empty">${produceRow(['wortel', 'broccoli', 'appel', 'paprika', 'banaan'])}<p style="margin:0 0 12px">Je lijst is nog leeg. Tik bij een recept op <b>Op boodschappenlijst</b>, of zet in één keer het hele weekmenu erop.</p>
     <button class="btn primary" data-addweek>Hele week op de boodschappenlijst</button></article>`}
-  <form class="addfree" id="addfree" novalidate>
-    <label for="freetext" class="small" style="font-weight:700">Zelf iets toevoegen</label>
-    <div class="row" style="flex-wrap:nowrap"><input type="text" id="freetext" maxlength="60" placeholder="Bijvoorbeeld: luiers, bananen" autocomplete="off"><button class="btn" type="submit">Toevoegen</button></div>
+  <form class="card extra" id="addfree" novalidate>
+    <h3>Extra boodschappen</h3>
+    <p class="small muted" style="margin:0">Tik om toe te voegen. Nog een keer tikken = één extra.</p>
+    <div class="snelknoppen">${SNEL().map(n => { const pv = prijsVoor(n); return `<button type="button" class="snelitem" data-snel="${esc(n)}">${art(pv.icoon || (zoekExtra(n) || [])[5] || 'tas', 30)}<span class="snaam">${esc(n)}</span><span class="sprijs${pv.bron === 'actie' ? ' actie' : ''}">${pv.prijs != null ? fmtEur(pv.prijs) : ''}</span></button>`; }).join('')}</div>
+    <label for="freetext" class="flabel2">Iets anders toevoegen</label>
+    <input type="text" id="freetext" maxlength="60" list="extra-namen" placeholder="Bijvoorbeeld: tandpasta" autocomplete="off">
+    <datalist id="extra-namen">${EXTRA.map(e => `<option value="${esc(e[0])}">`).join('')}</datalist>
+    <div class="fprijs small" id="fprijs" aria-live="polite"></div>
+    <div class="frij">
+      <div class="fveld"><span class="flabel2">Aantal</span>
+        <div class="stepper"><button type="button" data-faantal="-1" aria-label="Eén minder">−</button><span id="faantal">${fAantal}</span><button type="button" data-faantal="1" aria-label="Eén meer">+</button></div></div>
+      <label class="fveld"><span class="flabel2">Prijs per stuk</span>
+        <span class="eurveld"><span>€</span><input type="text" inputmode="decimal" id="fprijsin" placeholder="0,00" autocomplete="off"></span></label>
+    </div>
+    <button class="btn primary" type="submit">Op de lijst</button>
   </form>
   ${order.map(w => { const items = groups.get(w).slice().sort((a, b) => a.gekocht - b.gekocht); return `
     <article class="card shopgroup">
@@ -1945,17 +2065,25 @@ function viewList() {
       <ul class="ingr shop">${items.map(i => { const c = cost(i); const b = w && i.k ? best(i.k) : null; return `
         <li class="${i.gekocht ? 'done' : ''}">
           <input type="checkbox" id="l-${i.id}" data-lcheck="${i.id}" ${i.gekocht ? 'checked' : ''} aria-label="${esc(i.n)} gekocht">
-          <label for="l-${i.id}" class="lmain">${artIcon(i.k, i.n, 28)}<span class="ltext"><span class="iname">${esc(shownName(i.n))}</span>
-            <span class="lsub small muted">${esc([listQty(i), b ? b.actie : ''].filter(Boolean).join(' · '))}</span></span></label>
-          ${c ? (i.k ? `<button class="leur" data-cmp="${i.k}">${fmtEur(c.eur)}</button>` : `<span class="leur">${fmtEur(c.eur)}</span>`) : '<span class="leur muted">–</span>'}
+          <label for="l-${i.id}" class="lmain">${i.q == null ? extraIcoon(i, 28) : artIcon(i.k, i.n, 28)}<span class="ltext"><span class="iname">${esc(shownName(i.n))}</span>
+            <span class="lsub small muted">${esc(i.q == null
+              ? [i.prijs != null ? `${i.aantal || 1} × ${fmtEur(i.prijs)}` : (i.aantal > 1 ? `${i.aantal} stuks` : ''), i.prijsBron === 'actie' ? 'actieprijs' : i.prijsBron === 'richt' ? 'richtprijs' : ''].filter(Boolean).join(' · ')
+              : [listQty(i), b ? b.actie : ''].filter(Boolean).join(' · '))}</span></span></label>
+          ${i.q == null ? `<button class="leur${c ? '' : ' leeg'}" data-ledit="${i.id}" aria-label="Prijs en aantal van ${esc(i.n)} aanpassen">${c ? fmtEur(c.eur) : 'Prijs?'}</button>`
+            : c ? (i.k ? `<button class="leur" data-cmp="${i.k}">${fmtEur(c.eur)}</button>` : `<span class="leur">${fmtEur(c.eur)}</span>`) : '<span class="leur muted">–</span>'}
           <button class="lrm" data-lrm="${i.id}" aria-label="${esc(i.n)} verwijderen">×</button>
+          ${lEdit === i.id ? `<div class="ledit">
+            <div class="stepper"><button type="button" data-lstap="-1" data-id="${i.id}" aria-label="Eén minder">−</button><span>${i.aantal || 1}</span><button type="button" data-lstap="1" data-id="${i.id}" aria-label="Eén meer">+</button></div>
+            <span class="eurveld"><span>€</span><input type="text" inputmode="decimal" id="lprijs-${i.id}" value="${i.prijs != null ? i.prijs.toFixed(2).replace('.', ',') : ''}" placeholder="0,00" aria-label="Prijs per stuk"></span>
+            <button class="btn primary" type="button" data-lok="${i.id}">Klaar</button>
+          </div>` : ''}
         </li>`; }).join('')}</ul>
     </article>`; }).join('')}
   ${lijst.length ? `<div class="actions">
     ${lijst.some(i => i.gekocht) ? '<button class="btn" data-lclean>Afgevinkte weghalen</button>' : ''}
     <button class="btn danger" data-lclear>Lijst leegmaken</button>
   </div>
-  <p class="small muted" style="margin:0">Bedragen gaan over de hoeveelheid die je nodig hebt, niet over hele verpakkingen. Tik op een bedrag om de winkels te vergelijken.</p>` : ''}`;
+  <p class="small muted" style="margin:0">Bij recepten gaat het bedrag over de hoeveelheid die je nodig hebt, niet over hele verpakkingen; tik erop om winkels te vergelijken. Bij extra boodschappen tik je op het bedrag om de prijs of het aantal te veranderen.</p>` : ''}`;
 }
 
 function fmtStamp(t) {
@@ -2441,7 +2569,7 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
   if (t.dataset.like) {
     const p = (feed || []).find(x => x.id === t.dataset.like); if (!p) return;
@@ -2535,6 +2663,25 @@ app.addEventListener('click', e => {
   else if (t.dataset.cmp) { e.preventDefault(); openCompare(t.dataset.cmp); }
   else if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
   else if (t.hasAttribute('data-agenda')) zetInAgenda();
+  else if (t.dataset.snel) {
+    const n = t.dataset.snel, pv = prijsVoor(n);
+    voegExtraToe(n, 1, pv.prijs, pv.bron); render();
+    const it = lijst.find(x => !x.gekocht && x.q == null && x.n === n);
+    toast(`${n} staat op je lijst${it && it.aantal > 1 ? ` (${it.aantal} stuks)` : ''}${pv.prijs != null ? ` · ${fmtEur(pv.prijs)} per stuk` : ''}.`);
+  }
+  else if (t.dataset.faantal) { fAantal = Math.max(1, Math.min(99, fAantal + Number(t.dataset.faantal))); document.getElementById('faantal').textContent = fAantal; }
+  else if (t.dataset.ledit) { lEdit = lEdit === t.dataset.ledit ? null : t.dataset.ledit; render(); const f = document.getElementById('lprijs-' + lEdit); if (f) f.focus(); }
+  else if (t.dataset.lstap) {
+    const i = lijst.find(x => x.id === t.dataset.id); if (!i) return;
+    const f = document.getElementById('lprijs-' + i.id); const pr = f ? leesEuro(f.value) : null;
+    if (f && pr != null && pr !== i.prijs) { i.prijs = pr; i.prijsBron = 'eigen'; }
+    i.aantal = Math.max(1, Math.min(99, (i.aantal || 1) + Number(t.dataset.lstap))); persistList(); render();
+  }
+  else if (t.dataset.lok) {
+    const i = lijst.find(x => x.id === t.dataset.lok); const f = document.getElementById('lprijs-' + t.dataset.lok);
+    if (i && f) { const pr = leesEuro(f.value); if (pr !== i.prijs) { i.prijs = pr; i.prijsBron = pr == null ? null : 'eigen'; } }
+    lEdit = null; persistList(); render();
+  }
   else if (t.dataset.swap) swap(+t.dataset.swap);
   else if (t.dataset.reset) resetDay(+t.dataset.reset);
   else if (t.dataset.offer) {
@@ -2552,6 +2699,18 @@ app.addEventListener('click', e => {
   } else if (t.id === 'wis') { saveOffers([]); render(); openManual(); }
 });
 
+app.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'freetext') {
+    const out = document.getElementById('fprijs'), inv = document.getElementById('fprijsin');
+    const v = t.value.trim(); const pv = v.length > 1 ? prijsVoor(v) : { prijs: null };
+    out.textContent = pv.prijs == null ? (v.length > 1 ? 'Geen prijs bekend. Vul hieronder zelf een prijs in als je wilt.' : '')
+      : pv.bron === 'actie' ? `In de aanbieding bij ${pv.winkel}: ${fmtEur(pv.prijs)}${pv.per ? ' (' + pv.per + ')' : ''}` : `Richtprijs ongeveer ${fmtEur(pv.prijs)} (${pv.per})`;
+    out.classList.toggle('actie', pv.bron === 'actie');
+    if (!inv.dataset.eigen) inv.value = pv.prijs != null ? pv.prijs.toFixed(2).replace('.', ',') : '';
+  }
+  else if (t.id === 'fprijsin') { t.dataset.eigen = t.value ? '1' : ''; }
+});
 app.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'winkel') { offers = { ...offers, winkel: t.value }; store.set('offers', offers); render(); openManual(); }
@@ -2602,8 +2761,12 @@ app.addEventListener('submit', e => {
   e.preventDefault();
   const v = document.getElementById('freetext').value.trim().slice(0, 60);
   if (!v) return;
-  lijst.push({ id: Math.random().toString(36).slice(2, 10), n: v, k: detectKey(v), q: null, u: '', bron: [], gekocht: false });
-  persistList(); render();
+  const inv = document.getElementById('fprijsin'), pv = prijsVoor(v);
+  const eigen = leesEuro(inv.value);
+  const prijs = eigen != null ? eigen : pv.prijs;
+  voegExtraToe(v.charAt(0).toUpperCase() + v.slice(1), fAantal, prijs, eigen != null && inv.dataset.eigen ? 'eigen' : pv.bron);
+  toast(`${fAantal > 1 ? fAantal + ' × ' : ''}${v.charAt(0).toUpperCase() + v.slice(1)} staat op je lijst${prijs != null ? ` (${fmtEur(prijs * fAantal)})` : ''}.`);
+  fAantal = 1; render();
   const f = document.getElementById('freetext'); if (f) f.focus();
 });
 app.addEventListener('submit', e => {
