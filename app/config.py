@@ -78,10 +78,17 @@ class Settings(BaseSettings):
     # documenten NOOIT naar Basecone mogen, zelfs niet als extractie ze
     # herkent als een gewone uitgaande inkoopfactuur -- ze gaan al via een
     # ander kanaal de boekhouding in. Standaard: de Lease a Bike-"facturen"
-    # (Mobility Services/VWPFS) zijn kopieën van onze eigen kassaverkoop via
-    # CycleSoftware, die al automatisch via Twinfield wordt geboekt --
-    # nogmaals doorsturen zou een dubbele boeking veroorzaken.
-    basecone_exclude_suppliers: str = "Mobility Services,Lease a Bike,VWPFS,CycleSoftware"
+    # (Mobility Services/VWPFS) en HelloRider-documenten zijn kopieën van
+    # onze eigen kassaverkoop via CycleSoftware, die al automatisch via
+    # Twinfield wordt geboekt -- nogmaals doorsturen zou een dubbele
+    # boeking veroorzaken.
+    basecone_exclude_suppliers: str = "Mobility Services,Lease a Bike,VWPFS,HelloRider,CycleSoftware"
+    # Uitzondering op de incoming-documenten-worden-nooit-doorgestuurd-regel:
+    # leveranciers (kommagescheiden, hoofdletterongevoelig) van wie een
+    # INKOMEND document (zie INCOMING_SUPPLIERS) wél naar Basecone moet.
+    # Standaard ENRA: hun rekening-courantoverzicht is, ook al is het geld
+    # inkomend, wel degelijk een document dat de boekhouder moet zien.
+    basecone_include_incoming: str = "ENRA"
     # Every inkoopfactuur must be forwarded here so it reaches Basecone/the
     # boekhouder -- a matched invoice that never got forwarded is still
     # effectively a vraagpost. Empty disables the whole Basecone-forward
@@ -123,6 +130,10 @@ class Settings(BaseSettings):
     @property
     def basecone_exclude_supplier_names(self) -> list[str]:
         return [s.strip().lower() for s in self.basecone_exclude_suppliers.split(",") if s.strip()]
+
+    @property
+    def basecone_include_incoming_names(self) -> list[str]:
+        return [s.strip().lower() for s in self.basecone_include_incoming.split(",") if s.strip()]
 
     # -- Sync scheduling --
     sync_interval_minutes: int = 60

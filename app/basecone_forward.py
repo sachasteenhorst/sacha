@@ -69,15 +69,24 @@ def not_applicable_reason(invoice: Invoice) -> str | None:
     extraction is about its number/amount -- distinct from "not yet sent":
     it already reaches the accountant through another channel (or isn't a
     purchase at all), so forwarding it would be a duplicate booking. Real
-    example: Mobility Services' Lease a Bike "factuur" is a copy of a sale
-    this shop's own till (CycleSoftware) already booked into Twinfield."""
-    if invoice.direction == Direction.INCOMING.value:
-        return "inkomend document, geen inkoopfactuur"
+    example: Mobility Services' Lease a Bike "factuur" (and HelloRider's)
+    is a copy of a sale this shop's own till (CycleSoftware) already booked
+    into Twinfield.
+
+    Checked before the incoming-direction check, not after: an excluded
+    supplier is never forwarded even if for some reason its direction
+    isn't incoming, and BASECONE_INCLUDE_INCOMING (ENRA) is a narrow
+    exception to the incoming-direction rule specifically, not a blanket
+    override of the supplier exclusion list."""
     supplier_lower = (invoice.supplier_name or "").lower()
     if any(name and name in supplier_lower for name in settings.own_company_name_list):
         return "eigen verkoopfactuur"
     if any(name and name in supplier_lower for name in settings.basecone_exclude_supplier_names):
         return "via CycleSoftware/Twinfield"
+    if invoice.direction == Direction.INCOMING.value:
+        if any(name and name in supplier_lower for name in settings.basecone_include_incoming_names):
+            return None
+        return "inkomend document, geen inkoopfactuur"
     return None
 
 

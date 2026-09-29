@@ -85,12 +85,24 @@ def test_is_forwardable_excludes_other_and_already_sent(tmp_path):
 
 
 def test_is_forwardable_excludes_incoming_documents(tmp_path):
-    # ENRA/HelloRider/Mobility Services -- money coming IN, never a bill this
-    # shop needs to pay, so it must never be auto-forwarded to Basecone.
-    incoming = make_invoice(tmp_path, supplier_name="ENRA", direction="incoming")
+    # An incoming document from a supplier with no BASECONE_INCLUDE_INCOMING
+    # exception -- money coming IN, never a bill this shop needs to pay, so
+    # it must never be auto-forwarded to Basecone.
+    incoming = make_invoice(tmp_path, supplier_name="Onbekende Incoming Leverancier", direction="incoming")
     assert bf.is_forwardable(incoming) is False
     assert bf.not_applicable_reason(incoming) is not None
     assert bf.basecone_status_label(incoming).startswith("n.v.t.")
+
+
+def test_is_forwardable_makes_an_exception_for_enra_despite_incoming_direction(tmp_path):
+    # ENRA's rekening-courantoverzicht IS incoming (money flowing in), but
+    # unlike HelloRider/Mobility Services it's a real document the
+    # accountant needs to see, not a CycleSoftware/Twinfield duplicate --
+    # BASECONE_INCLUDE_INCOMING carves out this one exception.
+    enra = make_invoice(tmp_path, supplier_name="ENRA", direction="incoming")
+    assert bf.is_forwardable(enra) is True
+    assert bf.not_applicable_reason(enra) is None
+    assert bf.basecone_status_label(enra) == "nee"
 
 
 def test_is_forwardable_excludes_own_company_sales_invoices(tmp_path):
@@ -99,13 +111,23 @@ def test_is_forwardable_excludes_own_company_sales_invoices(tmp_path):
 
 
 def test_is_forwardable_excludes_configured_suppliers(tmp_path):
-    # Real production case: Mobility Services' Lease a Bike "factuur" is a
-    # copy of a sale this shop's own till (CycleSoftware) already booked
-    # into Twinfield -- forwarding it too would double-book it.
-    for supplier in ("Mobility Services", "Lease a Bike", "VWPFS B.V.", "CycleSoftware"):
+    # Real production case: Mobility Services' Lease a Bike "factuur" and
+    # HelloRider's documents are copies of a sale this shop's own till
+    # (CycleSoftware) already booked into Twinfield -- forwarding them too
+    # would double-book it.
+    for supplier in ("Mobility Services", "Lease a Bike", "VWPFS B.V.", "HelloRider", "CycleSoftware"):
         excluded = make_invoice(tmp_path, supplier_name=supplier)
         assert bf.is_forwardable(excluded) is False, supplier
         assert "CycleSoftware/Twinfield" in bf.basecone_status_label(excluded)
+
+
+def test_is_forwardable_excludes_hellorider_even_though_it_is_incoming(tmp_path):
+    # HelloRider is BOTH an incoming-direction supplier AND on the
+    # exclude list -- unlike ENRA, it has no BASECONE_INCLUDE_INCOMING
+    # exception, so it must stay excluded.
+    hellorider = make_invoice(tmp_path, supplier_name="HelloRider", direction="incoming")
+    assert bf.is_forwardable(hellorider) is False
+    assert "CycleSoftware/Twinfield" in bf.basecone_status_label(hellorider)
 
 
 def test_is_forwardable_true_for_normal_outgoing_supplier_invoice(tmp_path):
