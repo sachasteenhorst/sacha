@@ -3,8 +3,9 @@ ever made. Field names/response shapes here are this project's best-effort
 reading of Ponto Connect's public JSON:API docs (see the module's own
 docstring for the "not tried against a real account yet" caveat); these
 tests verify OUR OWN code's logic (auth caching, pagination, dedup, the
-consent-expiry warning) against that assumed shape, not that the assumed
-shape itself is exactly right.
+consent-expiry warning, and -- critically -- that the scheduled/read-only
+path NEVER triggers a synchronization) against that assumed shape, not that
+the assumed shape itself is exactly right.
 """
 from datetime import date, datetime, timedelta
 
@@ -13,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import app.bank_ponto as bank_ponto
-from app.bank_ponto import PontoError, ponto_configured, run_ponto_sync
+from app.bank_ponto import PontoError, ponto_configured, run_manual_ponto_refresh, run_ponto_sync
 from app.config import settings
 from app.db import Base
 from app.models import Transaction
@@ -33,10 +34,6 @@ def session():
 def _configure_ponto(monkeypatch):
     monkeypatch.setattr(settings, "ponto_client_id", "client-123")
     monkeypatch.setattr(settings, "ponto_client_secret", "secret-456")
-    monkeypatch.setattr(settings, "ponto_cert_path", "")
-    monkeypatch.setattr(settings, "ponto_key_path", "")
-    monkeypatch.setattr(settings, "ponto_key_password", "")
-    monkeypatch.setattr(settings, "ponto_signature_key_id", "")
     # Fresh auth cache per test.
     bank_ponto._auth = bank_ponto._PontoAuth()
     bank_ponto._state = bank_ponto.PontoSyncState()
@@ -53,6 +50,26 @@ class FakeResponse:
         return self._json
 
 
+def _fake_token_post(url, data=None, auth=None, timeout=None):
+    assert url == bank_ponto.PONTO_TOKEN_URL
+    assert url == "https://api.ponto.com/oauth2/token"
+    assert auth == (settings.ponto_client_id, settings.ponto_client_secret)
+    return FakeResponse(200, {"access_token": "tok-1", "expires_in": 1800})
+
+
+ONE_TRANSACTION_PAYLOAD = {
+    "data": [{
+        "id": "tx-1",
+        "attributes": {
+            "amount": "-39.60", "executionDate": "2026-09-15", "currency": "EUR",
+            "remittanceInformation": "Factuur F-1", "counterpartName": "Kruitbosch",
+            "counterpartReference": "NL00RABO0123456789",
+        },
+    }],
+    "links": {},
+}
+
+
 def test_ponto_configured_false_without_credentials(monkeypatch):
     monkeypatch.setattr(settings, "ponto_client_id", "")
     monkeypatch.setattr(settings, "ponto_client_secret", "")
@@ -66,56 +83,52 @@ def test_run_ponto_sync_noop_when_not_configured(session, monkeypatch):
     assert result.errors == []
 
 
-def test_run_ponto_sync_fetches_transactions_and_creates_rows(session, monkeypatch):
+# -- run_ponto_sync (the scheduled job) must NEVER trigger a synchronization --
+
+def test_run_ponto_sync_never_calls_synchronizations_endpoint(session, monkeypatch):
     calls = []
 
-    def fake_post(url, data=None, auth=None, cert=None, timeout=None):
-        calls.append(("POST", url, data))
-        if url == bank_ponto.PONTO_TOKEN_URL:
-            return FakeResponse(200, {"access_token": "tok-1", "expires_in": 3600})
-        if url.endswith("/synchronizations"):
-            return FakeResponse(200, {"data": {"id": "sync-1"}})
-        raise AssertionError(f"unexpected POST {url}")
-
-    def fake_request(method, url, headers=None, cert=None, timeout=None, params=None, json=None):
-        calls.append((method, url, params))
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        calls.append((method, url))
         if url.endswith("/accounts"):
             return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
-        if url.endswith("/synchronizations"):
-            return FakeResponse(200, {"data": {"id": "sync-1"}})
-        if "/synchronizations/" in url:
-            return FakeResponse(200, {"data": {"attributes": {"status": "success"}}})
         if url.endswith("/transactions"):
-            return FakeResponse(200, {
-                "data": [
-                    {
-                        "id": "tx-1",
-                        "attributes": {
-                            "amount": "-39.60",
-                            "executionDate": "2026-09-15",
-                            "currency": "EUR",
-                            "remittanceInformation": "Factuur F-1",
-                            "counterpartName": "Kruitbosch",
-                            "counterpartReference": "NL00RABO0123456789",
-                        },
-                    }
-                ],
-                "links": {},
-            })
-        raise AssertionError(f"unexpected {method} {url}")
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)
+        raise AssertionError(f"unexpected {method} {url} -- run_ponto_sync must be read-only")
 
-    monkeypatch.setattr(bank_ponto.requests, "post", fake_post)
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
     monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
 
     result = run_ponto_sync(session)
 
     assert result.errors == []
     assert result.new_transactions == 1
+    assert not any("/synchronizations" in url for _, url in calls)
     tx = session.query(Transaction).one()
     assert tx.external_ref == "ponto:tx-1"
     assert tx.amount_cents == -3960
     assert tx.counterparty_name == "Kruitbosch"
-    assert bank_ponto.get_state().last_synced_at is not None
+    assert bank_ponto.get_state().last_read_at is not None
+
+
+def test_run_ponto_sync_records_ponto_reported_synchronized_at(session, monkeypatch):
+    synced_at = "2026-09-29T06:00:00Z"
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {"synchronizedAt": synced_at}}]})
+        if url.endswith("/transactions"):
+            return FakeResponse(200, {"data": [], "links": {}})
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    run_ponto_sync(session)
+
+    state = bank_ponto.get_state()
+    assert state.last_ponto_synchronized_at is not None
+    assert state.last_ponto_synchronized_at.year == 2026
 
 
 def test_run_ponto_sync_skips_transaction_already_imported_from_csv(session, monkeypatch):
@@ -131,33 +144,14 @@ def test_run_ponto_sync_skips_transaction_already_imported_from_csv(session, mon
     ))
     session.commit()
 
-    def fake_post(url, data=None, auth=None, cert=None, timeout=None):
-        if url == bank_ponto.PONTO_TOKEN_URL:
-            return FakeResponse(200, {"access_token": "tok-1", "expires_in": 3600})
-        return FakeResponse(200, {"data": {"id": "sync-1"}})
-
-    def fake_request(method, url, headers=None, cert=None, timeout=None, params=None, json=None):
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
         if url.endswith("/accounts"):
             return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
-        if url.endswith("/synchronizations"):
-            return FakeResponse(200, {"data": {"id": "sync-1"}})
-        if "/synchronizations/" in url:
-            return FakeResponse(200, {"data": {"attributes": {"status": "success"}}})
         if url.endswith("/transactions"):
-            return FakeResponse(200, {
-                "data": [{
-                    "id": "tx-1",
-                    "attributes": {
-                        "amount": "-39.60", "executionDate": "2026-09-15", "currency": "EUR",
-                        "remittanceInformation": "Factuur F-1", "counterpartName": "Kruitbosch",
-                        "counterpartReference": "NL00RABO0123456789",
-                    },
-                }],
-                "links": {},
-            })
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)
         raise AssertionError(f"unexpected {method} {url}")
 
-    monkeypatch.setattr(bank_ponto.requests, "post", fake_post)
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
     monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
 
     result = run_ponto_sync(session)
@@ -169,23 +163,14 @@ def test_run_ponto_sync_skips_transaction_already_imported_from_csv(session, mon
 def test_run_ponto_sync_warns_when_consent_expires_soon(session, monkeypatch):
     expiry = (datetime.utcnow() + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def fake_post(url, data=None, auth=None, cert=None, timeout=None):
-        if url == bank_ponto.PONTO_TOKEN_URL:
-            return FakeResponse(200, {"access_token": "tok-1", "expires_in": 3600})
-        return FakeResponse(200, {"data": {"id": "sync-1"}})
-
-    def fake_request(method, url, headers=None, cert=None, timeout=None, params=None, json=None):
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
         if url.endswith("/accounts"):
             return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {"authorizationExpirationExpectedAt": expiry}}]})
-        if url.endswith("/synchronizations"):
-            return FakeResponse(200, {"data": {"id": "sync-1"}})
-        if "/synchronizations/" in url:
-            return FakeResponse(200, {"data": {"attributes": {"status": "success"}}})
         if url.endswith("/transactions"):
             return FakeResponse(200, {"data": [], "links": {}})
         raise AssertionError(f"unexpected {method} {url}")
 
-    monkeypatch.setattr(bank_ponto.requests, "post", fake_post)
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
     monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
 
     result = run_ponto_sync(session)
@@ -194,7 +179,7 @@ def test_run_ponto_sync_warns_when_consent_expires_soon(session, monkeypatch):
 
 
 def test_run_ponto_sync_records_error_on_auth_failure(session, monkeypatch):
-    def fake_post(url, data=None, auth=None, cert=None, timeout=None):
+    def fake_post(url, data=None, auth=None, timeout=None):
         return FakeResponse(401, text="invalid_client")
 
     monkeypatch.setattr(bank_ponto.requests, "post", fake_post)
@@ -205,15 +190,72 @@ def test_run_ponto_sync_records_error_on_auth_failure(session, monkeypatch):
     assert bank_ponto.get_state().last_error is not None
 
 
-def test_client_cert_raises_clear_error_for_encrypted_key(monkeypatch):
-    monkeypatch.setattr(settings, "ponto_cert_path", "/tmp/cert.pem")
-    monkeypatch.setattr(settings, "ponto_key_path", "/tmp/key.pem")
-    monkeypatch.setattr(settings, "ponto_key_password", "secret")
-    with pytest.raises(PontoError):
-        bank_ponto._client_cert()
+def test_token_request_never_sends_a_client_certificate(session, monkeypatch):
+    # Per Ponto's docs for a custom integration: Client Credentials only,
+    # no mTLS -- requests.post must never be called with a cert kwarg.
+    captured = {}
+
+    def fake_post(url, data=None, auth=None, timeout=None, **kwargs):
+        captured.update(kwargs)
+        return FakeResponse(200, {"access_token": "tok-1", "expires_in": 1800})
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None, **kwargs):
+        captured.update(kwargs)
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": []})
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", fake_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    run_ponto_sync(session)
+    assert "cert" not in captured
 
 
-def test_signature_headers_raise_when_configured_but_not_implemented(monkeypatch):
-    monkeypatch.setattr(settings, "ponto_signature_key_id", "key-1")
-    with pytest.raises(PontoError):
-        bank_ponto._signature_headers("GET", "/accounts")
+# -- run_manual_ponto_refresh ("Nu verversen") IS allowed to synchronize --
+
+def test_manual_refresh_requests_synchronization_with_requester_ip(session, monkeypatch):
+    calls = []
+
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        calls.append((method, url, headers))
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
+        if url.endswith("/synchronizations"):
+            return FakeResponse(200, {"data": {"id": "sync-1"}})
+        if "/synchronizations/" in url:
+            return FakeResponse(200, {"data": {"attributes": {"status": "success"}}})
+        if url.endswith("/transactions"):
+            return FakeResponse(200, ONE_TRANSACTION_PAYLOAD)
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_manual_ponto_refresh(session, "203.0.113.42")
+
+    assert result.errors == []
+    assert result.new_transactions == 1
+    sync_call = next(c for c in calls if c[1].endswith("/synchronizations"))
+    assert sync_call[2]["X-Forwarded-For"] == "203.0.113.42"
+
+
+def test_manual_refresh_requires_a_requester_ip(session, monkeypatch):
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        if url.endswith("/accounts"):
+            return FakeResponse(200, {"data": [{"id": "acc-1", "attributes": {}}]})
+        raise AssertionError(f"unexpected {method} {url}")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_manual_ponto_refresh(session, "")
+    assert len(result.errors) == 1
+    assert session.query(Transaction).count() == 0
+
+
+def test_manual_refresh_noop_when_not_configured(session, monkeypatch):
+    monkeypatch.setattr(settings, "ponto_client_id", "")
+    result = run_manual_ponto_refresh(session, "203.0.113.42")
+    assert result.new_transactions == 0
+    assert result.errors

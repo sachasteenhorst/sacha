@@ -175,17 +175,11 @@ class Settings(BaseSettings):
     # -- Ponto Connect (bankkoppeling) --
     # Leeg = uit; de app valt dan terug op handmatige CSV/CAMT.053/MT940-
     # upload. Zie README voor het aanmaken van een "Integration" in het
-    # Ponto-dashboard (OAuth2 Client Credentials, voor je EIGEN rekening --
-    # geen PSD2-multi-tenant AISP-flow).
+    # Ponto-dashboard. Authenticatie is voor een custom integratie altijd
+    # kaal OAuth2 Client Credentials (client ID + secret) -- geen
+    # certificaat, geen HTTP-signing.
     ponto_client_id: str = ""
     ponto_client_secret: str = ""
-    # Alleen invullen als Ponto voor jouw integratie mTLS/HTTP-signatures
-    # eist (zie hun documentatie/dashboard) -- de meeste Client Credentials-
-    # integraties hebben dit niet nodig.
-    ponto_cert_path: str = ""
-    ponto_key_path: str = ""
-    ponto_key_password: str = ""
-    ponto_signature_key_id: str = ""
 
     # -- CycleSoftware (kassasysteem) --
     # Placeholder voor een toekomstige live koppeling (CS Connect) -- zie

@@ -50,12 +50,16 @@
   {% if status_bar.ponto_enabled %}
   <span class="status-chip">
     <span class="status-dot status-{{ status_bar.ponto_status }}"></span> Bank: Ponto
-    {% if status_bar.ponto_last_synced_label %}
-      &mdash; laatst opgehaald {{ status_bar.ponto_last_synced_label }}
+    {% if status_bar.ponto_synced_label %}
+      &mdash; laatst gesynchroniseerd door Ponto {{ status_bar.ponto_synced_label }}
     {% else %}
       &mdash; nog niet gesynchroniseerd
     {% endif %}
   </span>
+  <form method="post" action="/bank/ponto/refresh" class="inline-form">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+    <button type="submit" class="btn btn-secondary">Nu verversen</button>
+  </form>
   {% endif %}
 </section>
 

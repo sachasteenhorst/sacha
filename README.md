@@ -337,43 +337,57 @@ documentatie die je van Basecone krijgt.
 ## Automatische bankkoppeling via Ponto Connect
 
 In plaats van steeds zelf een afschrift te downloaden en te uploaden, kan
-de app zelf elke 4 uur nieuwe transacties ophalen via **Ponto Connect**.
-Maak in het [Ponto-dashboard](https://myponto.com) een **Integration** aan
-(OAuth2 Client Credentials, voor je EIGEN rekening -- dit is niet de
-multi-tenant PSD2-AISP-flow voor boekhoudpakketten die bij klanten
-inloggen) en vul `PONTO_CLIENT_ID`/`PONTO_CLIENT_SECRET` in. Leeg laten
-zet de koppeling uit; je blijft dan gewoon op de handmatige upload
-hierboven werken.
+de app nieuwe transacties uitlezen via **Ponto Connect**. Maak in het
+[Ponto-dashboard](https://myponto.com) een **Integration** aan en vul
+`PONTO_CLIENT_ID`/`PONTO_CLIENT_SECRET` in. Leeg laten zet de koppeling
+uit; je blijft dan gewoon op de handmatige upload hierboven werken.
+Authenticatie is voor een eigen/custom integratie kaal **OAuth2 Client
+Credentials** (client ID + secret, Basic Auth tegen het token-endpoint,
+token ~30 minuten geldig) -- geen certificaat, geen HTTP-signing.
+
+**Belangrijk over hoe/wanneer gesynchroniseerd wordt** (dit is een harde
+regel uit Ponto's eigen voorwaarden, geen implementatiedetail):
+
+- **Ponto synchroniseert zelf** elke gekoppelde rekening met de bank, op
+  zijn eigen schema (ongeveer 4x per dag). Deze app hoeft en mag dat niet
+  zelf routinematig aanvragen.
+- Een synchronisatie **handmatig aanvragen** (de Ponto-API-aanroep die de
+  bank meteen laat verversen) mag **alleen** terwijl de echte gebruiker
+  erbij is, vanaf zijn eigen IP-adres. Dat vanuit een achtergrondtaak doen
+  is in strijd met Ponto's voorwaarden en kan tot blokkering van de
+  Integration leiden.
+- Daarom is de **achtergrondtaak** (elke paar uur, samen met de e-mailsync)
+  strikt **alleen-lezen**: die haalt alleen rekeningen en al geboekte
+  transacties op, en vraagt nooit een synchronisatie aan.
+- Alleen de knop **"Nu verversen"** op het dashboard vraagt wél een
+  synchronisatie aan -- en alleen dan, met het IP-adres van de ingelogde
+  gebruiker (uitgelezen uit de `X-Forwarded-For`-header die Caddy/de
+  reverse proxy meestuurt) erbij, zoals Ponto voor een handmatige
+  verversing vereist.
+- Er wordt nooit een "pending" (nog niet geboekte) transactie opgeslagen --
+  alleen het geboekte-transacties-endpoint wordt aangeroepen.
 
 Nieuwe transacties worden vergeleken met wat je al zelf via een CSV/
 CAMT.053/MT940-bestand hebt geüpload (op datum+bedrag+tegenrekening+
 omschrijving), zodat een overlappende periode nooit dubbel geboekt wordt.
-Na elke Ponto-sync draaien matching, regels en (indien aan) het
-automatisch doorsturen naar Basecone meteen mee, net als bij een gewone
-upload of e-mail-sync.
+Na elke import (automatisch gelezen of via "Nu verversen") draaien
+matching, regels en (indien aan) het automatisch doorsturen naar Basecone
+meteen mee, net als bij een gewone upload of e-mail-sync.
 
 **Belangrijke kanttekening** (zelfde soort als bij de CSV/CAMT.053/MT940-
 parsers en de Basecone API-client): `app/bank_ponto.py` is gebouwd op
 Ponto Connect's publiek gedocumenteerde JSON:API-vorm, maar nog niet tegen
-een echte Ponto-integratie geprobeerd. Endpoint-paden en veldnamen kunnen
-een kleine aanpassing nodig hebben zodra je 'm met echte inloggegevens
-draait -- de foutmeldingen tonen exact wat Ponto terugstuurde. Twee dingen
-zijn bewust nog niet (volledig) geïmplementeerd omdat ze per Integration
-kunnen verschillen en gokken hier meer kwaad dan goed zou doen:
-- **mTLS-clientcertificaat** (`PONTO_CERT_PATH`/`PONTO_KEY_PATH`) werkt
-  alleen met een NIET-versleutelde sleutel; is `PONTO_KEY_PASSWORD`
-  ingevuld, ontsleutel de sleutel dan eenmalig zelf (`openssl rsa -in
-  key.pem -out key-plain.pem`) en wijs `PONTO_KEY_PATH` naar het
-  ontsleutelde bestand.
-- **HTTP message signatures** (`PONTO_SIGNATURE_KEY_ID`) -- als jouw
-  Integration dit vereist, geeft de app een duidelijke foutmelding in
-  plaats van een gegokte (en dus mogelijk verkeerde) implementatie.
+een echte Ponto-integratie geprobeerd. Endpoint-paden en veldnamen (zoals
+de exacte header die Ponto verwacht om bij een handmatige synchronisatie
+het IP van de eindgebruiker te identificeren -- hier verstuurd als
+`X-Forwarded-For`) kunnen een kleine aanpassing nodig hebben zodra je 'm
+met echte inloggegevens draait -- de foutmeldingen tonen exact wat Ponto
+terugstuurde.
 
-De meeste Client Credentials-integraties hebben geen van beide nodig.
-
-Het dashboard toont een statuschip **"Bank: Ponto"** met wanneer voor het
-laatst is opgehaald. Verloopt de toestemming binnen 14 dagen, of mislukt
-een sync, dan komt er een pushmelding (zie hieronder).
+Het dashboard toont een statuschip **"Bank: Ponto"** met wanneer Ponto zelf
+voor het laatst heeft gesynchroniseerd (`synchronizedAt`). Verloopt de
+toestemming binnen 14 dagen, of mislukt het lezen, dan komt er een
+pushmelding (zie hieronder).
 
 ## Push-meldingen op je telefoon
 

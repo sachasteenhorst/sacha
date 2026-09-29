@@ -58,6 +58,10 @@ def _job() -> None:
 
 
 def _ponto_job() -> None:
+    """Read-only: Ponto synchronizes each account with the bank itself
+    (about 4x/day); this only ever reads whatever Ponto already has, never
+    triggers a synchronization (see app/bank_ponto.py's module docstring --
+    that's only allowed from an actual user click)."""
     if not ponto_configured():
         return
     session = SessionLocal()

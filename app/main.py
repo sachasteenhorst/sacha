@@ -23,8 +23,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
-from app.bank_ponto import get_state as get_ponto_state
-from app.bank_ponto import ponto_configured
+from app.bank_ponto import PontoError, get_state as get_ponto_state
+from app.bank_ponto import ponto_configured, run_manual_ponto_refresh
 from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
 from app.cyclesoftware_upload import CycleSoftwareImportError, import_sales_invoices
@@ -251,6 +251,18 @@ def _dot_status(configured: bool, error: str | None) -> str:
     return "grey"
 
 
+def _client_ip(request: Request) -> str:
+    """The real end user's IP behind the reverse proxy (Caddy sets
+    X-Forwarded-For) -- needed for a manual Ponto synchronization request,
+    which Ponto only allows while attached to the actual user's own IP (see
+    app/bank_ponto.py's module docstring). Falls back to the direct
+    connection's address when there's no proxy in front (e.g. local dev)."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
 @app.get("/")
 def index(user: str = Depends(require_auth)):
     return RedirectResponse(url="/dashboard")
@@ -358,9 +370,9 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     bank_error = last.basecone_error if settings.basecone_enabled else None
 
     ponto_state = get_ponto_state()
-    ponto_last_synced_label = (
-        ponto_state.last_synced_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
-        if ponto_state.last_synced_at else None
+    ponto_synced_label = (
+        ponto_state.last_ponto_synchronized_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
+        if ponto_state.last_ponto_synchronized_at else None
     )
 
     status_bar = {
@@ -374,8 +386,8 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         ),
         "latest_statement_label": _dutch_date(latest_statement_date) if latest_statement_date else None,
         "ponto_enabled": ponto_configured(),
-        "ponto_status": _dot_status(ponto_state.last_synced_at is not None, ponto_state.last_error),
-        "ponto_last_synced_label": ponto_last_synced_label,
+        "ponto_status": _dot_status(ponto_state.last_read_at is not None, ponto_state.last_error),
+        "ponto_synced_label": ponto_synced_label,
     }
 
     # -- Month dropdown options --
@@ -467,6 +479,30 @@ async def upload_bank_file(
     if result.errors:
         return _dashboard_redirect(q, maand, upload_error=result.errors[0])
     return _dashboard_redirect(q, maand, upload_new=str(result.new_transactions), upload_skipped=str(result.skipped))
+
+
+@app.post("/bank/ponto/refresh")
+def refresh_ponto(
+    request: Request,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    """The ONLY code path allowed to trigger a Ponto synchronization (see
+    app/bank_ponto.py's module docstring) -- Ponto only permits a manual
+    synchronization request while attached to the real end user's own IP,
+    so this must only ever run from an actual dashboard click, never a
+    background job."""
+    try:
+        result = run_manual_ponto_refresh(session, _client_ip(request))
+    except PontoError as exc:
+        session.rollback()
+        return _dashboard_redirect(q, maand, upload_error=str(exc))
+    session.commit()
+    if result.errors:
+        return _dashboard_redirect(q, maand, upload_error=result.errors[0])
+    return _dashboard_redirect(q, maand, upload_new=str(result.new_transactions))
 
 
 @app.post("/match-groups/{group_id}/confirm")
