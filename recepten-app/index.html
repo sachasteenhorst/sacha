@@ -757,6 +757,10 @@
   .knav .btn { min-height: 60px; font-size: 19px; }
   .knav .btn:disabled { opacity: .4; }
   .card.samen { display: grid; gap: 12px; }
+  .meldlink { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 10px 4px; min-height: 44px; }
+  .meldvak { display: grid; gap: 6px; margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--tile); border: 1px solid var(--tile-edge); }
+  .meldreden { display: flex; gap: 10px; align-items: center; min-height: 40px; font-size: 16px; cursor: pointer; }
+  .meldreden input { width: 20px; height: 20px; accent-color: var(--green); }
   .samenkop { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
   .samenkop > span:last-child { display: flex; flex-direction: column; gap: 2px; }
   .samenkop b { font-family: var(--display); font-size: 19px; }
@@ -2467,6 +2471,18 @@ function verklein(file) {
     img.onerror = () => rej(new Error('foto')); img.src = url;
   });
 }
+// Melden en blokkeren: wat je meldt of blokkeert, zie je op dit toestel direct niet meer
+let verborgenPosts = store.get('verborgenPosts', []), geblokkeerd = store.get('geblokkeerd', []), meldOpen = null;
+const zichtbaarInFeed = p => !verborgenPosts.includes(p.id) && !geblokkeerd.some(g => g.id === p.user_id);
+const REDENEN = [['ongepast', 'Ongepast of beledigend'], ['reclame', 'Reclame of spam'], ['geen recept', 'Geen recept'], ['anders', 'Iets anders']];
+async function meldPost(id, reden, blokkeer) {
+  const p = (feed || []).find(x => x.id === id); if (!p) return;
+  verborgenPosts = [...verborgenPosts, id]; store.set('verborgenPosts', verborgenPosts);
+  if (blokkeer && !geblokkeerd.some(g => g.id === p.user_id)) { geblokkeerd = [...geblokkeerd, { id: p.user_id, naam: p.auteur }]; store.set('geblokkeerd', geblokkeerd); }
+  meldOpen = null; render();
+  toast(blokkeer ? `Bedankt voor je melding. Je ziet ${p.auteur} niet meer.` : 'Bedankt voor je melding. Het bericht is verborgen.');
+  try { await sbInit(); await sb.from('meldingen').insert({ recept_id: id, reden }); } catch (e) {}
+}
 function postCard(p) {
   const likes = p.likes || [], mine = likes.some(l => l.user_id === sbUid), eigen = p.user_id === sbUid;
   const keys = [...new Set(p.ingredienten.map(detectKey).filter(Boolean))];
@@ -2489,8 +2505,14 @@ function postCard(p) {
     <div class="actions">
       <button class="btn fav${mine ? ' on' : ''}" data-like="${p.id}" aria-pressed="${mine}">${mine ? '♥' : '♡'} ${likes.length}</button>
       <button class="btn" data-postlist="${p.id}">Op boodschappenlijst</button>
-      ${eigen ? `<button class="btn danger" data-postdel="${p.id}">Verwijderen</button>` : ''}
+      ${eigen ? `<button class="btn danger" data-postdel="${p.id}">Verwijderen</button>` : `<button class="meldlink" data-meld="${p.id}" aria-expanded="${meldOpen === p.id}">Melden</button>`}
     </div>
+    ${meldOpen === p.id ? `<form class="meldvak" data-meldform="${p.id}">
+      <b>Wat is er mis met dit bericht?</b>
+      ${REDENEN.map(([v, t], n) => `<label class="meldreden"><input type="radio" name="reden" value="${v}" ${n === 0 ? 'checked' : ''}> ${t}</label>`).join('')}
+      <label class="meldreden"><input type="checkbox" name="blokkeer"> Ook ${esc(p.auteur)} blokkeren</label>
+      <div class="actions" style="margin:0"><button class="btn primary" type="submit">Melden</button><button class="btn" type="button" data-meld="${p.id}">Annuleren</button></div>
+    </form>` : ''}
   </article>`;
 }
 function viewTijdlijn() {
@@ -2527,8 +2549,9 @@ function viewTijdlijn() {
     </form>
   </article>` : `<div class="actions" style="margin-top:0"><button class="btn primary" data-deel="1">+ Deel een recept</button><button class="btn" data-refresh>Vernieuwen</button></div>`) : '';
   const lijst = feedErr ? `<article class="card"><p style="margin:0 0 10px">${esc(feedErr)}</p><button class="btn" data-refresh>Opnieuw proberen</button></article>`
-    : feed.length ? feed.map(postCard).join('') : `<article class="card empty">${produceRow(['pompoen', 'aardbei', 'avocado'])}<p style="margin:0">Nog niemand heeft een recept gedeeld. Wees de eerste!</p></article>`;
-  return kop + naam + form + `<div class="feed">${lijst}</div>` + (schermnaam ? `<p class="small muted" style="margin:0">Je deelt als <b>${esc(schermnaam)}</b>. <button class="linkbtn" data-naamwissel>Naam wijzigen</button></p>` : '');
+    : feed.filter(zichtbaarInFeed).length ? feed.filter(zichtbaarInFeed).map(postCard).join('') : `<article class="card empty">${produceRow(['pompoen', 'aardbei', 'avocado'])}<p style="margin:0">Nog niemand heeft een recept gedeeld. Wees de eerste!</p></article>`;
+  const blok = geblokkeerd.length || verborgenPosts.length ? `<p class="small muted" style="margin:0">${geblokkeerd.length ? `Geblokkeerd: ${esc(geblokkeerd.map(g => g.naam).join(', '))}. ` : ''}${verborgenPosts.length ? `${verborgenPosts.length} gemeld bericht${verborgenPosts.length > 1 ? 'en' : ''} verborgen. ` : ''}<button class="linkbtn" data-deblok>Alles weer tonen</button></p>` : '';
+  return kop + naam + form + `<div class="feed">${lijst}</div>` + blok + (schermnaam ? `<p class="small muted" style="margin:0">Je deelt als <b>${esc(schermnaam)}</b>. <button class="linkbtn" data-naamwissel>Naam wijzigen</button></p>` : '');
 }
 async function plaatsRecept() {
   const err = document.getElementById('d-err'), btn = document.getElementById('d-send');
@@ -2855,8 +2878,10 @@ document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
   if (!t) return;
+  if (t.dataset.meld) { meldOpen = meldOpen === t.dataset.meld ? null : t.dataset.meld; render(); return; }
+  if (t.hasAttribute('data-deblok')) { geblokkeerd = []; verborgenPosts = []; store.set('geblokkeerd', []); store.set('verborgenPosts', []); render(); toast('Iedereen is weer zichtbaar.'); return; }
   if (t.dataset.like) {
     const p = (feed || []).find(x => x.id === t.dataset.like); if (!p) return;
     const mine = (p.likes || []).some(l => l.user_id === sbUid);
@@ -3047,6 +3072,10 @@ app.addEventListener('submit', e => {
     schermnaam = v; store.set('schermnaam', v); render(); return;
   }
   if (e.target.id === 'deelform') { e.preventDefault(); plaatsRecept(); return; }
+  if (e.target.dataset.meldform) {
+    e.preventDefault(); const f = e.target;
+    meldPost(f.dataset.meldform, f.querySelector('input[name=reden]:checked').value, f.querySelector('input[name=blokkeer]').checked); return;
+  }
   if (e.target.id === 'gcodeform') { e.preventDefault(); gedeeldMeedoen(document.getElementById('gcode').value); return; }
   if (e.target.id !== 'addfree') return;
   e.preventDefault();
