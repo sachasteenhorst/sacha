@@ -723,6 +723,39 @@
   .wwijzig { font-weight: 700; color: var(--green); flex: none; }
   ul.shop li { font-size: 16px; }
   .agendakaart { display: grid; gap: 12px; }
+  .kookstart { width: 100%; margin: 4px 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 17px; }
+  .kookstart svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  body.kookt { overflow: hidden; }
+  .kook {
+    position: fixed; inset: 0; z-index: 50; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; gap: 14px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(16px + env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+  }
+  .kook[hidden] { display: none; }
+  .kkop { display: flex; align-items: center; gap: 12px; }
+  .kkop h2 { font-size: 20px; flex: 1; min-width: 0; }
+  .kstop { order: 2; flex: none; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 0; background: var(--btn); color: var(--btn-ink); font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 2px 0 var(--btn-edge); }
+  .kvoortgang { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; flex: none; }
+  .kvoortgang span { display: block; height: 100%; background: var(--green); border-radius: 4px; transition: width .25s; }
+  .kwekkers { display: grid; gap: 8px; }
+  .kwekkers:empty { display: none; }
+  .kwek { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; background: var(--olive-soft); color: var(--olive); border-radius: 14px; padding: 8px 8px 8px 14px; font-weight: 700; }
+  .kwek b { font-size: 24px; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .kwek.af { background: var(--tag); color: var(--tag-ink); animation: kpuls 1s infinite; }
+  .kwek.af b { color: var(--tag-ink); font-size: 18px; }
+  .kwek button { width: 40px; height: 40px; border-radius: 12px; border: 0; background: rgba(0,0,0,.06); color: inherit; font-size: 16px; cursor: pointer; }
+  @keyframes kpuls { 50% { transform: scale(1.02); } }
+  @media (prefers-reduced-motion: reduce) { .kwek.af { animation: none; } }
+  .kinhoud { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .keyebrow { font-size: 15px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: .06em; }
+  .ktekst { font-size: clamp(24px, 6.6vw, 32px); line-height: 1.35; margin: 0; font-weight: 500; }
+  .kwekknop { align-self: flex-start; font-size: 18px; min-height: 54px; padding-inline: 20px; }
+  .kingr { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .kingr li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; font-size: 19px; }
+  .kgerei { margin: 0; font-size: 18px; }
+  .kklaar { flex: 1; display: grid; place-content: center; justify-items: center; gap: 16px; text-align: center; }
+  .knav { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; flex: none; }
+  .knav .btn { min-height: 60px; font-size: 19px; }
+  .knav .btn:disabled { opacity: .4; }
   .card.samen { display: grid; gap: 12px; }
   .samenkop { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
   .samenkop > span:last-child { display: flex; flex-direction: column; gap: 2px; }
@@ -827,6 +860,7 @@
 </nav>
 
 <div class="scan" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scan-title"></div>
+<div class="kook" id="kook" hidden role="dialog" aria-modal="true" aria-labelledby="kook-titel"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script>
@@ -1724,6 +1758,7 @@ function recipeBody(r, dayIndex) {
     ${r.gerei ? `<div class="section-title">Wat heb je nodig</div>
     <ul class="gerei">${r.gerei.map(g => `<li>${esc(g)}</li>`).join('')}</ul>` : ''}
     <div class="section-title">Bereiding <span class="small muted" style="font-family:var(--body);font-weight:400">· tik een stap aan als hij klaar is</span></div>
+    <button class="btn primary kookstart" data-kook="${r.id}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7zM2 11h20M9 4c-1 1.5 1 2.5 0 4M14 4c-1 1.5 1 2.5 0 4"/></svg>Start kookstand</button>
     <ol class="steps cook">${r.stappen.map(adultStep).filter(Boolean).map((t, n) => `<li><button class="stepbtn" data-step aria-pressed="false"><span class="snum">${n + 1}</span><span class="stext">${esc(t)}</span></button></li>`).join('')}</ol>
     ${r.tip ? `<div class="tipbox"><b>Tip</b> ${esc(r.tip)}</div>` : ''}
     ${hasBaby() ? babyBlock(r, ing) : ''}
@@ -1732,6 +1767,110 @@ function recipeBody(r, dayIndex) {
       ${overrides[iso(weekDates[dayIndex])] ? `<button class="btn" data-reset="${dayIndex}">Terug naar voorstel</button>` : ''}
     </div>` : ''}`;
 }
+
+/* ---------- Kookstand: één stap tegelijk, groot, scherm blijft aan, met kookwekkers ---------- */
+let kook = null, kookLock = null, kookTik = null;
+const kookEl = () => document.getElementById('kook');
+// '20 minuten', '10 à 12 minuten', '1 uur' → wekkers (in minuten); bij een bereik de kortste tijd, om op tijd te controleren
+function wekkersIn(t) {
+  const uit = [], re = /(\d+(?:[.,]\d+)?)(?:\s*(?:à|a|tot|-|–|of)\s*(\d+(?:[.,]\d+)?))?\s*(minuten|minuut|min\b|uur|kwartier)/gi;
+  let m;
+  while ((m = re.exec(t))) {
+    if (/^\s*(korter|langer|eerder|later|voor het einde|extra)/i.test(t.slice(m.index + m[0].length))) continue;   // 'twee minuten korter' is geen kooktijd
+    const v = parseFloat(m[1].replace(',', '.')); const eenheid = m[3].toLowerCase();
+    const min = eenheid === 'uur' ? v * 60 : eenheid === 'kwartier' ? v * 15 : v;
+    if (min >= 1 && min <= 300 && !uit.includes(min)) uit.push(min);
+  }
+  if (/\bkwartier\b/i.test(t) && !/\d\s*kwartier/i.test(t) && !uit.includes(15)) uit.push(15);
+  return uit;
+}
+const duurTekst = min => min >= 60 ? `${Math.floor(min / 60)} uur${min % 60 ? ' ' + (min % 60) + ' min' : ''}` : `${min} min`;
+const klok = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+async function schermAan() { try { if ('wakeLock' in navigator && !kookLock) { kookLock = await navigator.wakeLock.request('screen'); kookLock.addEventListener('release', () => { kookLock = null; }); } } catch (e) {} }
+function kookOpen(id) {
+  const r = RMAP[id] || (window.eigenRecept && eigenRecept(id)); if (!r) return;
+  const stappen = r.stappen.map(adultStep).filter(Boolean);
+  kook = { r, stappen, stap: 0, wekkers: (kook && kook.wekkers) || [] };
+  kookEl().hidden = false; document.body.classList.add('kookt');
+  schermAan(); kookTeken();
+  clearInterval(kookTik); kookTik = setInterval(kookTikken, 500);
+}
+function kookSluiten() {
+  if (kook && kook.wekkers.some(w => !w.klaar) && !confirm('Er loopt nog een kookwekker. Toch stoppen?')) return;
+  kook = null; kookEl().hidden = true; kookEl().innerHTML = ''; document.body.classList.remove('kookt');
+  clearInterval(kookTik); if (kookLock) { kookLock.release().catch(() => {}); kookLock = null; }
+}
+function kookTeken() {
+  const { r, stappen, stap } = kook, n = stappen.length;   // stap 0 = klaarzetten, laatste = smakelijk eten
+  const ing = effIngr(r);
+  const inhoud = stap === 0 ? `
+      <div class="keyebrow">Eerst klaarzetten</div>
+      <ul class="kingr">${ing.map(i => `<li>${artIcon(i.k, i.n, 30)}<span><b>${esc(i.n)}</b> ${esc(fmtQ(i))}</span></li>`).join('')}</ul>
+      ${r.gerei ? `<div class="keyebrow" style="margin-top:18px">Pak erbij</div><p class="kgerei">${esc(r.gerei.join(', '))}</p>` : ''}`
+    : stap > n ? `<div class="kklaar">${produceRow(['tomaat', 'broccoli', 'wortel'])}<p class="ktekst">Klaar! Eet smakelijk.</p></div>`
+    : `<div class="keyebrow">Stap ${stap} van ${n}</div><p class="ktekst">${esc(stappen[stap - 1])}</p>
+      ${wekkersIn(stappen[stap - 1]).map(min => `<button class="btn kwekknop" data-kwekker="${min}" data-klabel="${esc('Stap ' + stap)}">⏲ Wekker ${duurTekst(min)}</button>`).join('')}`;
+  kookEl().innerHTML = `
+    <div class="kkop">
+      <button class="kstop" data-kstop aria-label="Kookstand sluiten">✕ Stoppen</button>
+      <h2 id="kook-titel">${esc(r.naam)}</h2>
+    </div>
+    <div class="kvoortgang" aria-hidden="true"><span style="width:${Math.round(Math.min(stap, n + 1) / (n + 1) * 100)}%"></span></div>
+    <div class="kwekkers" id="kwekkers"></div>
+    <div class="kinhoud">${inhoud}</div>
+    <div class="knav">
+      <button class="btn" data-kvorige ${stap === 0 ? 'disabled' : ''}>‹ Vorige</button>
+      ${stap > n ? '<button class="btn primary" data-kstop>Sluiten</button>' : `<button class="btn primary" data-kvolgende>${stap === 0 ? 'Beginnen' : stap === n ? 'Klaar' : 'Volgende ›'}</button>`}
+    </div>`;
+  kookTikken();
+}
+function kookTikken() {
+  if (!kook) return;
+  const box = document.getElementById('kwekkers'); if (!box) return;
+  const nu = Date.now();
+  kook.wekkers.forEach(w => { if (!w.klaar && nu >= w.eind) { w.klaar = true; kookAlarm(w); } });
+  box.innerHTML = kook.wekkers.map(w => `<div class="kwek${w.klaar ? ' af' : ''}"><span>⏲ ${esc(w.label)}</span><b>${w.klaar ? 'Tijd is om!' : klok(w.eind - nu)}</b><button data-kwekweg="${w.id}" aria-label="Wekker weghalen">✕</button></div>`).join('');
+}
+function kookAlarm(w) {
+  try { navigator.vibrate && navigator.vibrate([500, 250, 500, 250, 500]); } catch (e) {}
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .45, .9].forEach(t => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.0001, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(.4, ctx.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + t + .35);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .4); });
+  } catch (e) {}
+  toast(`Wekker klaar: ${w.label}`);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-kook],[data-kstop],[data-kvorige],[data-kvolgende],[data-kwekker],[data-kwekweg]');
+  if (!t) return;
+  if (t.dataset.kook) { kookOpen(t.dataset.kook); return; }
+  if (!kook) return;
+  if (t.hasAttribute('data-kstop')) kookSluiten();
+  else if (t.hasAttribute('data-kvorige')) { kook.stap = Math.max(0, kook.stap - 1); kookTeken(); }
+  else if (t.hasAttribute('data-kvolgende')) { kook.stap = Math.min(kook.stappen.length + 1, kook.stap + 1); kookTeken(); }
+  else if (t.dataset.kwekker) {
+    const min = Number(t.dataset.kwekker);
+    kook.wekkers.push({ id: Math.random().toString(36).slice(2, 8), label: `${t.dataset.klabel} · ${duurTekst(min)}`, eind: Date.now() + min * 60000, klaar: false });
+    kookTikken(); toast(`Wekker gezet: ${duurTekst(min)}`);
+  }
+  else if (t.dataset.kwekweg) { kook.wekkers = kook.wekkers.filter(w => w.id !== t.dataset.kwekweg); kookTikken(); }
+});
+document.addEventListener('keydown', e => {
+  if (!kook) return;
+  if (e.key === 'ArrowRight') document.querySelector('#kook [data-kvolgende]')?.click();
+  else if (e.key === 'ArrowLeft') document.querySelector('#kook [data-kvorige]')?.click();
+  else if (e.key === 'Escape') kookSluiten();
+});
+(() => {   // vegen naar links/rechts = volgende/vorige stap
+  let x0 = null;
+  document.addEventListener('touchstart', e => { x0 = kook ? e.touches[0].clientX : null; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (x0 == null || !kook) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 70) document.querySelector(dx < 0 ? '#kook [data-kvolgende]' : '#kook [data-kvorige]')?.click();
+  }, { passive: true });
+})();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && kook) { schermAan(); kookTikken(); } });
 
 /* ---------- Weergaven ---------- */
 function viewToday() {
