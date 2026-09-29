@@ -118,6 +118,41 @@ def test_notify_new_payable_invoices_skips_incasso_and_already_notified(session,
     assert sent_notifications == []
 
 
+def test_notify_new_payable_invoices_caps_individual_pushes_and_sends_one_summary(session, sent_notifications):
+    # Real production scenario: after an upgrade, 258 invoices all had
+    # notified_new_invoice=False at once -- must never fire 258 pushes.
+    invoices = [
+        make_invoice(email_message_id=f"<m{i}>", invoice_number=f"F-{i}", supplier_name=f"Leverancier {i}")
+        for i in range(8)
+    ]
+    session.add_all(invoices)
+    session.commit()
+
+    sent = notify.notify_new_payable_invoices(session)
+
+    # 5 individual pushes + 1 summary push for the remaining 3.
+    assert sent == notify.MAX_NEW_INVOICE_PUSHES_PER_SYNC + 1
+    assert len(sent_notifications) == notify.MAX_NEW_INVOICE_PUSHES_PER_SYNC + 1
+    assert all(inv.notified_new_invoice for inv in invoices)
+    summary_call = sent_notifications[-1]
+    assert "3 nieuwe facturen" in summary_call["data"].decode("utf-8")
+
+
+def test_notify_new_payable_invoices_marks_reminder_notified_without_sending(session, sent_notifications):
+    # A supplier resending the same invoice (already pushed once) must
+    # never trigger a second push, even though it's a "new" DB row.
+    original = make_invoice(email_message_id="<a>", received_at=datetime(2026, 9, 1), notified_new_invoice=True)
+    reminder = make_invoice(email_message_id="<b>", received_at=datetime(2026, 9, 15), notified_new_invoice=False)
+    session.add_all([original, reminder])
+    session.commit()
+
+    sent = notify.notify_new_payable_invoices(session)
+
+    assert sent == 0
+    assert sent_notifications == []
+    assert reminder.notified_new_invoice is True
+
+
 # -- send_daily_payment_summary --
 
 def test_daily_summary_sends_when_something_overdue(session, sent_notifications):

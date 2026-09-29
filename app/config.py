@@ -162,6 +162,22 @@ class Settings(BaseSettings):
     # direct debit -- for the rare case a supplier switched from incasso to
     # invoiced payment.
     pay_manual_suppliers: str = ""
+    # Facturen ontvangen VOOR deze datum komen nooit in "Nog te betalen" of
+    # in een pushmelding terecht -- zonder deze grens zou een upgrade op een
+    # bestaande database in één klap honderden jaren-oude, allang-afgehandelde
+    # facturen als "nog te betalen" tonen. Zo'n oude, nog openstaande factuur
+    # duikt wel op in Vraagposten als "oud, geen betaling gevonden --
+    # controleren" (zie app/vraagposten.py).
+    pay_from_date: str = "2026-09-01"
+    # Het eigen BTW-nummer -- als dit als "factuurnummer" wordt gelezen is
+    # het document een eigen verkoopfactuur (of iets dat er verkeerd uitziet
+    # als inkoopfactuur), nooit iets om zelf te betalen.
+    own_vat_number: str = "NL866688730B01"
+    # Consumenten-maildomeinen (kommagescheiden, zonder TLD -- elke TLD van
+    # elk domein telt mee, dus "ziggo" dekt zowel ziggo.nl als eventuele
+    # andere ziggo-domeinen). Een document van zo'n domein is zelden een
+    # echte zakelijke inkoopfactuur.
+    consumer_email_domains: str = "gmail,hotmail,icloud,me,live,hetnet,outlook,ziggo,kpnmail,planet,xs4all"
 
     # -- Push-meldingen (ntfy.sh, of je eigen ntfy-server) --
     ntfy_url: str = "https://ntfy.sh"
@@ -195,6 +211,15 @@ class Settings(BaseSettings):
     @property
     def pay_manual_supplier_names(self) -> list[str]:
         return [s.strip().lower() for s in self.pay_manual_suppliers.split(",") if s.strip()]
+
+    @property
+    def pay_from_date_value(self):
+        from datetime import date
+        return date.fromisoformat(self.pay_from_date)
+
+    @property
+    def consumer_email_domain_list(self) -> list[str]:
+        return [s.strip().lower() for s in self.consumer_email_domains.split(",") if s.strip()]
 
 
 settings = Settings()

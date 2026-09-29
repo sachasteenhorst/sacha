@@ -8,8 +8,13 @@ from app.config import settings
 from app.db import Base
 from app.models import DocumentKind, Invoice, LearnedIncassoSupplier, MatchStatus, PaymentMethod, Transaction
 from app.payments import (
+    dedupe_key,
+    deduplicate_invoices,
     days_until_due,
     determine_payment_method,
+    get_old_unreviewed_invoices,
+    get_payable_invoices,
+    is_duplicate_of_existing,
     is_payable_invoice,
     learn_incasso_supplier,
     mark_paid,
@@ -102,6 +107,156 @@ def test_is_payable_invoice_false_without_due_date(session):
 
 def test_is_payable_invoice_false_for_other_document_kind(session):
     assert is_payable_invoice(make_invoice(document_kind=DocumentKind.OTHER.value)) is False
+
+
+# -- is_payable_invoice: stricter exclusions (production bug: 258 false
+# "Nog te betalen" entries after the previous round's deploy) --
+
+def test_is_payable_invoice_false_when_own_vat_number_read_as_invoice_number(session):
+    # Real production bug: a document where our OWN BTW-nummer got read as
+    # the "factuurnummer" is, by definition, about us as the seller.
+    inv = make_invoice(invoice_number="NL866688730B01")
+    assert is_payable_invoice(inv) is False
+
+
+def test_is_payable_invoice_false_for_consumer_email_domains(session):
+    for domain in ("gmail.com", "hotmail.com", "icloud.com", "ziggo.nl", "kpnmail.nl"):
+        inv = make_invoice(email_from=f"iemand@{domain}", email_message_id=f"<{domain}>")
+        assert is_payable_invoice(inv) is False, domain
+
+
+def test_is_payable_invoice_true_for_business_email_domain(session):
+    inv = make_invoice(email_from="facturen@kruitbosch.nl")
+    assert is_payable_invoice(inv) is True
+
+
+def test_is_payable_invoice_false_when_not_addressed_to_own_company(session):
+    # No mention of "Van der Linden"/"Hing" anywhere in the document text --
+    # more likely addressed to a customer or private individual than a bill
+    # this shop owes.
+    inv = make_invoice(extracted_text="Factuur voor J. de Klant, Dorpsstraat 1, Amsterdam. Totaal: EUR 120,00")
+    assert is_payable_invoice(inv) is False
+
+
+def test_is_payable_invoice_true_when_addressed_to_own_company(session):
+    inv = make_invoice(extracted_text="Factuur voor Van der Linden Tweewielers, Hoofdstraat 1. Totaal: EUR 120,00")
+    assert is_payable_invoice(inv) is True
+
+
+def test_is_payable_invoice_not_excluded_when_no_text_at_all(session):
+    # No extracted_text to check against at all -- not enough signal to
+    # exclude on the addressee-name basis alone.
+    inv = make_invoice(extracted_text="")
+    assert is_payable_invoice(inv) is True
+
+
+def test_is_payable_invoice_false_for_incasso_specification_subjects(session):
+    # Giant's English-language incasso announcement isn't matched by the
+    # Dutch-only SPECIFICATION_RE in app.email_client, so it needs its own
+    # subject-based exclusion here.
+    dutch = make_invoice(email_subject="Specificatie automatische incasso 12345", email_message_id="<a>")
+    english = make_invoice(email_subject="Advance Notification of Direct Debit", email_message_id="<b>")
+    assert is_payable_invoice(dutch) is False
+    assert is_payable_invoice(english) is False
+
+
+# -- is_payable_invoice: PAY_FROM_DATE cutoff --
+
+def test_is_payable_invoice_false_for_invoice_received_before_pay_from_date(session):
+    inv = make_invoice(received_at=datetime(2026, 8, 31))
+    assert is_payable_invoice(inv) is False
+
+
+def test_is_payable_invoice_true_for_invoice_received_exactly_on_pay_from_date(session):
+    inv = make_invoice(received_at=datetime(2026, 9, 1))
+    assert is_payable_invoice(inv) is True
+
+
+def test_is_payable_invoice_true_for_invoice_received_after_pay_from_date(session):
+    inv = make_invoice(received_at=datetime(2026, 9, 2))
+    assert is_payable_invoice(inv) is True
+
+
+def test_get_old_unreviewed_invoices_returns_old_would_be_payable_invoices(session):
+    old = make_invoice(received_at=datetime(2026, 1, 1))
+    recent = make_invoice(received_at=datetime(2026, 9, 5), email_message_id="<recent>", invoice_number="F-2")
+    session.add_all([old, recent])
+    session.commit()
+
+    old_ones = get_old_unreviewed_invoices(session)
+
+    assert [inv.id for inv in old_ones] == [old.id]
+
+
+def test_get_old_unreviewed_invoices_excludes_genuinely_ineligible_ones(session):
+    # Old AND incasso -- never belonged on "Nog te betalen" for a reason
+    # that has nothing to do with its age, so it must not show up here either.
+    old_incasso = make_invoice(received_at=datetime(2026, 1, 1), payment_method=PaymentMethod.INCASSO.value)
+    session.add(old_incasso)
+    session.commit()
+
+    assert get_old_unreviewed_invoices(session) == []
+
+
+# -- dedupe_key / deduplicate_invoices / is_duplicate_of_existing --
+
+def test_dedupe_key_none_without_invoice_number(session):
+    assert dedupe_key(make_invoice(invoice_number="")) is None
+
+
+def test_dedupe_key_same_for_matching_supplier_number_amount(session):
+    a = make_invoice(supplier_name="Kruitbosch", invoice_number="F-100", amount_cents=5000)
+    b = make_invoice(supplier_name="KRUITBOSCH", invoice_number="f-100", amount_cents=5000)
+    assert dedupe_key(a) == dedupe_key(b)
+
+
+def test_deduplicate_invoices_keeps_earliest_received(session):
+    original = make_invoice(email_message_id="<a>", received_at=datetime(2026, 9, 1))
+    reminder = make_invoice(email_message_id="<b>", received_at=datetime(2026, 9, 15))
+    result = deduplicate_invoices([reminder, original])
+    assert result == [original]
+
+
+def test_deduplicate_invoices_keeps_all_without_invoice_number(session):
+    a = make_invoice(email_message_id="<a>", invoice_number="")
+    b = make_invoice(email_message_id="<b>", invoice_number="")
+    result = deduplicate_invoices([a, b])
+    assert len(result) == 2
+
+
+def test_is_duplicate_of_existing_true_for_a_later_reminder(session):
+    original = make_invoice(email_message_id="<a>", received_at=datetime(2026, 9, 1))
+    reminder = make_invoice(email_message_id="<b>", received_at=datetime(2026, 9, 15))
+    session.add_all([original, reminder])
+    session.commit()
+
+    assert is_duplicate_of_existing(session, reminder) is True
+    assert is_duplicate_of_existing(session, original) is False
+
+
+def test_is_duplicate_of_existing_false_without_invoice_number(session):
+    inv = make_invoice(invoice_number="")
+    session.add(inv)
+    session.commit()
+    assert is_duplicate_of_existing(session, inv) is False
+
+
+# -- get_payable_invoices --
+
+def test_get_payable_invoices_deduplicates_and_sorts_by_due_date(session):
+    later = make_invoice(email_message_id="<later>", due_date=date(2026, 10, 1))
+    earlier = make_invoice(email_message_id="<earlier>", due_date=date(2026, 9, 20), invoice_number="F-2")
+    reminder_of_later = make_invoice(
+        email_message_id="<reminder>", due_date=date(2026, 10, 1),
+        invoice_number="F-1", received_at=datetime(2026, 9, 20),
+    )
+    session.add_all([later, earlier, reminder_of_later])
+    session.commit()
+
+    result = get_payable_invoices(session)
+
+    assert [inv.due_date for inv in result] == [date(2026, 9, 20), date(2026, 10, 1)]
+    assert len(result) == 2  # later + reminder_of_later deduped to one (earliest received)
 
 
 # -- days_until_due --

@@ -12,13 +12,13 @@ from dataclasses import dataclass
 from datetime import date
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.basecone_forward import is_forwardable
 from app.matcher import MIN_REFERENCE_SUFFIX_LENGTH, _name_similarity, _transaction_direction
 from app.models import Direction, Invoice, MatchStatus, Transaction
-from app.payments import days_until_due, is_payable_invoice
+from app.payments import days_until_due, deduplicate_invoices, get_old_unreviewed_invoices, is_payable_invoice
 
 # A payment this small is more likely a personal/small cash-type expense
 # (parking, coffee for a supplier visit, ...) than something worth chasing a
@@ -35,7 +35,8 @@ ACCELL_DESCR_MARKER_RE = re.compile(r"descr\.?\s*(.+?)\s*kenmerk\s*machtiging", 
 @dataclass
 class Vraagpost:
     key: str
-    kind: str  # "controleren" | "regel" | "bon" | "opvragen" | "doorsturen" | "te_betalen_te_laat"
+    kind: str  # "controleren" | "regel" | "bon" | "opvragen" | "doorsturen" |
+    # "te_betalen_te_laat" | "betaald_niet_gekoppeld" | "oud_controleren"
     label: str
     age_days: int
     # None for "te_betalen_te_laat" -- that kind is about an invoice with no
@@ -162,23 +163,60 @@ def _suggest_for_unmatched(
     return "opvragen", "Geen factuur in mail -- opvragen bij leverancier", None, _mailto_for_request(transaction)
 
 
-def _overdue_payable_vraagposten(all_invoices: list[Invoice], today: date) -> list[Vraagpost]:
+def _overdue_payable_vraagposten(all_invoices: list[Invoice], today: date, latest_statement_date: date | None) -> list[Vraagpost]:
     """A "Nog te betalen" invoice (see app.payments.is_payable_invoice) that
     is actually past its due date -- distinct from merely "due soon", which
     isn't a vraagpost yet, just something to plan for. Has no transaction:
-    that's exactly the point -- nobody has paid it yet."""
+    that's exactly the point -- nobody has paid it yet.
+
+    If the due date already falls BEFORE the latest bank statement we have
+    on file, that's suspicious rather than simply "still owed": a bank
+    statement covering that period exists and nothing matched, which is as
+    likely to mean "paid another way and the matcher missed it" as "genuinely
+    still unpaid" -- framed as "Betaald maar niet gekoppeld?" instead of a
+    flat "te laat" so Sacha checks rather than assumes it's simply overdue.
+    Deduplicated (see app.payments.deduplicate_invoices) so a supplier's
+    resent reminder of the same invoice doesn't produce two identical rows.
+    """
+    payable = deduplicate_invoices([inv for inv in all_invoices if is_payable_invoice(inv)])
     items = []
-    for inv in all_invoices:
-        if not is_payable_invoice(inv):
-            continue
+    for inv in payable:
         days_overdue = -days_until_due(inv, today)
         if days_overdue <= 0:
             continue
+        if latest_statement_date is not None and inv.due_date < latest_statement_date:
+            items.append(Vraagpost(
+                key=f"inv-{inv.id}-niet-gekoppeld",
+                kind="betaald_niet_gekoppeld",
+                label="Betaald maar niet gekoppeld? -- vervaldatum ligt al voor het laatste bankafschrift, controleer handmatig",
+                age_days=days_overdue,
+                invoice=inv,
+            ))
+        else:
+            items.append(Vraagpost(
+                key=f"inv-{inv.id}-te-laat",
+                kind="te_betalen_te_laat",
+                label=f"Te betalen, over termijn -- {days_overdue} dagen te laat",
+                age_days=days_overdue,
+                invoice=inv,
+            ))
+    return items
+
+
+def _old_unreviewed_vraagposten(session: Session, today: date) -> list[Vraagpost]:
+    """Invoices old enough to predate PAY_FROM_DATE that would otherwise
+    belong on "Nog te betalen" -- too old to trust blindly after a database
+    upgrade (see app.payments.get_old_unreviewed_invoices), so they surface
+    here instead for a one-time manual check rather than silently vanishing
+    or flooding "Nog te betalen" with years-old backlog."""
+    items = []
+    for inv in get_old_unreviewed_invoices(session):
+        age_days = (today - inv.received_at.date()).days if inv.received_at else 0
         items.append(Vraagpost(
-            key=f"inv-{inv.id}-te-laat",
-            kind="te_betalen_te_laat",
-            label=f"Te betalen, over termijn -- {days_overdue} dagen te laat",
-            age_days=days_overdue,
+            key=f"inv-{inv.id}-oud",
+            kind="oud_controleren",
+            label="Oud, geen betaling gevonden -- controleren",
+            age_days=age_days,
             invoice=inv,
         ))
     return items
@@ -201,6 +239,7 @@ def build_vraagposten(session: Session) -> list[Vraagpost]:
     all_invoices = list(session.scalars(select(Invoice)))
     recurring = _recurring_transaction_ids(unmatched)
     today = date.today()
+    latest_statement_date = session.scalar(select(func.max(Transaction.booking_date)))
 
     items: list[Vraagpost] = []
 
@@ -221,7 +260,8 @@ def build_vraagposten(session: Session) -> list[Vraagpost]:
             age_days=(today - t.booking_date).days, invoice=pending_invoice,
         ))
 
-    items.extend(_overdue_payable_vraagposten(all_invoices, today))
+    items.extend(_overdue_payable_vraagposten(all_invoices, today, latest_statement_date))
+    items.extend(_old_unreviewed_vraagposten(session, today))
 
     items.sort(key=lambda v: (-v.age_days, -_vraagpost_amount_cents(v)))
     return items

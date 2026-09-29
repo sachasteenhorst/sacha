@@ -42,7 +42,7 @@ def make_invoice(**kwargs):
         attachment_filename="factuur.pdf",
         email_subject="Factuur",
         email_from="verkoop@leverancier.nl",
-        received_at=datetime(2026, 1, 1),
+        received_at=datetime(2026, 9, 5),  # after the default PAY_FROM_DATE (2026-09-01)
         invoice_number="F-1",
         supplier_name="Leverancier",
         amount_cents=12000,
@@ -251,6 +251,62 @@ def test_not_yet_due_payable_invoice_is_not_a_vraagpost(session):
     items = build_vraagposten(session)
 
     assert items == []
+
+
+def test_overdue_invoice_before_latest_statement_becomes_betaald_niet_gekoppeld(session):
+    # A bank statement covering the period after this invoice's due date
+    # exists and nothing matched -- more likely paid-but-unlinked than
+    # genuinely still unpaid.
+    inv = make_invoice(due_date=date(2026, 9, 1), amount_cents=5000)
+    tx = make_transaction(booking_date=date(2026, 9, 20), counterparty_name="Someone Else")
+    session.add_all([inv, tx])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    overdue_items = [i for i in items if i.invoice and i.invoice.id == inv.id]
+    assert len(overdue_items) == 1
+    assert overdue_items[0].kind == "betaald_niet_gekoppeld"
+
+
+def test_overdue_invoice_after_latest_statement_stays_te_betalen_te_laat(session):
+    # The latest bank statement doesn't even cover the due date yet -- a
+    # genuinely still-open "te laat" is the right framing here.
+    inv = make_invoice(due_date=date(2026, 9, 25), amount_cents=5000)
+    tx = make_transaction(booking_date=date(2026, 9, 1), counterparty_name="Someone Else")
+    session.add_all([inv, tx])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    overdue_items = [i for i in items if i.invoice and i.invoice.id == inv.id]
+    assert len(overdue_items) == 1
+    assert overdue_items[0].kind == "te_betalen_te_laat"
+
+
+def test_old_invoice_before_pay_from_date_becomes_oud_controleren(session):
+    inv = make_invoice(received_at=datetime(2026, 1, 1), due_date=date(2026, 1, 31))
+    session.add(inv)
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    assert len(items) == 1
+    assert items[0].kind == "oud_controleren"
+    assert items[0].invoice.id == inv.id
+
+
+def test_duplicate_reminder_invoices_produce_only_one_overdue_vraagpost(session):
+    original = make_invoice(email_message_id="<a>", received_at=datetime(2026, 9, 1), due_date=date(2026, 1, 1))
+    reminder = make_invoice(email_message_id="<b>", received_at=datetime(2026, 9, 15), due_date=date(2026, 1, 1))
+    session.add_all([original, reminder])
+    session.commit()
+
+    items = build_vraagposten(session)
+
+    matching = [i for i in items if i.kind == "te_betalen_te_laat"]
+    assert len(matching) == 1
+    assert matching[0].invoice.id == original.id
 
 
 def test_sorted_oldest_first_then_largest_amount(session):

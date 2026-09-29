@@ -33,7 +33,7 @@ from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE, GraphApiError, Gra
 from app.matcher import _transaction_direction, run_matching
 from app.models import BaseconeForwardStatus, Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
 from app.notify import send_test_notification
-from app.payments import days_until_due, is_payable_invoice, learn_incasso_supplier, mark_paid
+from app.payments import days_until_due, get_payable_invoices, learn_incasso_supplier, mark_paid
 from app.rules import apply_rules
 from app.scheduler import start_scheduler
 from app.sync import import_bank_file, run_sync
@@ -333,10 +333,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         oldest_unmatched_days = (date.today() - oldest).days
 
     # -- Nog te betalen: never filtered by q/maand, its own worklist --
-    te_betalen = sorted(
-        (inv for inv in session.scalars(select(Invoice)) if is_payable_invoice(inv)),
-        key=lambda inv: inv.due_date,
-    )
+    te_betalen = get_payable_invoices(session)
 
     # -- Counters (always totals, unaffected by the active filter) --
     now_ams = datetime.now(ZoneInfo("Europe/Amsterdam"))

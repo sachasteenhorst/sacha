@@ -49,7 +49,7 @@
           <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone">
             <button class="btn btn-secondary">Stuur naar Basecone</button>
           </form>
-          {% elif item.kind == "te_betalen_te_laat" and inv %}
+          {% elif item.kind in ("te_betalen_te_laat", "betaald_niet_gekoppeld", "oud_controleren") and inv %}
           <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
             <button class="btn btn-secondary">Betaald</button>
           </form>

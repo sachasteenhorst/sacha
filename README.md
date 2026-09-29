@@ -247,9 +247,21 @@ eerst), dan op bedrag. Per rij een concrete voorgestelde actie:
   uitzoeken.
 - **Te betalen, over termijn -- N dagen te laat** -- een factuur uit "Nog
   te betalen" (zie hieronder) waarvan de vervaldatum al voorbij is en die
-  nog niet gekoppeld of betaald is. Heeft geen bankregel (er is nog geen
+  nog niet gekoppeld of betaald is, en waarvoor nog geen bankafschrift
+  bestaat dat die periode dekt. Heeft geen bankregel (er is nog geen
   betaling), dus de knoppen "Betaald"/"Loopt via incasso" en de PDF staan
   er direct bij.
+- **Betaald maar niet gekoppeld?** -- hetzelfde als hierboven, maar de
+  vervaldatum ligt al VOOR het laatste bankafschrift dat je hebt. Er is dus
+  al bankdata die die periode dekt en er is nog steeds niets gematcht --
+  dat is net zo goed een teken dat het wél betaald is maar de matcher het
+  mist, als dat het genuine nog openstaat, dus deze vraagt om een blik
+  erop in plaats van een harde "te laat"-waarschuwing.
+- **Oud, geen betaling gevonden -- controleren** -- een factuur die verder
+  aan alle voorwaarden voor "Nog te betalen" voldoet, maar ontvangen is
+  vóór `PAY_FROM_DATE` (zie hieronder) en dus bewust NIET in dat blok of
+  in een pushmelding is beland. Eenmalig na te lopen in plaats van in
+  stilte te laten verdwijnen.
 
 Elke rij toont in de kolom "Gekoppelde factuur/betaling" ook welk document
 er (mogelijk) bij hoort, waar van toepassing.
@@ -261,12 +273,33 @@ lijst door te nemen of naar de boekhouder te sturen.
 
 Het blok **"Nog te betalen"** bovenaan het dashboard (`#nog-te-betalen`)
 toont elke openstaande, uitgaande inkoopfactuur die je zelf moet overmaken
--- dus expliciet NIET: facturen die via automatische incasso worden
-afgeschreven, creditnota's, factuurbedragen van EUR 0, inkomende
-documenten (ENRA/HelloRider/CycleSoftware-verkoopfacturen) en alles wat al
-gekoppeld of handmatig op "Betaald" gezet is. Gesorteerd op vervaldatum;
-een vervaldatum met een "~" ervoor is een schatting (zie hieronder), geen
-letterlijk van de factuur gelezen datum.
+-- dus expliciet NIET:
+- facturen die via automatische incasso worden afgeschreven, creditnota's
+  of factuurbedragen van EUR 0;
+- inkomende documenten (ENRA/HelloRider/CycleSoftware-verkoopfacturen);
+- alles wat al gekoppeld of handmatig op "Betaald" gezet is;
+- een document waar ons EIGEN BTW-nummer (`OWN_VAT_NUMBER`,
+  standaard `NL866688730B01`) als "factuurnummer" is gelezen -- dat is per
+  definitie een eigen verkoopfactuur, geen inkoopfactuur;
+- een afzender op een consumenten-maildomein (`CONSUMER_EMAIL_DOMAINS`,
+  standaard gmail/hotmail/icloud/me/live/hetnet/outlook/ziggo/kpnmail/
+  planet/xs4all) -- zelden een echte zakelijke inkoopfactuur;
+- een document waar nergens "Van der Linden"/"Hing" (`OWN_COMPANY_NAMES`)
+  in de tekst voorkomt -- waarschijnlijker aan een klant/particulier
+  gericht dan aan ons;
+- Giant/Accell-incasso-aankondigingen (onderwerp "Advance Notification of
+  Direct Debit" of "Specificatie automatische incasso") -- die kondigen
+  alleen een incasso aan, ze zijn zelf niets om te betalen;
+- ontvangen vóór `PAY_FROM_DATE` (zie hieronder).
+
+Ontvangt een leverancier dezelfde factuur twee keer (een herinnering, of
+hetzelfde document via twee mailboxen) dan telt dat -- op gelijke
+leverancier + factuurnummer + bedrag -- als ÉÉN factuur; de oudst-
+ontvangen versie is de "echte" en de latere komt niet los nog eens in de
+lijst (of in een pushmelding) terecht.
+
+Gesorteerd op vervaldatum; een vervaldatum met een "~" ervoor is een
+schatting (zie hieronder), geen letterlijk van de factuur gelezen datum.
 
 **Vervaldatum lezen**: de tekst wordt doorzocht op een label als
 "Vervaldatum", "Vervalt", "Uiterste betaaldatum", "Te betalen voor/vóór" of
@@ -297,6 +330,17 @@ zeldzame geval dat een leverancier overstapt van incasso naar factuur).
 Bij elke rij: knop **"Betaald"** (zet 'm direct van de lijst af, ongeacht
 of de bankregel al binnen is) en **"Loopt via incasso"** (voor als de
 detectie een leverancier gemist heeft).
+
+**`PAY_FROM_DATE`** (standaard `2026-09-01`) is een harde ondergrens: een
+factuur ontvangen vóór die datum komt nooit in "Nog te betalen" of een
+pushmelding, hoe goed hij verder ook aan de voorwaarden voldoet. Reden:
+zonder die grens zou het activeren van deze functie op een bestaande
+database in één klap honderden jaren-oude, allang-afgehandelde facturen als
+"nog te betalen" tonen -- en, via de pushmeldingen, net zoveel meldingen in
+één keer sturen (precies wat er gebeurde na het uitrollen van deze functie
+voordat deze grens bestond). Zo'n oude factuur duikt wel op in Vraagposten
+als "oud, geen betaling gevonden -- controleren" (zie hierboven) zodat hij
+niet in stilte verdwijnt.
 
 Bestaande facturen (van vóór deze functie) krijgen hun vervaldatum via
 `scripts/reparse_invoices.py` -- draai dat script eenmalig na een upgrade.
@@ -401,14 +445,29 @@ authenticatie leesbaar voor wie de naam raadt) en vul die naam in als
 Je krijgt een melding:
 - **Bij een nieuwe factuur** (niet-incasso, dus iets voor "Nog te
   betalen"): "Nieuwe factuur: Leverancier EUR x, uiterlijk dd-mm". Elke
-  factuur meldt maar één keer, ook na een reparse.
+  factuur meldt maar één keer, ook na een reparse; een herinnering van
+  dezelfde factuur (zelfde leverancier+factuurnummer+bedrag) meldt
+  helemaal niet nog een keer. Bij een grote stapel tegelijk (bijv. na een
+  upgrade) worden hooguit 5 losse meldingen gestuurd -- de rest komt in
+  één samenvattende melding ("N nieuwe facturen, totaal EUR x").
 - **Dagelijks om 08:00** (Europe/Amsterdam), maar ALLEEN als er iets te
   laat is of binnen 7 dagen vervalt: aantal, totaalbedrag en de top 5,
-  met hoge prioriteit als er iets te laat is.
+  met hoge prioriteit als er iets te laat is. Nooit meer dan 1x per dag,
+  ook al draait de taak twee keer.
 - **Bij een probleem**: de Microsoft Graph-login is verlopen, doorsturen
   naar Basecone mislukt, of de Ponto-banksync mislukt -- maximaal één keer
   per dag per soort probleem, zodat een aanhoudend probleem je telefoon
   niet elk uur opnieuw laat piepen.
+
+**Bij het toevoegen van deze functie** kreeg elke factuur die al in de
+database stond `notified_new_invoice=false` zonder eenmalige correctie,
+wat bij het eerstvolgende sync-moment honderden losse meldingen zou hebben
+gestuurd (en op productie ook echt bijna deed). Dat is met terugwerkende
+kracht rechtgezet: alle facturen die al bestonden voordat deze correctie
+draaide zijn eenmalig op "al gemeld" gezet (bijgehouden via
+`data/notified_new_invoice_backfilled.marker`, niet via de kolom zelf,
+omdat die op dat moment al bestond) -- alleen een factuur die daarna nog
+binnenkomt telt als "nieuw".
 
 Elke melding heeft een "Click"-link naar `/dashboard#nog-te-betalen`
 (instelbaar via `DASHBOARD_PUBLIC_URL`). Test de koppeling met de knop

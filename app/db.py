@@ -123,6 +123,38 @@ def _migrate_schema() -> None:
         _backfill_manually_ignored()
 
 
+NOTIFIED_NEW_INVOICE_BACKFILL_MARKER = "./data/notified_new_invoice_backfilled.marker"
+
+
+def _backfill_notified_new_invoice() -> None:
+    """notified_new_invoice shipped with a plain "ADD COLUMN ... DEFAULT 0"
+    migration and no backfill -- on a database that already had invoices,
+    every one of them (1253 in production) came back as "unnotified",
+    which would have fired a push per invoice on the very next sync. Unlike
+    manually_ignored's backfill, this can't key off "column didn't exist
+    yet" (it already shipped once without this fix, so the column now
+    exists everywhere) -- a marker file instead records whether this
+    specific backfill has run, so it still applies exactly once on an
+    already-upgraded database. Every invoice that exists the moment this
+    finally runs predates the push-notification feature entirely, so all of
+    them are marked notified; only a genuinely new invoice fetched AFTER
+    this point starts at False."""
+    import os
+
+    from app.models import Invoice
+
+    if os.path.exists(NOTIFIED_NEW_INVOICE_BACKFILL_MARKER):
+        return
+    with SessionLocal() as session:
+        session.query(Invoice).filter(Invoice.notified_new_invoice.is_(False)).update(
+            {Invoice.notified_new_invoice: True}
+        )
+        session.commit()
+    os.makedirs(os.path.dirname(NOTIFIED_NEW_INVOICE_BACKFILL_MARKER), exist_ok=True)
+    with open(NOTIFIED_NEW_INVOICE_BACKFILL_MARKER, "w") as fh:
+        fh.write("done")
+
+
 def _backfill_bank_code_from_raw_data() -> None:
     """Transactions uploaded before the bank_code column existed have it
     empty even though the Rabobank CSV's "Code" column is sitting right
@@ -149,6 +181,7 @@ def init_db() -> None:
     _migrate_schema()
     _seed_default_rules()
     _backfill_bank_code_from_raw_data()
+    _backfill_notified_new_invoice()
 
 
 def get_session():

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Invoice, NotificationLog
-from app.payments import days_until_due, is_payable_invoice
+from app.payments import days_until_due, get_payable_invoices, is_duplicate_of_existing, is_payable_invoice
 
 logger = logging.getLogger("notify")
 
@@ -25,6 +25,11 @@ logger = logging.getLogger("notify")
 # matches the task's "binnen 7 dagen vervalt" rule for the daily summary.
 DAILY_SUMMARY_WINDOW_DAYS = 7
 DASHBOARD_CLICK_PATH = "/dashboard#nog-te-betalen"
+# Safety cap: a bulk backlog of new invoices (e.g. right after an upgrade,
+# or a mailbox that was unreachable for a while) sends at most this many
+# INDIVIDUAL pushes per sync -- anything beyond that is rolled into one
+# summary push instead of flooding the phone with one notification each.
+MAX_NEW_INVOICE_PUSHES_PER_SYNC = 5
 
 
 def ntfy_configured() -> bool:
@@ -76,19 +81,40 @@ def _format_amount(cents: int) -> str:
 
 
 def notify_new_payable_invoices(session: Session) -> int:
-    """Sends one push per still-unnotified payable invoice ("nieuwe factuur:
+    """Sends a push per still-unnotified payable invoice ("nieuwe factuur:
     Leverancier EUR x, uiterlijk dd-mm") and marks it notified so it's never
-    sent twice, however many sync runs it survives. Returns how many were
-    sent."""
+    sent twice, however many sync runs it survives. A supplier's reminder
+    e-mail of an invoice already seen (same leverancier+factuurnummer+
+    bedrag) is marked notified WITHOUT sending -- see
+    app.payments.is_duplicate_of_existing. Caps individual pushes at
+    MAX_NEW_INVOICE_PUSHES_PER_SYNC; anything beyond that is rolled into one
+    summary push instead. Returns how many pushes were actually sent
+    (summary counts as one)."""
     if not ntfy_configured():
         return 0
-    sent = 0
-    candidates = session.scalars(
-        select(Invoice).where(Invoice.notified_new_invoice.is_(False))
-    )
+
+    candidates = [
+        inv for inv in session.scalars(
+            select(Invoice).where(Invoice.notified_new_invoice.is_(False)).order_by(Invoice.received_at)
+        )
+        if is_payable_invoice(inv)
+    ]
+    if not candidates:
+        return 0
+
+    to_notify: list[Invoice] = []
     for invoice in candidates:
-        if not is_payable_invoice(invoice):
+        if is_duplicate_of_existing(session, invoice):
+            invoice.notified_new_invoice = True  # a re-sent reminder, not news
             continue
+        to_notify.append(invoice)
+    if not to_notify:
+        return 0
+
+    sent = 0
+    individual, rest = to_notify[:MAX_NEW_INVOICE_PUSHES_PER_SYNC], to_notify[MAX_NEW_INVOICE_PUSHES_PER_SYNC:]
+
+    for invoice in individual:
         due_label = invoice.due_date.strftime("%d-%m") if invoice.due_date else "?"
         ok = send_notification(
             "Nieuwe factuur",
@@ -99,6 +125,19 @@ def notify_new_payable_invoices(session: Session) -> int:
         if ok:
             invoice.notified_new_invoice = True
             sent += 1
+
+    if rest:
+        total_cents = sum(inv.amount_cents for inv in rest)
+        ok = send_notification(
+            "Nieuwe facturen",
+            f"{len(rest)} nieuwe facturen, totaal EUR {_format_amount(total_cents)} -- zie 'Nog te betalen'.",
+            tags="receipt",
+        )
+        if ok:
+            for invoice in rest:
+                invoice.notified_new_invoice = True
+            sent += 1
+
     return sent
 
 
@@ -121,7 +160,7 @@ def send_daily_payment_summary(session: Session) -> bool:
         return False
 
     today = date.today()
-    payable = [inv for inv in session.scalars(select(Invoice)) if is_payable_invoice(inv)]
+    payable = get_payable_invoices(session)
     due_soon = [inv for inv in payable if days_until_due(inv, today) <= DAILY_SUMMARY_WINDOW_DAYS]
     if not due_soon:
         _mark_sent_today(session, "daily-summary")

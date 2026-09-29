@@ -81,3 +81,47 @@ def test_backfill_leaves_non_ignored_invoices_untouched(isolated_session_local):
     with Session() as session:
         inv = session.get(Invoice, inv_id)
         assert inv.manually_ignored is False
+
+
+# -- notified_new_invoice backfill (marker-file based, see module docstring
+# on why it can't key off "column didn't exist yet" like the others) --
+
+def test_notified_new_invoice_backfill_marks_all_existing_invoices_notified(isolated_session_local, tmp_path, monkeypatch):
+    marker = tmp_path / "notified_backfilled.marker"
+    monkeypatch.setattr(db_module, "NOTIFIED_NEW_INVOICE_BACKFILL_MARKER", str(marker))
+    Session = isolated_session_local
+    with Session() as session:
+        inv = make_invoice(notified_new_invoice=False)
+        session.add(inv)
+        session.commit()
+        inv_id = inv.id
+
+    db_module._backfill_notified_new_invoice()
+
+    with Session() as session:
+        inv = session.get(Invoice, inv_id)
+        assert inv.notified_new_invoice is True
+    assert marker.exists()
+
+
+def test_notified_new_invoice_backfill_runs_only_once(isolated_session_local, tmp_path, monkeypatch):
+    marker = tmp_path / "notified_backfilled.marker"
+    monkeypatch.setattr(db_module, "NOTIFIED_NEW_INVOICE_BACKFILL_MARKER", str(marker))
+    Session = isolated_session_local
+
+    db_module._backfill_notified_new_invoice()  # first run: writes the marker
+
+    with Session() as session:
+        # A genuinely new invoice arriving AFTER the backfill already ran
+        # must keep notified_new_invoice=False -- the backfill must never
+        # fire again and wrongly mark it as already notified.
+        inv = make_invoice(notified_new_invoice=False, email_message_id="<new>")
+        session.add(inv)
+        session.commit()
+        inv_id = inv.id
+
+    db_module._backfill_notified_new_invoice()  # second call: must be a no-op
+
+    with Session() as session:
+        inv = session.get(Invoice, inv_id)
+        assert inv.notified_new_invoice is False
