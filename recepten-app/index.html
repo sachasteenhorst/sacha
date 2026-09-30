@@ -829,6 +829,18 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { background: #C4552F; color: #FFFFFF; box-shadow: 0 3px 0 #5A1F0C; } }
   :root[data-theme="dark"] .btn.primary { background: #C4552F; color: #FFFFFF; box-shadow: 0 3px 0 #5A1F0C; }
   @media (max-width: 380px) { .shopgroup.card, .lcard.card { padding-inline: 12px; } ul.shop li { padding-inline: 8px; column-gap: 8px; } }
+  /* ---------- Budget per persoon, categorieën en zoeken ---------- */
+  .bkeuze { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bkeuze .chip { padding: 9px 13px; font-variant-numeric: tabular-nums; }
+  .pill.over { background: var(--no-bg); color: var(--no); }
+  .rzoek { width: 100%; min-height: 48px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; }
+  .catbalk { display: flex; gap: 8px; overflow-x: auto; margin-inline: -16px; padding: 4px 16px 8px; scrollbar-width: none; }
+  .catbalk::-webkit-scrollbar { display: none; }
+  .catbalk .chip { flex: none; white-space: nowrap; }
+  .catbalk .chip .n { font-weight: 400; opacity: .7; margin-left: 2px; }
+  .rtoggles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .catkop { font-family: var(--display); font-weight: 700; font-size: 17px; margin: 14px 0 2px; display: flex; justify-content: space-between; align-items: baseline; }
+  .catkop:first-child { margin-top: 0; }
 </style>
 <!--wrapper-->
 </head>
@@ -886,7 +898,7 @@
 /* ---------- Opslag ---------- */
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ak:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem('ak:' + k, JSON.stringify(v)); } catch (e) {} }
+  set(k, v) { planCache = null; try { localStorage.setItem('ak:' + k, JSON.stringify(v)); } catch (e) {} }
 };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -1375,8 +1387,105 @@ const RECIPES = [
     tip: "Scheur de mozzarella in stukjes in plaats van hem te snijden: zo krijg je mooie gesmolten plekken.",
     stappen: ["Verwarm de oven voor op 200 °C. Kook de penne 2 minuten korter dan op de verpakking staat en giet af.", "Snipper de ui, pers de knoflook en snijd de courgette in halve plakjes. Halveer de tomaten.", "Bak ui, knoflook en courgette 5 minuten in een beetje olie. Schenk de passata erbij, voeg oregano toe en laat 5 minuten pruttelen.", "Neem nu wat saus met courgette apart voor {baby}. Breng de rest op smaak met peper en zout.", "Meng de pasta met de saus en de cherrytomaten in de ovenschaal. Verdeel de mozzarella erover.", "Bak 15 minuten in de oven tot de kaas gesmolten en goudbruin is. Strooi er verse basilicum over.", "Kook voor {baby} de zoete aardappel in blokjes zacht."],
     baby: { stappen: ["Geen pasta: prak de zoete aardappel met de apart gehouden saus en courgette."], allergenen: ["melk (kaas)"] } },
+  { id: "aardappelsalade", cat: "salade",
+    naam: "Lauwe aardappelsalade met ei, sperziebonen en mosterddressing", tijd: 30, soort: "Ei",
+    ingr: [I(600, "g", "krieltjes", "aardappel"), I(4, "", "eieren", "eieren"), I(300, "g", "sperziebonen", "sperziebonen"), I(1, "", "komkommer", "komkommer"), I(1, "", "rode ui", "ui"), I(150, "g", "volle yoghurt", "yoghurt"), I(1, "el", "mosterd"), I(null, "", "bieslook, peper, zout")],
+    gerei: ["Twee pannen", "Grote kom", "Kommetje", "Snijplank en mes"],
+    tip: "Meng de dressing door de aardappelen terwijl ze nog lauw zijn: dan nemen ze de smaak veel beter op.",
+    stappen: ["Was de krieltjes, halveer de grote en kook ze in 15 minuten gaar.", "Kook de eieren in 9 minuten hard en laat ze schrikken in koud water.", "Haal de uiteinden van de sperziebonen af en kook ze 8 minuten, tot ze zacht maar nog groen zijn. Spoel ze kort af met koud water.", "Snijd de komkommer in blokjes en de rode ui in heel dunne ringen.", "Neem nu een paar krieltjes, sperziebonen en een ei apart voor {baby}.", "Roer de yoghurt met de mosterd, fijngeknipte bieslook, peper en een snufje zout tot een dressing.", "Meng de lauwe krieltjes, sperziebonen, komkommer en ui in de kom met de dressing. Pel de eieren, snijd ze in partjes en leg ze erop."],
+    baby: { stappen: ["Prak een krieltje met zachte sperziebonen en wat hardgekookt ei.", "Geef zachte sperziebonen en eireepjes ook als vingervoedsel."], allergenen: ["ei", "melk (yoghurt)"] } },
+  { id: "griekse-salade-kip", cat: "salade",
+    naam: "Griekse salade met kip, feta en warme pita", tijd: 25, soort: "Kip",
+    ingr: [I(300, "g", "kipfilet", "kipfilet"), I(1, "", "komkommer", "komkommer"), I(250, "g", "cherrytomaten", "tomaat"), I(1, "", "rode paprika", "paprika"), I(1, "", "rode ui", "ui"), I(100, "g", "feta", "feta"), I(4, "", "pitabroodjes", "brood"), I(2, "el", "olijfolie"), I(1, "", "citroen"), I(null, "", "oregano, peper, zout"), I(1, "", "aardappel (voor {baby})", "aardappel", true)],
+    gerei: ["Koekenpan", "Grote slakom", "Snijplank en mes"],
+    tip: "Snijd de rode ui heel dun en laat hem 5 minuten in het citroensap liggen: dan wordt hij milder.",
+    stappen: ["Kook voor {baby} de aardappel in stukjes gaar.", "Snijd de kip in reepjes. Bak hem in een scheutje olie in 6 tot 8 minuten gaar en goudbruin.", "Neem nu een paar stukjes kip apart voor {baby}, voordat de kruiden erop gaan.", "Bestrooi de rest van de kip met oregano, peper en zout.", "Snijd de komkommer, paprika en tomaten in stukjes en de rode ui in dunne ringen. Meng ze in de slakom met de olijfolie en het sap van de citroen.", "Verkruimel de feta erover en leg de kip erop.", "Warm de pitabroodjes kort op in een droge pan of broodrooster en serveer ze erbij."],
+    baby: { stappen: ["Snijd de kip heel fijn en prak hem met de aardappel.", "Geef stukjes komkommer zonder schil of zacht gestoomde paprika als vingervoedsel.", "Feta is te zout voor een baby."], allergenen: [] } },
+  { id: "linzen-bolognese", cat: "pasta",
+    naam: "Linzenbolognese met volkoren spaghetti", tijd: 35, soort: "Vega",
+    ingr: [I(150, "g", "rode linzen", "linzen"), I(200, "g", "volkoren spaghetti", "pasta"), I(1, "", "ui", "ui"), I(2, "", "wortels", "wortel"), I(1, "", "courgette", "courgette"), I(500, "g", "passata", "passata"), I(1, "el", "tomatenpuree"), I(1, "", "teen knoflook"), I(30, "g", "Parmezaanse kaas (geraspt)", "kaas"), I(null, "", "oregano, peper, zout"), I(1, "", "zoete aardappel (voor {baby})", "zoete-aardappel", true)],
+    gerei: ["Hapjespan met deksel", "Pan voor de spaghetti", "Rasp", "Zeef", "Snijplank en mes"],
+    tip: "Linzen geven dezelfde stevige bite als gehakt, voor een fractie van de prijs. Kinderen merken vaak niet eens het verschil.",
+    stappen: ["Spoel de linzen af in een zeef. Snipper de ui, pers de knoflook en rasp de wortels en courgette grof.", "Fruit de ui en knoflook 3 minuten in een scheutje olie. Voeg de geraspte groente toe en bak 3 minuten mee.", "Roer de tomatenpuree erdoor. Voeg de linzen, de passata en 300 ml water toe en breng aan de kook.", "Laat de saus 20 minuten zachtjes pruttelen met de deksel schuin op de pan, tot de linzen zacht zijn. Roer af en toe en voeg wat water toe als hij te dik wordt.", "Kook ondertussen de spaghetti volgens de verpakking. Kook voor {baby} de zoete aardappel in blokjes zacht.", "Schep nu een portie saus apart voor {baby}.", "Breng de rest op smaak met oregano, peper en zout en serveer met de spaghetti en Parmezaanse kaas."],
+    baby: { stappen: ["Geen spaghetti: prak de linzensaus door de zoete aardappel.", "Rode linzen zijn na het koken vanzelf zacht en zitten vol ijzer."], allergenen: [] } },
+  { id: "zoete-aardappelsoep", cat: "soep",
+    naam: "Zoete-aardappelsoep met kokos en rode linzen", tijd: 30, soort: "Vega",
+    ingr: [I(600, "g", "zoete aardappel", "zoete-aardappel"), I(2, "", "wortels", "wortel"), I(1, "", "ui", "ui"), I(75, "g", "rode linzen", "linzen"), I(200, "ml", "kokosmelk", "kokosmelk"), I(1, "tl", "milde kerriepoeder"), I(1, "", "bouillonblokje (groente)"), I(4, "", "sneetjes volkorenbrood", "brood")],
+    gerei: ["Grote soeppan", "Staafmixer", "Dunschiller", "Zeef", "Snijplank en mes"],
+    tip: "Houd een scheutje kokosmelk achter en druppel het bij het opscheppen over de soep. Dat staat mooi en maakt hem extra romig.",
+    stappen: ["Schil de zoete aardappel en de wortels en snijd ze in blokjes. Snipper de ui. Spoel de linzen af.", "Fruit de ui 3 minuten in een scheutje olie in de soeppan. Roer de kerriepoeder erdoor en bak 30 seconden.", "Voeg de zoete aardappel, wortel, linzen en 900 ml water toe. Breng aan de kook en laat 18 minuten zachtjes koken, tot alles zacht is.", "Pureer de soep glad met de staafmixer en roer de kokosmelk erdoor.", "Schep nu de portie van {baby} eruit.", "Los het bouillonblokje op in de rest van de soep en warm nog even door. Serveer met volkorenbrood."],
+    baby: { stappen: ["Geef de soep lekker dik, zodat {baby} hem met een lepel kan eten.", "Geen brood: geef zachte stukjes gekookte wortel erbij."], allergenen: [] } },
+  { id: "gebakken-rijst", cat: "rijst",
+    naam: "Gebakken rijst met ei, doperwten en wortel", tijd: 25, soort: "Ei",
+    ingr: [I(150, "g", "zilvervliesrijst", "rijst"), I(3, "", "eieren", "eieren"), I(200, "g", "doperwten (diepvries)", "doperwten"), I(2, "", "wortels", "wortel"), I(1, "", "prei", "prei"), I(2, "el", "sojasaus"), I(1, "", "teen knoflook"), I(null, "", "lente-ui en sesamzaad"), I(1, "", "aardappel (voor {baby})", "aardappel", true)],
+    gerei: ["Wok of grote koekenpan", "Pan voor de rijst", "Kom en vork", "Snijplank en mes"],
+    tip: "Kook de rijst een dag eerder of spoel hem na het koken koud af. Koude, droge rijst bakt los en knapperig in plaats van plakkerig.",
+    stappen: ["Kook de rijst volgens de verpakking, spoel hem af met koud water en laat hem goed uitlekken. Kook voor {baby} de aardappel gaar.", "Schil de wortels en snijd ze in kleine blokjes. Snijd de prei in dunne ringen en pers de knoflook.", "Verhit een scheutje olie in de wok op middelhoog vuur. Bak de wortel 4 minuten, voeg de prei en doperwten toe en bak nog 3 minuten.", "Neem nu wat wortel en doperwten apart voor {baby}.", "Schuif de groente opzij, breek de eieren in de wok en roer ze tot roerei. Laat het ei helemaal stollen.", "Neem een schepje roerei apart voor {baby}.", "Doe de rijst en knoflook erbij en roerbak op hoog vuur 4 minuten, tot alles heet is. Roer de sojasaus erdoor en bestrooi met lente-ui en sesamzaad."],
+    baby: { stappen: ["Geen rijst: prak de aardappel met de wortel, doperwten en het goed gestolde roerei.", "Sojasaus is te zout voor een baby; die gaat er pas na de babyportie in."], allergenen: ["ei"] } },
+  { id: "rodekool-stamppot", cat: "stamppot", comfort: true,
+    naam: "Rodekoolstamppot met appel en gehaktballetjes", tijd: 40, soort: "Vlees",
+    ingr: [I(700, "g", "kruimige aardappelen", "aardappel"), I(500, "g", "rode kool (gesneden)", "rode-kool"), I(2, "", "appels", "appel"), I(250, "g", "rundergehakt", "gehakt"), I(1, "", "ui", "ui"), I(100, "ml", "melk"), I(1, "el", "roomboter"), I(null, "", "kaneel, nootmuskaat, peper, zout")],
+    gerei: ["Pan voor de aardappelen", "Pan met deksel voor de rode kool", "Koekenpan", "Pureestamper", "Snijplank en mes"],
+    tip: "Een snufje kaneel en een scheutje azijn door de rode kool maken hem net als bij oma.",
+    stappen: ["Schil de aardappelen, snijd ze in stukken en kook ze in ongeveer 20 minuten gaar.", "Schil de appels en snijd ze in blokjes. Stoof de rode kool met de appel en een bodem water 20 minuten met de deksel op de pan.", "Snipper de ui. Draai van het gehakt kleine balletjes, zonder zout.", "Bak de balletjes met de ui in een scheutje olie in 10 minuten rondom bruin en gaar.", "Giet de aardappelen af en stamp ze met de melk en de boter. Roer de uitgelekte rode kool met appel erdoor.", "Neem nu de portie van {baby} apart, met een paar balletjes.", "Breng de rest op smaak met kaneel, nootmuskaat, peper en zout en serveer met de balletjes."],
+    baby: { stappen: ["Prak de stamppot en de balletjes fijn, of geef zachte balletjes als vingervoedsel.", "Rode kool kan de luier paars kleuren; dat is onschuldig."], allergenen: ["melk"] } },
+  { id: "zalm-bowl", cat: "wraps",
+    naam: "Zalmbowl met rijst, avocado en komkommer", tijd: 30, soort: "Vis",
+    ingr: [I(2, "", "zalmfilets (± 250 g)", "zalm"), I(150, "g", "zilvervliesrijst", "rijst"), I(1, "", "avocado", "avocado"), I(1, "", "komkommer", "komkommer"), I(2, "", "wortels", "wortel"), I(200, "g", "doperwten (diepvries)", "doperwten"), I(2, "el", "sojasaus"), I(1, "el", "honing"), I(null, "", "sesamzaad en lente-ui"), I(1, "", "zoete aardappel (voor {baby})", "zoete-aardappel", true)],
+    gerei: ["Koekenpan", "Pan voor de rijst", "Kommetje", "Rasp", "Snijplank en mes"],
+    tip: "Leg de zalm met de huid naar beneden in de pan en laat hem liggen tot de huid krokant loslaat. Dan hoef je hem maar één keer om te draaien.",
+    stappen: ["Kook de rijst volgens de verpakking. Kook voor {baby} de zoete aardappel in blokjes zacht.", "Kook de doperwten 3 minuten en spoel ze koud af. Rasp de wortels grof en snijd de komkommer en avocado in plakjes.", "Bak de zalm in een scheutje olie op middelhoog vuur 4 minuten op de huid en 2 tot 3 minuten op de andere kant, tot hij net gaar is.", "Neem nu een stukje zalm apart voor {baby}, zonder saus.", "Roer de sojasaus en de honing door elkaar. Verdeel de rest van de zalm in stukken.", "Verdeel rijst, zalm, avocado, komkommer, wortel en doperwten over kommen. Schenk de saus erover en bestrooi met sesamzaad en lente-ui."],
+    baby: { stappen: ["Controleer de zalm goed op graatjes en prak hem met de zoete aardappel en wat avocado.", "Honing mag pas vanaf 1 jaar en sojasaus is te zout: geef {baby} geen saus."], allergenen: ["vis"] } },
+  { id: "kip-tikka", cat: "stoof",
+    naam: "Milde kip tikka masala met bloemkool en rijst", tijd: 35, soort: "Kip",
+    ingr: [I(350, "g", "kipfilet", "kipfilet"), I(150, "g", "volle yoghurt", "yoghurt"), I(1, "el", "milde currypasta"), I(1, "", "ui", "ui"), I(1, "", "teen knoflook"), I(400, "g", "tomatenblokjes", "passata"), I(100, "ml", "kookroom", "room"), I(300, "g", "bloemkool", "bloemkool"), I(150, "g", "zilvervliesrijst", "rijst"), I(null, "", "verse koriander, zout")],
+    gerei: ["Hapjespan met deksel", "Pan voor de rijst", "Kom", "Snijplank en mes"],
+    tip: "Laat de kip een kwartier in de yoghurt met currypasta liggen als je tijd hebt. Hij wordt er extra mals van.",
+    stappen: ["Kook de rijst volgens de verpakking.", "Snijd de kip in blokjes en de bloemkool in kleine roosjes. Snipper de ui en pers de knoflook.", "Houd voor {baby} een paar stukjes kip en wat bloemkool apart.", "Meng de rest van de kip in een kom met de helft van de yoghurt en de currypasta.", "Fruit de ui en knoflook 3 minuten in een scheutje olie. Voeg de kip toe en bak 4 minuten tot hij rondom kleur heeft.", "Voeg de tomatenblokjes, de bloemkool en 100 ml water toe. Leg de deksel erop en laat 12 minuten zachtjes koken, tot de bloemkool zacht en de kip gaar is.", "Kook de kip en bloemkool voor {baby} in een klein pannetje water gaar, zonder kruiden.", "Roer de kookroom erdoor, breng op smaak met zout en serveer met de rijst, de rest van de yoghurt en koriander."],
+    baby: { stappen: ["Geen rijst: prak de apart gekookte kip heel fijn met de zachte bloemkool en een gekookte aardappel.", "Een lepel yoghurt zonder kruiden maakt het lekker smeuïg."], allergenen: ["melk (yoghurt, room)"] } },
+  { id: "gevulde-zoete-aardappel", cat: "oven",
+    naam: "Gevulde zoete aardappel uit de oven met zwarte bonen", tijd: 50, soort: "Vega",
+    ingr: [I(800, "g", "zoete aardappels (4 stuks)", "zoete-aardappel"), I(1, "blik", "zwarte bonen", "bonen"), I(1, "", "rode paprika", "paprika"), I(1, "", "rode ui", "ui"), I(150, "g", "cherrytomaten", "tomaat"), I(60, "g", "geraspte kaas", "kaas"), I(100, "g", "volle yoghurt", "yoghurt"), I(1, "", "limoen"), I(1, "tl", "komijn en paprikapoeder")],
+    gerei: ["Bakplaat met bakpapier", "Koekenpan", "Zeef", "Vork", "Snijplank en mes"],
+    tip: "Prik met een vork een paar gaatjes in de zoete aardappels voor ze de oven in gaan. Dan barsten ze niet open.",
+    stappen: ["Verwarm de oven voor op 200 °C. Was de zoete aardappels, prik er met een vork gaatjes in en rooster ze 40 minuten op de bakplaat, tot ze helemaal zacht zijn.", "Spoel de bonen af in een zeef. Snijd de paprika in blokjes, de ui in ringen en halveer de tomaten.", "Neem een schepje bonen apart voor {baby}.", "Bak de paprika en ui 5 minuten in een scheutje olie. Voeg de rest van de bonen, de komijn en het paprikapoeder toe en warm 3 minuten mee.", "Snijd de zoete aardappels in de lengte open en druk ze een beetje open met een vork.", "Neem nu een stuk zoete aardappel apart voor {baby}.", "Vul de rest met het bonenmengsel, strooi de kaas erover en zet ze nog 5 minuten in de oven. Serveer met tomaat, een lepel yoghurt en een partje limoen."],
+    baby: { stappen: ["Prak de zoete aardappel met de apart gehouden bonen; wrijf de velletjes goed kapot.", "Zachte partjes zoete aardappel zijn ook goed als vingervoedsel."], allergenen: [] } },
+  { id: "pasta-broccoli-kip", cat: "pasta",
+    naam: "Pasta met broccoli, kip, knoflook en citroen", tijd: 25, soort: "Kip",
+    ingr: [I(200, "g", "penne", "pasta"), I(350, "g", "broccoli", "broccoli"), I(250, "g", "kippendijfilet", "kippendij"), I(2, "", "tenen knoflook"), I(2, "el", "olijfolie"), I(40, "g", "Parmezaanse kaas (geraspt)", "kaas"), I(1, "", "citroen"), I(null, "", "chilivlokken, peper, zout"), I(1, "", "aardappel (voor {baby})", "aardappel", true)],
+    gerei: ["Grote pan voor de pasta", "Koekenpan", "Rasp", "Snijplank en mes"],
+    tip: "Kook de broccoli de laatste 4 minuten mee in het pastawater. Dat scheelt een pan en de broccoli wordt precies gaar.",
+    stappen: ["Kook de penne volgens de verpakking. Doe de broccoliroosjes de laatste 4 minuten erbij. Kook voor {baby} de aardappel gaar.", "Snijd de kip in reepjes en de knoflook in dunne plakjes.", "Bak de kip in de olijfolie op middelhoog vuur in 6 tot 8 minuten gaar en goudbruin.", "Neem nu een stukje kip en wat broccoli apart voor {baby}.", "Doe de knoflook bij de kip en bak 1 minuut, tot hij lekker ruikt maar niet bruin wordt.", "Schep de uitgelekte pasta en broccoli door de kip. Rasp er citroenschil over, knijp er wat sap bij en breng op smaak met chilivlokken, peper en zout. Serveer met Parmezaanse kaas."],
+    baby: { stappen: ["Geen pasta: prak de aardappel met de fijngesneden kip en zachte broccoli.", "Parmezaanse kaas is te zout voor een baby."], allergenen: [] } },
 ];
 const RMAP = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+/* ---------- Categorieën (soort gerecht) ---------- */
+const CATEGORIEEN = [
+  ['pasta', 'Pasta'], ['rijst', 'Rijst & wok'], ['soep', 'Soep'], ['oven', 'Uit de oven'], ['stamppot', 'Stamppot & aardappel'],
+  ['stoof', 'Curry & stoof'], ['wraps', 'Wraps, brood & bowls'], ['salade', 'Salade & licht'], ['ei', 'Ei & pannenkoek'], ['overig', 'Overig'],
+];
+const CATNAAM = Object.fromEntries(CATEGORIEEN);
+const CAT_VAN = {
+  'zalm-zoet': 'oven', pompoencurry: 'stoof', linzenstoof: 'stoof', frittata: 'ei', 'kabeljauw-prei': 'stamppot', gehaktballetjes: 'pasta',
+  'bloemkool-ovenschotel': 'oven', spinaziestoof: 'stoof', 'kalkoen-sperzie': 'stamppot', bietenstamppot: 'stamppot', 'wraps-kip': 'wraps',
+  pompoensoep: 'soep', shakshuka: 'ei', 'kip-traybake': 'oven', chili: 'stoof', hutspot: 'stamppot', lasagne: 'pasta', 'witvis-erwten': 'stamppot',
+  'kip-pinda': 'rijst', bloemkoolcurry: 'stoof', carbonara: 'pasta', 'nasi-goreng': 'rijst', burgers: 'wraps', macaroni: 'pasta',
+  'kip-champignon': 'stamppot', wrappizza: 'wraps', hachee: 'stoof', pannenkoeken: 'ei', teriyaki: 'rijst', shoarma: 'wraps',
+  tomatensoep: 'soep', groentesoep: 'soep', kippensoep: 'soep', broccolisoep: 'soep', 'zalm-pasta': 'pasta', 'vis-curry': 'stoof',
+  'prei-stamppot': 'stamppot', 'cottage-pie': 'oven', 'kip-kerrie': 'stoof', burrito: 'wraps', quesadilla: 'wraps', omelet: 'ei',
+  risotto: 'rijst', ratatouille: 'oven', 'kip-honing': 'oven', 'vis-oven': 'oven', linzensoep: 'soep', bolognese: 'pasta', goulash: 'stoof',
+  'kip-wok': 'rijst', ovenpasta: 'pasta',
+};
+// Recepten van de tijdlijn hebben geen categorie: raad hem aan de hand van de naam
+function gokCategorie(r) {
+  const n = (r.naam || '').toLowerCase();
+  const regels = [[/soep/, 'soep'], [/pasta|spaghetti|lasagne|macaroni|penne|noedel/, 'pasta'], [/rijst|wok|nasi|bami|risotto/, 'rijst'],
+    [/curry|stoof|chili|goulash|hachee|dahl/, 'stoof'], [/stamppot|puree|aardappel/, 'stamppot'], [/oven|schotel|traybake|pie/, 'oven'],
+    [/wrap|burger|brood|bowl|pita|taco|burrito/, 'wraps'], [/salade/, 'salade'], [/omelet|frittata|pannenkoe|ei\b/, 'ei']];
+  const hit = regels.find(([re]) => re.test(n));
+  return hit ? hit[1] : 'overig';
+}
+const catVan = r => r.cat || CAT_VAN[r.id] || gokCategorie(r);
 // Recepten die je van de tijdlijn hebt bewaard: ze staan tussen je recepten, maar komen alleen in het weekmenu als je ze er zelf in zet
 let eigenRecepten = store.get('eigenRecepten', []);
 eigenRecepten.forEach(r => { if (!RMAP[r.id]) { RECIPES.push(r); RMAP[r.id] = r; } });
@@ -1440,7 +1549,11 @@ let lijst = store.get('boodschappen', []);
 let lijstSync = 'lokaal';
 let saveList = null;
 let swaps = store.get('swaps', {});           // per recept de gekozen goedkopere alternatieven
-let budget = store.get('budget', null);       // budget per maaltijd in euro
+// Budget per persoon per maaltijd (euro). Oudere versies bewaarden een budget per maaltijd: dat één keer omrekenen.
+let budgetPP = store.get('budgetPP', null);
+if (budgetPP == null && store.get('budget', null) != null) { budgetPP = Math.round(store.get('budget') / Math.max(1, gezin.volw + gezin.kind) * 2) / 2; store.set('budgetPP', budgetPP); }
+// Filters in het kookboek (per apparaat)
+let receptCat = store.get('receptCat', null), receptZoek = '', alleenBudget = store.get('alleenBudget', false), alleenSnel = false;
 let standaardWinkel = store.get('standaardWinkel', null);
 const budgetOpen = new Set();
 // Favorieten, allergieën en voorkeuren (ook bij je account bewaard)
@@ -1538,7 +1651,13 @@ function prefBonus(r) {
 function basePlan() {
   const seed = Number(iso(monday).replace(/-/g, '')) + [...offerSet()].sort().join().length * 7919;
   const rand = rng(seed);
-  const scored = allowedRecipes().filter(r => !r.eigen).map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) + rand() * 7 }));
+  let pool = allowedRecipes().filter(r => !r.eigen);
+  // Budget per persoon: alleen gerechten binnen budget; zijn dat er te weinig, dan de goedkoopste
+  if (budgetPP != null) {
+    const binnen = pool.filter(binnenBudget);
+    pool = binnen.length >= 7 ? binnen : [...pool].sort((a, b) => ppKosten(a) - ppKosten(b)).slice(0, Math.max(9, binnen.length));
+  }
+  const scored = pool.map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) + rand() * 7 }));
   const plan = [];
   let nitr = 0, fish = 0;
   for (let d = 0; d < 7; d++) {
@@ -1565,12 +1684,24 @@ function basePlan() {
   }
   return plan;
 }
+var planCache = null;   // var: store.set leegt hem al voordat deze regel is uitgevoerd
 function plan() {
+  if (planCache) return planCache;   // binnen één tekenronde maar één keer uitrekenen
+  planCache = planZonderCache(); queueMicrotask(() => { planCache = null; });
+  return planCache;
+}
+function zetBudget(v) {
+  budgetPP = v; store.set('budgetPP', v); store.set('budget', null);
+  if (v == null) { alleenBudget = false; store.set('alleenBudget', false); }
+  render();
+  toast(v == null ? 'Geen budget meer ingesteld.' : `Budget: ${fmtEur(v)} per persoon. Het weekmenu houdt er rekening mee.`);
+}
+function planZonderCache() {
   const b = basePlan();
   return b.map((r, i) => { const o = RMAP[overrides[iso(weekDates[i])]]; return o && allowed(o) ? o : r; });
 }
 function ranked() {
-  return allowedRecipes().map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) })).sort((a, b) => b.s - a.s || a.r.naam.localeCompare(b.r.naam)).map(x => x.r);
+  return allowedRecipes().map(r => ({ r, s: hits(r).length * 10 + prefBonus(r) - (binnenBudget(r) ? 0 : 60) })).sort((a, b) => b.s - a.s || a.r.naam.localeCompare(b.r.naam)).map(x => x.r);
 }
 function swap(i) {
   const p = plan();
@@ -1780,6 +1911,26 @@ function swapOptions(r) {
   }).filter(o => o.on || o.saving > 0.1).sort((a, b) => b.saving - a.saving);
 }
 const fmtEur = v => '€ ' + v.toFixed(2).replace('.', ',');
+// Budget per persoon: kosten van het gerecht gedeeld door het aantal eters (baby's tellen niet mee)
+const ppKosten = r => recipeCost(r).total / eters();
+const budgetMaaltijd = () => budgetPP == null ? null : budgetPP * eters();
+const binnenBudget = r => budgetPP == null || ppKosten(r) <= budgetPP + 0.005;
+const BUDGET_KEUZES = [2, 2.5, 3, 3.5, 4, 5, 6];
+function budgetKiezer(id) {
+  return `<div class="bkeuze" role="group" aria-label="Budget per persoon">${BUDGET_KEUZES.map(v => `<button type="button" class="chip" data-bpp="${v}" aria-pressed="${budgetPP === v}">${fmtEur(v).replace(',00', '')}</button>`).join('')}<button type="button" class="chip" data-bpp="" aria-pressed="${budgetPP == null}">Geen</button></div>
+    <div class="row" style="margin-top:10px;align-items:center"><label for="${id}" class="small" style="font-weight:700">Of vul zelf in</label>
+    <span class="eurin">€ <input type="number" id="${id}" data-budget min="0.5" max="50" step="0.25" value="${budgetPP != null ? budgetPP : ''}" placeholder="bijv. 3"></span><span class="small muted">per persoon</span></div>`;
+}
+function budgetKaart() {
+  const p = plan(), binnen = p.filter(binnenBudget).length;
+  return `<article class="card budgetkaart">
+    <div class="eyebrow">Budget</div>
+    <h3 style="font-size:20px;margin-top:2px">Wat mag een maaltijd per persoon kosten?</h3>
+    <p class="small muted" style="margin:6px 0 10px">Het weekmenu kiest dan gerechten die binnen je budget blijven. Voor ${esc(gezinLabel())}${budgetPP != null ? ` is dat ≈ ${fmtEur(budgetMaaltijd())} per maaltijd en ≈ ${fmtEur(budgetMaaltijd() * 7)} per week` : ''}.</p>
+    ${budgetKiezer('budgetpp-kaart')}
+    ${budgetPP != null ? `<p class="small" style="margin:10px 0 0">${binnen === 7 ? '<b class="ok">Alle 7 gerechten</b> passen binnen je budget.' : `<b class="${binnen ? 'ok' : 'over'}">${binnen} van de 7</b> gerechten passen binnen je budget. ${RECIPES.filter(r => !r.eigen && allowed(r) && binnenBudget(r)).length < 7 ? 'Er zijn te weinig recepten zo goedkoop; het weekmenu kiest dan de goedkoopste. Met <b>Goedkoper maken</b> bij een recept kom je vaak nog lager uit.' : 'Een gerecht dat je zelf hebt gekozen blijft staan, ook als het duurder is.'}`}</p>` : ''}
+  </article>`;
+}
 
 /* ---------- Gezin en baby's ---------- */
 const babys = () => gezin.babys || [];
@@ -1858,16 +2009,15 @@ const offerTag = (k, big) => `<button class="tag${big ? ' big' : ''}" data-cmp="
 
 function budgetBlock(r) {
   const c = recipeCost(r), opts = swapOptions(r);
+  const budget = budgetMaaltijd(), pp = c.total / eters();
   const over = budget != null && c.total > budget + 0.005;
   return `
     <details class="budget" data-rid="${r.id}"${budgetOpen.has(r.id) ? ' open' : ''}>
-      <summary><span class="bsum">Kosten ≈ ${fmtEur(c.total)}</span><span class="small muted">${fmtEur(c.total / eters())} per persoon${budget != null ? (over ? ` · <b class="over">${fmtEur(c.total - budget)} boven budget</b>` : ' · <b class="ok">binnen budget</b>') : ''}</span></summary>
+      <summary><span class="bsum">Kosten ≈ ${fmtEur(c.total)}</span><span class="small muted">${fmtEur(pp)} per persoon${budget != null ? (over ? ` · <b class="over">${fmtEur(pp - budgetPP)} p.p. boven budget</b>` : ' · <b class="ok">binnen budget</b>') : ''}</span></summary>
       <ul class="costs">${effIngr(r).map(i => { const k = lineCost(i); return k ? `<li><span>${esc(i.n)}</span>${k.actie ? '<span class="tag">Actie</span>' : ''}<span class="eur">${fmtEur(k.eur)}</span></li>` : ''; }).join('')}</ul>
       <p class="small muted" style="margin:6px 0 0">Voor de hoeveelheid die in het gerecht gaat. ${c.actie ? `${fmtEur(c.actie)} daarvan is actieprijs, de rest` : 'Alles'} is een richtprijs.</p>
-      <div class="row" style="margin-top:12px;align-items:center">
-        <label for="budget-${r.id}" class="small" style="font-weight:700">Mijn budget per maaltijd</label>
-        <span class="eurin">€ <input type="number" id="budget-${r.id}" data-budget min="1" max="100" step="0.5" value="${budget != null ? budget : ''}" placeholder="bijv. 8"></span>
-      </div>
+      <div class="section-title" style="font-size:15px;margin-top:14px">Mijn budget per persoon</div>
+      ${budgetKiezer('budget-' + r.id)}
       ${opts.length ? `<div class="section-title" style="font-size:15px;margin-top:14px">Goedkoper maken</div>
       <div class="swaps">${opts.map(o => `<label><input type="checkbox" data-swapid="${o.w.id}" data-rid="${r.id}" ${o.on ? 'checked' : ''}><span>${esc(o.w.label)}</span><span class="small muted">${o.on ? 'bespaart' : 'scheelt'} ≈ ${fmtEur(o.saving)}</span></label>`).join('')}</div>
       ${over && opts.some(o => !o.on) ? `<button class="btn" style="margin-top:10px" data-autobudget="${r.id}">Pas aan tot binnen budget</button>` : ''}` : ''}
@@ -1962,12 +2112,14 @@ function kookOpen(id) {
   const r = RMAP[id] || (window.eigenRecept && eigenRecept(id)); if (!r) return;
   const stappen = r.stappen.map(adultStep).filter(Boolean);
   kook = { r, stappen, stap: 0, wekkers: (kook && kook.wekkers) || [] };
+  track('kookstand_start', { stappen: stappen.length }, r.id);
   kookEl().hidden = false; document.body.classList.add('kookt');
   schermAan(); kookTeken();
   clearInterval(kookTik); kookTik = setInterval(kookTikken, 500);
 }
 function kookSluiten() {
   if (kook && kook.wekkers.some(w => !w.klaar) && !confirm('Er loopt nog een kookwekker. Toch stoppen?')) return;
+  if (kook && kook.stap <= kook.stappen.length) track('kookstand_stop', { stap: kook.stap, van: kook.stappen.length }, kook.r.id);
   kook = null; kookEl().hidden = true; kookEl().innerHTML = ''; document.body.classList.remove('kookt');
   clearInterval(kookTik); if (kookLock) { kookLock.release().catch(() => {}); kookLock = null; }
 }
@@ -2019,11 +2171,11 @@ document.addEventListener('click', e => {
   if (!kook) return;
   if (t.hasAttribute('data-kstop')) kookSluiten();
   else if (t.hasAttribute('data-kvorige')) { kook.stap = Math.max(0, kook.stap - 1); kookTeken(); }
-  else if (t.hasAttribute('data-kvolgende')) { kook.stap = Math.min(kook.stappen.length + 1, kook.stap + 1); kookTeken(); }
+  else if (t.hasAttribute('data-kvolgende')) { kook.stap = Math.min(kook.stappen.length + 1, kook.stap + 1); if (kook.stap > kook.stappen.length) track('kookstand_klaar', { wekkers: kook.wekkers.length }, kook.r.id); kookTeken(); }
   else if (t.dataset.kwekker) {
     const min = Number(t.dataset.kwekker);
     kook.wekkers.push({ id: Math.random().toString(36).slice(2, 8), label: `${t.dataset.klabel} · ${duurTekst(min)}`, eind: Date.now() + min * 60000, klaar: false });
-    kookTikken(); toast(`Wekker gezet: ${duurTekst(min)}`);
+    kookTikken(); toast(`Wekker gezet: ${duurTekst(min)}`); track('kookwekker', { min }, kook.r.id);
   }
   else if (t.dataset.kwekweg) { kook.wekkers = kook.wekkers.filter(w => w.id !== t.dataset.kwekweg); kookTikken(); }
 });
@@ -2153,8 +2305,10 @@ function viewWeek() {
   <article class="card weekbar">
     <div><div class="eyebrow">Hele week</div><div class="bigeur">≈ ${fmtEur(week)}</div><div class="small muted">${fmtEur(week / 7)} per dag gemiddeld</div></div>
     <button class="gezinlink" data-go="gezin"><span class="small muted">Voor</span><b>${esc(gezinLabel())}</b><span class="small" style="color:var(--green)">Aanpassen ›</span></button>
+    ${budgetPP != null ? `<div class="small" style="grid-column:1/-1;margin-top:-4px">Budget ${fmtEur(budgetPP)} p.p. · ≈ ${fmtEur(budgetMaaltijd() * 7)} per week · ${week <= budgetMaaltijd() * 7 + 0.01 ? '<b class="ok">binnen budget</b>' : `<b class="over">${fmtEur(week - budgetMaaltijd() * 7)} erboven</b>`}</div>` : ''}
     <button class="btn primary" data-addweek style="grid-column:1/-1">Hele week op de boodschappenlijst</button>
   </article>
+  ${budgetKaart()}
   <article class="card agendakaart">
     <h3>Herinnering in je agenda</h3>
     <div class="agendavelden">
@@ -2166,11 +2320,11 @@ function viewWeek() {
   </article>
   <div style="display:grid;gap:10px">
   ${p.map((r, i) => `
-    <details class="day${i === dayIdx ? ' today' : ''}"${i === dayIdx ? ' open' : ''}>
+    <details class="day${i === dayIdx ? ' today' : ''}" data-rid="${esc(r.id)}"${i === dayIdx ? ' open' : ''}>
       <summary>
         ${plate(r)}
         <span class="dtext"><span class="dname">${i === dayIdx ? 'Vandaag' : DAYS[i]} · begin ${startTijd(r)}</span><span class="rname">${esc(r.naam)}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
-        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
+        <span class="badges"><span class="pill ${binnenBudget(r) ? 'ok' : 'over'}">≈ ${fmtEur(recipeCost(r).total)}</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}${hits(r).length ? `<span class="tag">${hits(r).length}× actie</span>` : ''}${isNitrate(r) ? '<span class="pill warn">nitraat</span>' : ''}</span>
       </summary>
       <div class="inner">
         ${r.foto ? photoBlock(r, 'rowphoto') : ''}
@@ -2193,12 +2347,12 @@ function filterSummary() {
 }
 function recipeRow(r) {
   return `
-    <details class="day rrow">
+    <details class="day rrow" data-rid="${esc(r.id)}">
       <summary>
         ${plate(r)}
         <span class="dtext"><span class="rname">${esc(r.naam)}${isFav(r) ? ' <span class="heart" aria-label="Favoriet">♥</span>' : ''}</span>
-          <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
-        <span class="badges"><span class="pill ok">≈ ${fmtEur(recipeCost(r).total)}</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}</span>
+          <span class="rmeta small muted">${r.tijd} min · ${esc(r.soort)} · ${esc(CATNAAM[catVan(r)])}${hits(r).length ? ` · ${hits(r).length}× actie` : ''}</span>${r.comfort ? '<span class="pill comfort">Comfortfood</span>' : ''}</span>
+        <span class="badges"><span class="pill ${binnenBudget(r) ? 'ok' : 'over'}">≈ ${fmtEur(ppKosten(r))} p.p.</span>${voorraadHits(r).length ? `<span class="pill huis">${voorraadHits(r).length}× in huis</span>` : ''}</span>
       </summary>
       <div class="inner">${r.foto ? photoBlock(r, 'rowphoto') : ''}${recipeBody(r, null)}</div>
     </details>`;
@@ -2247,10 +2401,42 @@ function viewRecipes() {
   </details>
 
   <section>
-    <h3 class="section-title">Alle recepten <span class="small muted" style="font-family:var(--body);font-weight:400">${none ? '' : `${list.length} van ${RECIPES.length}`}</span></h3>
-    ${none ? '<article class="card"><p style="margin:0">Geen enkel recept past bij deze filters. Het weekmenu negeert de filters tot je er een uitzet.</p></article>'
-      : `<div style="display:grid;gap:10px">${list.map(recipeRow).join('')}</div>`}
+    <h3 class="section-title">Alle recepten</h3>
+    ${none ? '<article class="card"><p style="margin:0">Geen enkel recept past bij deze filters. Het weekmenu negeert de filters tot je er een uitzet.</p></article>' : `
+    <input type="search" class="rzoek" id="rzoek" placeholder="Zoek op gerecht of ingrediënt, bijv. pompoen" value="${esc(receptZoek)}" autocomplete="off" enterkeyhint="search" aria-label="Zoek een recept">
+    <div class="catbalk" role="group" aria-label="Categorie">${[[null, 'Alles'], ...CATEGORIEEN].map(([id, naam]) => { const n = list.filter(r => id == null || catVan(r) === id).length; return n || id == null ? `<button class="chip" data-rcat="${id || ''}" aria-pressed="${receptCat === id}">${esc(naam)}<span class="n">${n}</span></button>` : ''; }).join('')}</div>
+    <div class="rtoggles">
+      <button class="chip" data-rsnel aria-pressed="${alleenSnel}">Snel (30 min of minder)</button>
+      ${budgetPP != null ? `<button class="chip" data-rbudget aria-pressed="${alleenBudget}">Binnen budget (${fmtEur(budgetPP)} p.p.)</button>` : '<button class="chip" data-go="gezin">Budget per persoon instellen</button>'}
+    </div>
+    <div id="rlijst" style="margin-top:12px">${receptLijstHtml()}</div>`}
   </section>`;
+}
+// Zoeken en filteren in het kookboek; tekent alleen de lijst opnieuw, zodat het zoekveld de focus houdt
+const zoekNorm = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function receptGefilterd() {
+  const q = zoekNorm(receptZoek.trim());
+  return RECIPES.filter(allowed).filter(r => !receptCat || catVan(r) === receptCat)
+    .filter(r => !alleenSnel || r.tijd <= 30).filter(r => !alleenBudget || binnenBudget(r))
+    .filter(r => !q || q.split(/\s+/).every(w => zoekNorm(r.naam + ' ' + r.soort + ' ' + CATNAAM[catVan(r)] + ' ' + r.ingr.map(i => i.n).join(' ')).includes(w)))
+    .sort((a, b) => a.naam.localeCompare(b.naam));
+}
+function receptLijstHtml() {
+  const lijst = receptGefilterd();
+  if (!lijst.length) return `<article class="card"><p style="margin:0">Geen recepten gevonden${receptZoek ? ` voor "${esc(receptZoek)}"` : ''}. ${alleenBudget ? 'Probeer het zonder "Binnen budget", of ' : ''}kies een andere categorie.</p></article>`;
+  const kop = `<p class="small muted" style="margin:0 0 8px">${lijst.length} van ${RECIPES.filter(allowed).length} recepten</p>`;
+  if (receptCat || receptZoek.trim()) return kop + `<div style="display:grid;gap:10px">${lijst.map(recipeRow).join('')}</div>`;
+  return kop + CATEGORIEEN.map(([id, naam]) => { const rs = lijst.filter(r => catVan(r) === id); return rs.length ? `
+    <div class="catkop"><span>${esc(naam)}</span><span class="small muted" style="font-family:var(--body);font-weight:400">${rs.length}</span></div>
+    <div style="display:grid;gap:10px">${rs.map(recipeRow).join('')}</div>` : ''; }).join('');
+}
+function tekenReceptLijst() {
+  if (tab !== 'recepten') return;
+  const el = document.getElementById('rlijst'); if (!el) { render(); return; }
+  el.innerHTML = receptLijstHtml();
+  app.querySelectorAll('[data-rcat]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.rcat || null) === receptCat));
+  const s = app.querySelector('[data-rsnel]'); if (s) s.setAttribute('aria-pressed', alleenSnel);
+  const bb = app.querySelector('[data-rbudget]'); if (bb) bb.setAttribute('aria-pressed', alleenBudget);
 }
 
 /* ---------- Extra boodschappen met prijs ---------- */
@@ -2528,6 +2714,7 @@ function viewGezin() {
     ${stepper('volw', 'Volwassenen', 'Vanaf 12 jaar', gezin.volw, 1)}
     ${stepper('kind', 'Kinderen', '2 tot 12 jaar, ongeveer 0,6 portie', gezin.kind, 0)}
   </article>
+  ${budgetKaart()}
 
   <section>
     <h3 class="section-title" style="margin-top:4px">Baby's</h3>
@@ -2597,6 +2784,70 @@ function viewGezin() {
 // De anon-sleutel is bedoeld om in apps te staan; de beveiliging zit in de regels van supabase/setup.sql.
 const SUPA = window.AK_SUPA || { url: 'https://dfegvnmmfpuzfjrlypcb.supabase.co', key: 'sb_publishable_XhqFcuJz6DWmmGyihd_1xA_Pz9Xbm0Y' };
 const inClaude = !!(window.claude && window.claude.use);
+
+/* ---------- Anonieme gebruiksstatistieken (Supabase, tabel ak_events; zie supabase/statistieken.sql) ---------- */
+// Doel: zien welke onderdelen en recepten gebruikt worden, zodat de app beter kan worden.
+// Er gaan geen namen, vrije teksten, kaartnummers of boodschappenlijsten mee: alleen wat er wordt aangetikt.
+// Elk toestel krijgt een willekeurige code. Uitzetten kan onder Meer. In Claude zelf wordt niets verstuurd.
+const APP_VERSIE = '2026-09-30';
+const STATS_URL = SUPA.url ? SUPA.url + '/rest/v1/ak_events' : '';
+const statsAan = () => !inClaude && !!STATS_URL && store.get('statsUit', false) !== true;
+const nieuwId = () => ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).replace(/-/g, '').slice(0, 24);
+let apparaat = store.get('apparaat', null);
+const eersteKeer = !apparaat;
+if (!apparaat) { apparaat = nieuwId(); store.set('apparaat', apparaat); }
+let sessie = nieuwId().slice(0, 16), laatsteActie = Date.now(), statsTimer = null, statsBezig = false, statsFouten = 0;
+let statsRij = (store.get('statsRij', []) || []).slice(-200);
+function track(event, data = {}, recept = null) {
+  if (!statsAan()) return;
+  try {
+    if (Date.now() - laatsteActie > 30 * 60000) sessie = nieuwId().slice(0, 16);   // een half uur niets gedaan: nieuwe sessie
+    laatsteActie = Date.now();
+    statsRij.push({ apparaat, sessie, event, tab: String(tab || '').slice(0, 30), recept: recept ? String(recept).slice(0, 60) : null, data, versie: APP_VERSIE });
+    if (statsRij.length > 200) statsRij = statsRij.slice(-200);
+    try { localStorage.setItem('ak:statsRij', JSON.stringify(statsRij)); } catch (e) {}
+    clearTimeout(statsTimer); statsTimer = setTimeout(statsFlush, 5000);
+  } catch (e) {}
+}
+async function statsFlush() {
+  if (statsBezig || !statsRij.length || !STATS_URL || inClaude || navigator.onLine === false) return;
+  const deel = statsRij.slice(0, 50); statsBezig = true; let ok = false;
+  try {
+    const r = await fetch(STATS_URL, { method: 'POST', keepalive: true, body: JSON.stringify(deel),
+      headers: { apikey: SUPA.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' } });
+    // Gelukt, of een fout die niet vanzelf overgaat (bijv. tabel bestaat nog niet): niet blijven proberen
+    if (r.ok || (r.status >= 400 && r.status < 500 && r.status !== 429)) { statsRij = statsRij.slice(deel.length); ok = r.ok; }
+  } catch (e) {}
+  try { localStorage.setItem('ak:statsRij', JSON.stringify(statsRij)); } catch (e) {}
+  statsBezig = false;
+  if (ok && statsRij.length) setTimeout(statsFlush, 1000);
+}
+function statsZetten(aan) {
+  if (!aan) { statsRij = []; track('stats_uit'); statsFlush(); store.set('statsUit', true); }
+  else { store.set('statsUit', false); track('stats_aan'); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') statsFlush(); });
+window.addEventListener('pagehide', statsFlush);
+window.addEventListener('online', statsFlush);
+window.addEventListener('error', e => { if (statsFouten++ < 5) track('fout', { msg: String(e.message || 'onbekend').slice(0, 160), regel: e.lineno || null }); });
+function statsStart() {
+  const ua = navigator.userAgent;
+  const os = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : /Windows/.test(ua) ? 'windows' : /Mac/.test(ua) ? 'mac' : 'overig';
+  const vorige = store.get('laatstOpen', null); store.set('laatstOpen', Date.now());
+  track('app_open', {
+    eerste: eersteKeer, dagenWeg: vorige ? Math.floor((Date.now() - vorige) / 864e5) : null,
+    app: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true, os,
+    breed: innerWidth < 400 ? 's' : innerWidth < 800 ? 'm' : 'l',
+    volw: gezin.volw, kind: gezin.kind, babys: babys().length, winkels: mijnWinkels, budgetpp: budgetPP,
+    filters: filtersOn(), allergieen, favorieten: favorieten.length, voorraad: voorraad.length, lijst: lijst.length,
+    voorbeeld: isExample(), gedeeld: !!gedeeld, start: tab,
+  });
+}
+let zoekTrackTimer = null;
+function trackZoek() {
+  clearTimeout(zoekTrackTimer);
+  zoekTrackTimer = setTimeout(() => { const q = receptZoek.trim().toLowerCase(); if (q.length >= 2) track('zoeken', { term: q.slice(0, 40), treffers: receptGefilterd().length }); }, 1500);
+}
 let sb = null, sbUid = null, feed = null, feedErr = '', feedBusy = false;
 let schermnaam = store.get('schermnaam', '');
 let deelOpen = false;
@@ -2801,6 +3052,7 @@ async function plaatsRecept() {
     const { error } = await sb.from('recepten').insert({ auteur: schermnaam, titel: titel.slice(0, 80), tijd, soort, ingredienten: ingredienten.map(x => x.slice(0, 120)), bereiding: bereiding.map(x => x.slice(0, 600)), foto_pad });
     if (error) throw error;
     deelOpen = false; feed = null; render();
+    track('tijdlijn_gedeeld', { foto: !!foto_pad, soort });
   } catch (e) {
     btn.disabled = false; btn.textContent = `Plaatsen als ${schermnaam}`;
     err.textContent = 'Plaatsen is niet gelukt. Controleer je internetverbinding en probeer het opnieuw.';
@@ -3083,9 +3335,15 @@ function viewMeer() {
       <span class="mtext"><b>Privacy</b><span>Wat de app bewaart en hoe je het wist</span></span>
       <span class="mpijl" aria-hidden="true">›</span>
     </a>
+    ${!inClaude && STATS_URL ? `<button class="meertegel klein" data-statsknop aria-pressed="${statsAan()}">
+      <span class="micon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+      <span class="mtext"><b>Anonieme statistieken: ${statsAan() ? 'aan' : 'uit'}</b><span>Laat anoniem zien welke onderdelen en recepten gebruikt worden, zodat de app beter wordt. Geen namen of boodschappen. Tik om ${statsAan() ? 'uit' : 'aan'} te zetten.</span></span>
+      <span class="mpijl" aria-hidden="true">${statsAan() ? '✓' : '○'}</span>
+    </button>` : ''}
   </div>`;
 }
 function render() {
+  planCache = null;
   const views = { voorraad: viewVoorraad, vandaag: viewToday, week: viewWeek, recepten: viewRecipes, lijst: viewList, aanbiedingen: viewOffers, gezin: viewGezin, kaarten: viewCards, tijdlijn: viewTijdlijn, meer: viewMeer };
   renderStoreBar();
   document.querySelector('.storebar-wrap').hidden = !['lijst', 'aanbiedingen'].includes(tab);
@@ -3098,7 +3356,7 @@ function render() {
   const actief = HOOFD.includes(tab) ? tab : 'meer';
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === actief));
 }
-function go(t) { if (HOOFD.includes(tab) && !HOOFD.includes(t)) terugNaar = tab; tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
+function go(t) { if (t !== tab) track('tab', { van: tab, naar: t }); if (HOOFD.includes(tab) && !HOOFD.includes(t)) terugNaar = tab; tab = t; store.set('tab', t); render(); window.scrollTo(0, 0); }
 function openFilters() { const d = document.querySelector('details.filters'); if (d) d.open = true; }
 // Details die de gebruiker open had, blijven open na opnieuw tekenen
 function persistPrefs() {
@@ -3126,8 +3384,53 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCompa
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) go(b.dataset.tab); });
 document.querySelector('.gezinbtn').addEventListener('click', () => go('gezin'));
 
+// Statistieken: kijkt vóór de gewone afhandeling, zodat hij de toestand van vóór de tik nog ziet
 app.addEventListener('click', e => {
-  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-postbewaar],[data-inweek],[data-eigenweg],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-voorraad],[data-voorraadleeg],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],#zoek,#wis');
+  if (!statsAan()) return;
+  const sum = e.target.closest('summary');
+  if (sum) {
+    const det = sum.parentElement;
+    if (det && !det.open && det.matches('details[data-rid]')) track('recept_open', { bron: tab }, det.dataset.rid);
+    else if (det && !det.open && det.matches('details.budget')) track('kosten_bekeken', {}, det.dataset.rid);
+    else if (det && !det.open && det.matches('details.filters')) track('filters_open');
+    return;
+  }
+  const t = e.target.closest('button,a'); if (!t) return;
+  const d = t.dataset, p = () => plan();
+  if (d.fav) track('favoriet', { aan: !favorieten.includes(d.fav) }, d.fav);
+  else if (d.addrecipe) track('op_lijst', {}, d.addrecipe);
+  else if (t.hasAttribute('data-addweek')) track('week_op_lijst');
+  else if (d.swap) track('ander_recept', { dag: +d.swap }, p()[+d.swap].id);
+  else if (d.reset) track('terug_naar_voorstel', { dag: +d.reset }, p()[+d.reset].id);
+  else if (d.inweek) track('in_weekmenu', {}, d.inweek);
+  else if (d.omit) { const [rid, ...rest] = d.omit.split('|'); track('weglaten', { ingr: rest.join('|').slice(0, 60), terug: weglaten.includes(d.omit) }, rid); }
+  else if (d.autobudget) track('goedkoper_auto', {}, d.autobudget);
+  else if (d.allergy) track('filter', { soort: 'allergie', waarde: d.allergy, aan: !allergieen.includes(d.allergy) });
+  else if (d.pref) track('filter', { soort: 'voorkeur', waarde: d.pref });
+  else if (t.hasAttribute('data-resetfilters')) track('filter', { soort: 'wissen' });
+  else if (t.hasAttribute('data-rcat')) track('categorie', { cat: d.rcat || 'alles' });
+  else if (t.hasAttribute('data-rsnel')) track('filter', { soort: 'snel', aan: !alleenSnel });
+  else if (t.hasAttribute('data-rbudget')) track('filter', { soort: 'binnen_budget', aan: !alleenBudget });
+  else if (t.hasAttribute('data-bpp')) track('budget', { pp: d.bpp === '' ? null : Number(d.bpp), plek: tab });
+  else if (d.cmp) track('vergelijk', { product: d.cmp });
+  else if (t.hasAttribute('data-agenda')) track('agenda');
+  else if (d.snel) track('extra_product', { product: d.snel, snelknop: true });
+  else if (d.voorraad) track('voorraad', { product: d.voorraad, aan: !inHuis(d.voorraad) });
+  else if (d.count) track('gezin', { wie: d.count, delta: +d.delta });
+  else if (t.hasAttribute('data-addbaby')) track('baby_toegevoegd');
+  else if (t.hasAttribute('data-gmaak')) track('lijst_delen');
+  else if (d.gmeedoen) track('lijst_meedoen');
+  else if (d.like) track('tijdlijn_like');
+  else if (d.postbewaar) track('tijdlijn_bewaard');
+  else if (d.postlist) track('tijdlijn_op_lijst');
+  else if (d.card) track('kaart_getoond');
+  else if (t.hasAttribute('data-lclean')) track('lijst_opruimen');
+  else if (t.hasAttribute('data-lclear') && d.sure) track('lijst_leeg');
+  else if (d.offer) track('aanbieding_zelf', { product: d.offer });
+  else if (t.id === 'zoek') track('folder_geplakt');
+});
+app.addEventListener('click', e => {
+  const t = e.target.closest('[data-like],[data-postlist],[data-postdel],[data-meld],[data-deblok],[data-postbewaar],[data-inweek],[data-eigenweg],[data-deel],[data-refresh],[data-naamwissel],[data-omit],[data-step],[data-count],[data-addbaby],[data-brule],[data-brm],[data-fav],[data-allergy],[data-pref],[data-resetfilters],[data-card],[data-cmp],[data-go],[data-swap],[data-reset],[data-offer],[data-addrecipe],[data-addweek],[data-agenda],[data-voorraad],[data-voorraadleeg],[data-gmaak],[data-gmeedoen],[data-guitnodigen],[data-gstop],[data-snel],[data-faantal],[data-ledit],[data-lstap],[data-lok],[data-lrm],[data-lclean],[data-lclear],[data-autobudget],[data-bpp],[data-rcat],[data-rsnel],[data-rbudget],[data-statsknop],#zoek,#wis');
   if (!t) return;
   if (t.dataset.postbewaar) { bewaarPost(t.dataset.postbewaar); return; }
   if (t.dataset.inweek) { const sel = document.getElementById('wd-' + t.dataset.inweek); zetInWeek(t.dataset.inweek, Number(sel ? sel.value : dayIdx)); return; }
@@ -3214,11 +3517,16 @@ app.addEventListener('click', e => {
     if (!t.dataset.sure) { t.dataset.sure = '1'; t.textContent = 'Zeker weten? Tik nog eens'; return; }
     lijst = []; persistList(); render();
   }
+  else if (t.hasAttribute('data-bpp')) { const v = t.dataset.bpp; zetBudget(v === '' ? null : Number(v)); }
+  else if (t.hasAttribute('data-rcat')) { receptCat = t.dataset.rcat || null; store.set('receptCat', receptCat); tekenReceptLijst(); }
+  else if (t.hasAttribute('data-rsnel')) { alleenSnel = !alleenSnel; tekenReceptLijst(); }
+  else if (t.hasAttribute('data-rbudget')) { alleenBudget = !alleenBudget; store.set('alleenBudget', alleenBudget); tekenReceptLijst(); }
+  else if (t.hasAttribute('data-statsknop')) { statsZetten(!statsAan()); render(); toast(statsAan() ? 'Anonieme statistieken staan aan. Dank je wel!' : 'Anonieme statistieken staan uit. Er wordt niets meer verstuurd.'); }
   else if (t.dataset.autobudget) {
     const r = RMAP[t.dataset.autobudget];
     // Zet alternatieven aan, grootste besparing eerst, tot het gerecht binnen budget valt
     for (const o of swapOptions(r).filter(o => !o.on)) {
-      if (recipeCost(r).total <= budget) break;
+      if (recipeCost(r).total <= budgetMaaltijd()) break;
       const cur = swaps[r.id] || [];
       if (SWAPS.find(w => w.id === o.w.id).from.some(k => cur.some(id => SWAPS.find(w => w.id === id).from.includes(k)))) continue;
       swaps[r.id] = [...cur, o.w.id];
@@ -3275,6 +3583,7 @@ app.addEventListener('click', e => {
 
 app.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'rzoek') { receptZoek = t.value.slice(0, 60); tekenReceptLijst(); trackZoek(); return; }
   if (t.id === 'freetext') {
     const out = document.getElementById('fprijs'), inv = document.getElementById('fprijsin');
     const v = t.value.trim(); const pv = v.length > 1 ? prijsVoor(v) : { prijs: null };
@@ -3287,6 +3596,11 @@ app.addEventListener('input', e => {
 });
 app.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset.lcheck) track('afgevinkt', { aan: t.checked });
+  else if (t.dataset.swapid) track('goedkoper', { optie: t.dataset.swapid, aan: t.checked }, t.dataset.rid);
+  else if (t.hasAttribute('data-budget')) track('budget', { pp: parseFloat(String(t.value).replace(',', '.')) || null, plek: tab, zelf: true });
+  else if (t.id === 'etenstijd') track('etenstijd', { tijd: t.value });
+  else if (t.id === 'pref-snel') track('filter', { soort: 'vaker_snel', aan: t.checked });
   if (t.id === 'winkel') { offers = { ...offers, winkel: t.value }; store.set('offers', offers); render(); openManual(); }
   else if (t.dataset.bname || t.dataset.bdate || t.dataset.bnote) {
     const b = babys().find(x => x.id === (t.dataset.bname || t.dataset.bdate || t.dataset.bnote)); if (!b) return;
@@ -3307,7 +3621,7 @@ app.addEventListener('change', e => {
   else if (t.id === 'herinnering') { herinnering = Number(t.value) || 0; store.set('herinnering', herinnering); }
   else if (t.id === 'stdwinkel') { standaardWinkel = t.value; store.set('standaardWinkel', t.value); }
   else if (t.hasAttribute('data-budget')) {
-    const v = parseFloat(t.value); budget = v > 0 ? v : null; store.set('budget', budget); render();
+    const v = parseFloat(String(t.value).replace(',', '.')); zetBudget(v > 0 ? Math.round(v * 100) / 100 : null);
   }
   else if (t.dataset.swapid) {
     const rid = t.dataset.rid, id = t.dataset.swapid;
@@ -3344,6 +3658,7 @@ app.addEventListener('submit', e => {
   const eigen = leesEuro(inv.value);
   const prijs = eigen != null ? eigen : pv.prijs;
   voegExtraToe(v.charAt(0).toUpperCase() + v.slice(1), fAantal, prijs, eigen != null && inv.dataset.eigen ? 'eigen' : pv.bron);
+  track('extra_product', { product: (zoekExtra(v) || [null])[0], bekend: !!zoekExtra(v), snelknop: false });   // alleen bekende productnamen, nooit de getypte tekst
   toast(`${fAantal > 1 ? fAantal + ' × ' : ''}${v.charAt(0).toUpperCase() + v.slice(1)} staat op je lijst${prijs != null ? ` (${fmtEur(prijs * fAantal)})` : ''}.`);
   fAantal = 1; render();
   const f = document.getElementById('freetext'); if (f) f.focus();
@@ -3360,6 +3675,7 @@ app.addEventListener('submit', e => {
   if (nummer.length < 6) { err.textContent = 'Dit nummer is te kort. Neem het hele nummer onder de streepjescode over.'; return; }
   if (kaarten.some(c => c.nummer === nummer)) { err.textContent = 'Deze kaart staat er al in.'; return; }
   kaarten = [...kaarten, { id: Date.now().toString(36), type, naam, nummer }];
+  track('kaart_toegevoegd', { type });
   persistCards(); render();
 });
 
@@ -3375,6 +3691,8 @@ if (gedeeld && kanDelen()) gedeeldLaden();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gedeeld && kanDelen()) gedeeldLaden(); });
 
 render();
+
+statsStart();
 
 /* Welkomstscherm: "Wat eten we deze week?", daarna het weekmenu */
 (() => {

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Statistieken Aanbiedingskeuken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #FBF7F1; --surface: #FFFFFF; --ink: #2B2420; --muted: #6B5F57; --line: #EDE3D8; --tile: #FBF5EE;
+    --accent: #B84A2A; --accent-soft: #FBE8DE; --bar: #C4552F; --bar-2: #E9B49E; --good: #4F6B2F; --good-soft: #EDF2E1;
+    --bad: #9B2F2F; --bad-soft: #F8E4E2; --grid: #EFE7DE;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #16110F; --surface: #211A17; --ink: #F4EDE7; --muted: #B5A89E; --line: #3A2F29; --tile: #2A211D;
+      --accent: #F2916B; --accent-soft: #3B2219; --bar: #E8835D; --bar-2: #6B3A28; --good: #B5CF8E; --good-soft: #26301B;
+      --bad: #F09A93; --bad-soft: #3A1E1D; --grid: #2E2521;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #16110F; --surface: #211A17; --ink: #F4EDE7; --muted: #B5A89E; --line: #3A2F29; --tile: #2A211D;
+    --accent: #F2916B; --accent-soft: #3B2219; --bar: #E8835D; --bar-2: #6B3A28; --good: #B5CF8E; --good-soft: #26301B;
+    --bad: #F09A93; --bad-soft: #3A1E1D; --grid: #2E2521;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; color: var(--ink); font: 16px/1.5 var(--body); padding: 0 16px 48px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.15; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; padding: 24px 0 16px; }
+  header h1 { font-size: clamp(26px, 5vw, 34px); font-weight: 800; }
+  .eyebrow { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .muted { color: var(--muted); } .small { font-size: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; min-width: 0; }
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .tile .k { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .tile .v { font-family: var(--display); font-weight: 800; font-size: 30px; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 2px; }
+  .tile .s { font-size: 13px; color: var(--muted); }
+  .card h2 { font-size: 19px; margin-bottom: 2px; }
+  .card > p.sub { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+  .seg { display: inline-flex; background: var(--tile); border-radius: 12px; padding: 4px; gap: 4px; }
+  .seg button { border: 0; background: none; font: 700 14px var(--body); color: var(--muted); padding: 8px 12px; border-radius: 9px; cursor: pointer; min-height: 40px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #FFFFFF; }
+  .btn { border: 0; background: var(--accent); color: #FFFFFF; font: 800 15px var(--body); padding: 0 18px; min-height: 46px; border-radius: 12px; cursor: pointer; }
+  .btn.ghost { background: var(--accent-soft); color: var(--accent); }
+  input[type=password], input[type=text] { font: 17px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 46px; width: 100%; }
+  .login { max-width: 460px; margin: 10vh auto 0; }
+  .login form { display: grid; gap: 10px; margin-top: 14px; }
+  .err { color: var(--bad); font-size: 14px; min-height: 1.4em; }
+  /* staafjes */
+  .hbars { display: grid; gap: 6px; }
+  .hbar { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr) 3.5em; gap: 10px; align-items: center; font-size: 14px; position: relative; }
+  .hbar .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar .track { height: 14px; background: none; position: relative; }
+  .hbar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .hbar .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .hbar:hover .lab { color: var(--accent); }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .axis { font: 12px var(--body); fill: var(--muted); }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 13px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); opacity: 0; transition: opacity .1s; z-index: 2; }
+  .tip.on { opacity: 1; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12.5px; color: var(--muted); font-weight: 700; cursor: pointer; white-space: nowrap; position: sticky; top: 0; background: var(--surface); }
+  th[aria-sort] { color: var(--accent); }
+  .tabel { max-height: 460px; overflow: auto; }
+  .pill { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+  .pill.good { background: var(--good-soft); color: var(--good); } .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  ul.tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  ul.tips li { background: var(--tile); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
+  ul.tips li b { color: var(--accent); }
+  .leeg { color: var(--muted); font-size: 14px; margin: 4px 0; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .funnel .hbar { grid-template-columns: minmax(0, 12em) minmax(0, 1fr) 7.5em; }
+  footer { margin-top: 20px; font-size: 13px; color: var(--muted); }
+  @media (max-width: 520px) { .hbar { grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr) 3em; } .funnel .hbar { grid-template-columns: minmax(0, 8em) minmax(0, 1fr) 7em; } .card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<div class="tip" id="tip" role="status"></div>
+<script>
+const SUPA = { url: 'https://dfegvnmmfpuzfjrlypcb.supabase.co', key: 'sb_publishable_XhqFcuJz6DWmmGyihd_1xA_Pz9Xbm0Y' };
+const NAMEN = {"zalm-zoet":"Zalm uit de oven met zoete aardappel en broccoli","pompoencurry":"Pompoencurry met kip en kikkererwten","linzenstoof":"Linzenstoof met wortel en tomaat","frittata":"Frittata met courgette en paprika","kabeljauw-prei":"Kabeljauw met preipuree","gehaktballetjes":"Gehaktballetjes in tomatensaus met volkoren spaghetti","bloemkool-ovenschotel":"Bloemkool-broccoli-ovenschotel met kip","spinaziestoof":"Zoete-aardappelstoof met spinazie en kikkererwten","kalkoen-sperzie":"Kalkoenfilet met sperziebonen en krieltjes","bietenstamppot":"Bietenstamppot met appel en kippendij","wraps-kip":"Volkoren wraps met kip, avocado en paprika","pompoensoep":"Pompoensoep met rode linzen","shakshuka":"Shakshuka met kikkererwten","kip-traybake":"Kip uit de oven met pastinaak, wortel en rode ui","chili":"Chili sin carne met zoete aardappel en bonen","hutspot":"Hutspot met gehaktballetjes","lasagne":"Lasagne met courgette, champignons en gehakt","witvis-erwten":"Witvis met doperwten-muntpuree","kip-pinda":"Kip met pindasaus, sperziebonen en rijst","bloemkoolcurry":"Bloemkool-linzencurry","carbonara":"Romige pasta carbonara met spekjes","nasi-goreng":"Nasi goreng met kip en gebakken ei","burgers":"Zelfgemaakte burgers met ovenfriet","macaroni":"Macaroni-ovenschotel met gehakt en kaas","kip-champignon":"Kip in romige champignonsaus met krieltjes","wrappizza":"Wrappizza's met champignons en paprika","hachee":"Hollandse hachee met puree en rode kool","pannenkoeken":"Pannenkoeken met spek en appel","teriyaki":"Kip teriyaki met rijst en broccoli","shoarma":"Shoarmabowl met knoflooksaus","tomatensoep":"Romige tomatensoep met tosti's","groentesoep":"Groentesoep met balletjes","kippensoep":"Kippensoep met vermicelli en groente","broccolisoep":"Romige broccolisoep met kaasbroodjes","zalm-pasta":"Pasta met zalm, spinazie en room","vis-curry":"Witvis-curry met kokos en sperziebonen","prei-stamppot":"Preistamppot met spekjes en kaas","cottage-pie":"Cottage pie met gehakt en zoete-aardappelpuree","kip-kerrie":"Kip-kerrie met appel en rijst","burrito":"Burrito's met zwarte bonen en avocado","quesadilla":"Quesadilla's met kip, paprika en maïs","omelet":"Boerenomelet met champignons, spinazie en brood","risotto":"Romige champignonrisotto","ratatouille":"Ratatouille uit de oven met kikkererwten en feta","kip-honing":"Kippendijen met honing-mosterd, wortel en krieltjes","vis-oven":"Kabeljauw uit de oven met tomaat, courgette en krieltjes","linzensoep":"Turkse rodelinzensoep met wortel","bolognese":"Spaghetti bolognese met verstopte groente","goulash":"Hongaarse goulash met paprika en aardappel","kip-wok":"Roerbak kip met broccoli, paprika en rijst","ovenpasta":"Ovenpasta met courgette, tomaat en mozzarella","aardappelsalade":"Lauwe aardappelsalade met ei, sperziebonen en mosterddressing","griekse-salade-kip":"Griekse salade met kip, feta en warme pita","linzen-bolognese":"Linzenbolognese met volkoren spaghetti","zoete-aardappelsoep":"Zoete-aardappelsoep met kokos en rode linzen","gebakken-rijst":"Gebakken rijst met ei, doperwten en wortel","rodekool-stamppot":"Rodekoolstamppot met appel en gehaktballetjes","zalm-bowl":"Zalmbowl met rijst, avocado en komkommer","kip-tikka":"Milde kip tikka masala met bloemkool en rijst","gevulde-zoete-aardappel":"Gevulde zoete aardappel uit de oven met zwarte bonen","pasta-broccoli-kip":"Pasta met broccoli, kip, knoflook en citroen"};
+const TABNAAM = { week: 'Weekmenu', recepten: 'Recepten', lijst: 'Boodschappen', meer: 'Meer', vandaag: 'Vandaag koken', aanbiedingen: 'Aanbiedingen', tijdlijn: 'Tijdlijn', voorraad: 'Voorraad', kaarten: 'Spaarkaarten', gezin: 'Gezin en baby' };
+const CATNAAM = { alles: 'Alles', pasta: 'Pasta', rijst: 'Rijst & wok', soep: 'Soep', oven: 'Uit de oven', stamppot: 'Stamppot & aardappel', stoof: 'Curry & stoof', wraps: 'Wraps, brood & bowls', salade: 'Salade & licht', ei: 'Ei & pannenkoek', overig: 'Overig' };
+const EVNAAM = { app_open: 'App geopend', tab: 'Ander onderdeel', recept_open: 'Recept bekeken', op_lijst: 'Recept op lijst', week_op_lijst: 'Hele week op lijst', favoriet: 'Favoriet', ander_recept: 'Ander recept gekozen', terug_naar_voorstel: 'Terug naar voorstel', in_weekmenu: 'Zelf in weekmenu gezet', weglaten: 'Ingrediënt weggelaten', kosten_bekeken: 'Kosten bekeken', goedkoper: 'Goedkoper gemaakt', goedkoper_auto: 'Automatisch binnen budget', filter: 'Filter', filters_open: 'Filters geopend', categorie: 'Categorie gekozen', zoeken: 'Gezocht', budget: 'Budget ingesteld', vergelijk: 'Winkels vergeleken', agenda: 'In agenda gezet', extra_product: 'Extra boodschap', afgevinkt: 'Afgevinkt', voorraad: 'Voorraad', gezin: 'Gezin aangepast', baby_toegevoegd: 'Baby toegevoegd', lijst_delen: 'Lijst gedeeld', lijst_meedoen: 'Meegedaan met lijst', lijst_opruimen: 'Lijst opgeruimd', lijst_leeg: 'Lijst leeggemaakt', kookstand_start: 'Kookstand gestart', kookstand_klaar: 'Kookstand afgemaakt', kookstand_stop: 'Kookstand gestopt', kookwekker: 'Kookwekker', tijdlijn_like: 'Tijdlijn: like', tijdlijn_bewaard: 'Tijdlijn: bewaard', tijdlijn_op_lijst: 'Tijdlijn: op lijst', tijdlijn_gedeeld: 'Tijdlijn: recept gedeeld', kaart_getoond: 'Spaarkaart getoond', kaart_toegevoegd: 'Spaarkaart toegevoegd', aanbieding_zelf: 'Aanbieding zelf toegevoegd', folder_geplakt: 'Folder geplakt', etenstijd: 'Etenstijd aangepast', stats_uit: 'Statistieken uitgezet', stats_aan: 'Statistieken aangezet', fout: 'Foutmelding' };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nf = n => Number(n || 0).toLocaleString('nl-NL');
+const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+const rnaam = id => NAMEN[id] || (String(id).startsWith('tl-') ? 'Recept van de tijdlijn' : id);
+const opslag = { get(k) { try { return localStorage.getItem('akstats:' + k); } catch (e) { return null; } }, set(k, v) { try { v == null ? localStorage.removeItem('akstats:' + k) : localStorage.setItem('akstats:' + k, v); } catch (e) {} } };
+
+let code = opslag.get('code') || '', dagen = Number(opslag.get('dagen')) || 30, data = null, fout = '', laden = false, sorteer = 'bekeken';
+const root = document.getElementById('root');
+
+async function haal() {
+  laden = true; fout = ''; teken();
+  try {
+    const r = await fetch(SUPA.url + '/rest/v1/rpc/ak_statistieken', { method: 'POST', headers: { apikey: SUPA.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_sleutel: code, p_dagen: dagen }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      const m = (j && (j.message || j.hint)) || '';
+      if (/Onjuiste code/i.test(m)) { fout = 'Deze code klopt niet. Gebruik de code die je in statistieken.sql hebt ingevuld.'; code = ''; opslag.set('code', null); data = null; }
+      else if (r.status === 404 || /Could not find|does not exist/i.test(m)) fout = 'De statistiekfunctie bestaat nog niet. Voer eerst statistieken.sql uit in Supabase.';
+      else fout = 'Ophalen is niet gelukt (' + r.status + '). ' + esc(m);
+    } else data = j;
+  } catch (e) { fout = 'Geen verbinding met Supabase. Controleer je internet en probeer het opnieuw.'; }
+  laden = false; teken();
+}
+
+/* ---------- Bouwstenen ---------- */
+function hbars(rows, { lab, val, fmt = nf, max } = {}) {
+  if (!rows.length) return '<p class="leeg">Nog geen gegevens.</p>';
+  const m = max || Math.max(...rows.map(val), 1);
+  return `<div class="hbars">${rows.map(r => `<div class="hbar" data-tip="${esc(lab(r))}: ${esc(fmt(val(r)))}"><span class="lab" title="${esc(lab(r))}">${esc(lab(r))}</span><span class="track"><span class="fill" style="width:${Math.min(100, val(r) / m * 100).toFixed(1)}%"></span></span><span class="val">${esc(fmt(val(r)))}</span></div>`).join('')}</div>`;
+}
+// Staafdiagram in de tijd (dagen of uren), één reeks, met tooltip per staaf
+function kolommen(punten, { label, waarde, tip, as }) {
+  if (!punten.length) return '<p class="leeg">Nog geen gegevens.</p>';
+  const W = 640, H = 200, L = 34, B = 24, T = 8, n = punten.length;
+  const max = Math.max(1, ...punten.map(waarde));
+  const stap = Math.max(1, Math.ceil(max / 4)), top = stap * 4;
+  const bw = (W - L) / n, gap = Math.min(2, bw * .2);
+  const y = v => T + (H - T - B) * (1 - v / top);
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const v = stap * i; g += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text class="axis" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`; }
+  const elke = Math.ceil(n / 8);
+  const bars = punten.map((p, i) => {
+    const x = L + i * bw + gap / 2, w = Math.max(1, bw - gap), v = waarde(p), h = y(0) - y(v);
+    const r = Math.min(4, w / 2, h);
+    const pad = h > 0 ? `M${x},${y(0)} V${y(v) + r} Q${x},${y(v)} ${x + r},${y(v)} H${x + w - r} Q${x + w},${y(v)} ${x + w},${y(v) + r} V${y(0)} Z` : '';
+    return `<g data-tip="${esc(tip(p))}"><rect x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" fill="transparent"/>${pad ? `<path d="${pad}" fill="var(--bar)"/>` : ''}</g>`
+      + (i % elke === 0 ? `<text class="axis" x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${esc(as(p))}</text>` : '');
+  }).join('');
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${g}${bars}<line x1="${L}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/></svg></div>`;
+}
+const kaart = (titel, sub, inhoud, extra = '') => `<section class="card" ${extra}><h2>${titel}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}${inhoud}</section>`;
+
+/* ---------- Adviezen: waar kun je de app op verbeteren? ---------- */
+function adviezen(d) {
+  const uit = [];
+  const t = d.trechter || {};
+  if (t.geopend >= 5) {
+    if (t.recept / t.geopend < .5) uit.push(`Maar <b>${pct(t.recept, t.geopend)}</b> van de gebruikers opent een recept. Maak het recept van vandaag of de weekkaart uitnodigender.`);
+    if (t.recept && t.lijst / t.recept < .35) uit.push(`Van wie een recept bekijkt, zet <b>${pct(t.lijst, t.recept)}</b> iets op de boodschappenlijst. Maak de knop "Op boodschappenlijst" opvallender of zet hem hoger.`);
+    if (t.koken && t.klaar / t.koken < .5) uit.push(`De kookstand wordt vaak niet afgemaakt (<b>${pct(t.klaar, t.koken)}</b> komt tot het eind). Kijk hieronder bij welke stap mensen stoppen.`);
+  }
+  const weg = (d.recepten || []).filter(r => r.weggeklikt >= 3).sort((a, b) => b.weggeklikt - a.weggeklikt).slice(0, 3);
+  if (weg.length) uit.push(`Deze recepten worden het vaakst weggeklikt in het weekmenu: <b>${weg.map(r => esc(rnaam(r.recept))).join(', ')}</b>. Overweeg ze aan te passen of minder vaak voor te stellen.`);
+  const geen = (d.zoektermen || []).filter(z => z.geen > 0).slice(0, 5);
+  if (geen.length) uit.push(`Er wordt gezocht naar recepten die er niet zijn: <b>${geen.map(z => esc(z.term)).join(', ')}</b>. Goede kandidaten voor nieuwe recepten.`);
+  const wi = (d.weggelaten || []).slice(0, 3).filter(w => w.n >= 3);
+  if (wi.length) uit.push(`Vaak weggelaten ingrediënten: <b>${wi.map(w => esc(w.ingr)).join(', ')}</b>. Misschien optioneel maken of vervangen.`);
+  const bud = (d.budget || []).filter(b => b.pp != null);
+  if (bud.length) { const tot = bud.reduce((s, b) => s + b.apparaten, 0), laag = bud.filter(b => b.pp <= 2.5).reduce((s, b) => s + b.apparaten, 0);
+    if (laag / tot >= .3) uit.push(`<b>${pct(laag, tot)}</b> van wie een budget instelt, kiest € 2,50 per persoon of minder. Meer goedkope recepten zouden goed vallen.`); }
+  if ((d.fouten || []).length) uit.push(`Er zijn <b>${nf(d.fouten.reduce((s, f) => s + f.n, 0))}</b> foutmeldingen geweest. Zie het blok Foutmeldingen onderaan.`);
+  const tv = d.toestel || {};
+  if (tv.totaal >= 5 && tv.als_app / tv.totaal < .3) uit.push(`Maar <b>${pct(tv.als_app, tv.totaal)}</b> gebruikt de app vanaf het beginscherm. Een korte uitleg "Zet op je beginscherm" kan helpen om mensen terug te laten komen.`);
+  return uit;
+}
+
+/* ---------- Tekenen ---------- */
+function teken() {
+  if (!code) {
+    root.innerHTML = `<div class="login card"><div class="eyebrow">Aanbiedingskeuken</div><h1 style="font-size:28px;margin-top:4px">Statistieken</h1>
+      <p class="muted small">Vul de geheime code in die je in <b>statistieken.sql</b> hebt gekozen. De code blijft alleen op dit apparaat bewaard.</p>
+      <form id="login"><input type="password" id="code" autocomplete="current-password" placeholder="Geheime code" aria-label="Geheime code"><button class="btn" type="submit">Bekijk statistieken</button><div class="err" aria-live="polite">${fout}</div></form></div>`;
+    document.getElementById('code').focus(); return;
+  }
+  const kop = `<header><div><div class="eyebrow">Aanbiedingskeuken</div><h1>Statistieken</h1><div class="small muted">${data ? 'Bijgewerkt ' + new Date(data.bijgewerkt).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : laden ? 'Laden…' : ''}</div></div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Periode">${[[7, '7 dagen'], [30, '30 dagen'], [90, '90 dagen'], [365, 'Jaar']].map(([v, t]) => `<button data-dagen="${v}" aria-pressed="${v === dagen}">${t}</button>`).join('')}</div>
+    <button class="btn ghost" data-ververs>Vernieuwen</button><button class="btn ghost" data-uitloggen>Uitloggen</button></div></header>`;
+  if (fout) { root.innerHTML = kop + `<div class="card"><p class="err" style="margin:0">${fout}</p></div>`; return; }
+  if (!data) { root.innerHTML = kop + '<div class="card"><p class="muted" style="margin:0">Statistieken laden…</p></div>'; return; }
+  const d = data, t = d.totaal || {}, a = d.actief || {}, tr = d.trechter || {};
+  if (!t.events) { root.innerHTML = kop + `<div class="card"><h2>Nog geen gegevens</h2><p class="muted">In deze periode is er nog niets binnengekomen. Controleer of de nieuwe versie van de app online staat; binnen een paar seconden na het openen van de app verschijnt hier de eerste gebruiker.</p></div>`; return; }
+  const ev = Object.fromEntries((d.events || []).map(e => [e.event, e]));
+  const tips = adviezen(d);
+  const recepten = [...(d.recepten || [])].sort((x, y) => (y[sorteer] || 0) - (x[sorteer] || 0) || (y.bekeken - x.bekeken));
+  const kol = [['bekeken', 'Bekeken'], ['op_lijst', 'Op lijst'], ['koken', 'Kookstand'], ['klaar', 'Afgemaakt'], ['favoriet', 'Favoriet'], ['zelf_gekozen', 'Zelf gekozen'], ['weggeklikt', 'Weggeklikt'], ['weglaten', 'Iets weggelaten']];
+  const perdag = vulDagen(d.perdag || [], d.dagen);
+  root.innerHTML = kop + `
+  <div class="tiles">
+    <div class="tile"><div class="k">Gebruikers vandaag</div><div class="v">${nf(a.vandaag)}</div><div class="s">verschillende toestellen</div></div>
+    <div class="tile"><div class="k">Afgelopen 7 dagen</div><div class="v">${nf(a.week)}</div><div class="s">${nf(a.maand)} in 30 dagen</div></div>
+    <div class="tile"><div class="k">Nieuwe gebruikers</div><div class="v">${nf(t.nieuw)}</div><div class="s">in ${d.dagen} dagen</div></div>
+    <div class="tile"><div class="k">Komt terug</div><div class="v">${pct(d.terugkeer.meer_dagen, d.terugkeer.totaal)}</div><div class="s">op 2 of meer dagen actief</div></div>
+    <div class="tile"><div class="k">Sessies</div><div class="v">${nf(t.sessies)}</div><div class="s">mediaan ${String(d.sessie.mediaan_min ?? 0).replace('.', ',')} min, ${nf(d.sessie.mediaan_acties)} tikken</div></div>
+    <div class="tile"><div class="k">Recepten gekookt</div><div class="v">${nf((ev.kookstand_klaar || {}).n)}</div><div class="s">${nf((ev.kookstand_start || {}).n)} keer kookstand gestart</div></div>
+  </div>
+  ${tips.length ? `<section class="card" style="margin-top:14px"><h2>Waar kun je de app op verbeteren?</h2><p class="sub">Automatisch opgemaakt uit de cijfers hieronder.</p><ul class="tips">${tips.map(x => `<li>${x}</li>`).join('')}</ul></section>` : ''}
+  <div class="grid" style="margin-top:14px">
+    ${kaart('Gebruikers per dag', 'Aantal verschillende toestellen dat de app die dag gebruikte.', kolommen(perdag, { label: 'Gebruikers per dag', waarde: p => p.apparaten, tip: p => `${datum(p.dag)}: ${p.apparaten} gebruiker${p.apparaten === 1 ? '' : 's'}${p.nieuw ? `, ${p.nieuw} nieuw` : ''}`, as: p => datumKort(p.dag) }))}
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    ${kaart('Van openen tot koken', 'Hoeveel gebruikers elke stap bereiken.', `<div class="funnel">${hbars([['App geopend', tr.geopend], ['Recept bekeken', tr.recept], ['Op boodschappenlijst', tr.lijst], ['Boodschappen afgevinkt', tr.afgevinkt], ['Kookstand gestart', tr.koken], ['Kookstand afgemaakt', tr.klaar]], { lab: r => r[0], val: r => r[1] || 0, fmt: v => `${nf(v)} · ${pct(v, tr.geopend)}`, max: tr.geopend })}</div>`)}
+    ${kaart('Welke onderdelen worden gebruikt', 'Hoe vaak mensen naar een onderdeel gaan.', hbars((d.tabs || []).slice(0, 10), { lab: r => TABNAAM[r.tab] || r.tab, val: r => r.n }))}
+    ${kaart('Wanneer wordt de app gebruikt', 'Sessies per uur van de dag.', kolommen(Array.from({ length: 24 }, (_, u) => ({ uur: u, sessies: ((d.peruur || []).find(x => x.uur === u) || {}).sessies || 0 })), { label: 'Sessies per uur', waarde: p => p.sessies, tip: p => `${p.uur}:00 – ${p.uur + 1}:00: ${p.sessies} sessies`, as: p => p.uur + 'u' }))}
+    ${kaart('Categorieën', 'Welke categorie mensen kiezen in Recepten.', hbars((d.categorieen || []).slice(0, 10), { lab: r => CATNAAM[r.cat] || r.cat, val: r => r.n }))}
+  </div>
+  <section class="card" style="margin-top:14px"><h2>Recepten</h2><p class="sub">Tik op een kolomkop om te sorteren. "Weggeklikt" = in het weekmenu vervangen door een ander recept.</p>
+    <div class="tabel"><table><thead><tr><th>Recept</th>${kol.map(([k, t]) => `<th data-sort="${k}"${sorteer === k ? ' aria-sort="descending"' : ''}>${t}</th>`).join('')}</tr></thead>
+    <tbody>${recepten.map(r => `<tr><td>${esc(rnaam(r.recept))}</td>${kol.map(([k]) => `<td>${r[k] ? nf(r[k]) : '<span class="muted">·</span>'}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${kol.length + 1}" class="muted">Nog geen gegevens.</td></tr>`}</tbody></table></div>
+    ${Object.keys(NAMEN).length ? `<p class="small muted" style="margin:10px 0 0">${Object.keys(NAMEN).filter(id => !(d.recepten || []).some(r => r.recept === id && r.bekeken)).length} van de ${Object.keys(NAMEN).length} recepten zijn in deze periode niet bekeken.</p>` : ''}
+  </section>
+  <div class="grid g2" style="margin-top:14px">
+    ${kaart('Zoektermen', 'Waar mensen naar zoeken. Rood = niets gevonden.', (d.zoektermen || []).length ? `<div class="tabel"><table><thead><tr><th>Zoekterm</th><th>Keer</th><th>Gevonden</th></tr></thead><tbody>${d.zoektermen.map(z => `<tr><td>${esc(z.term)}</td><td>${nf(z.n)}</td><td>${z.geen ? `<span class="pill bad">${z.geen}× niets</span>` : '<span class="pill good">ja</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="leeg">Nog niet gezocht.</p>')}
+    ${kaart('Budget per persoon', 'Laatst ingestelde budget per gebruiker.', hbars((d.budget || []).map(b => ({ l: b.pp == null ? 'Geen budget' : '€ ' + String(b.pp).replace('.', ',').replace(/,5$/, ',50'), n: b.apparaten })), { lab: r => r.l, val: r => r.n }))}
+    ${kaart('Filters', 'Welke allergieën, voorkeuren en snelfilters worden aangezet.', hbars((d.filters || []).slice(0, 12), { lab: r => filterNaam(r), val: r => r.n }))}
+    ${kaart('Kookstand: waar stoppen mensen?', 'Recept en stap waarop de kookstand werd gesloten.', hbars((d.kookstop || []).slice(0, 10), { lab: r => `${rnaam(r.recept)} · stap ${r.stap}`, val: r => r.n }))}
+    ${kaart('Vaak weggelaten ingrediënten', 'Met de knop "Laat weg" bij een recept.', hbars(d.weggelaten || [], { lab: r => r.ingr, val: r => r.n }))}
+    ${kaart('Goedkoper gemaakt', 'Welke goedkopere alternatieven worden aangezet.', hbars(d.goedkoper || [], { lab: r => r.optie, val: r => r.n }))}
+    ${kaart('Winkels', 'Welke winkels gebruikers hebben aanstaan.', hbars(d.winkels || [], { lab: r => r.winkel, val: r => r.n }))}
+    ${kaart('Gezin', `${pct(d.gezin.met_baby, d.gezin.totaal)} van de gebruikers heeft een baby ingesteld. Aantal eters:`, hbars(d.gezin.personen || [], { lab: r => r.p + (r.p === 1 ? ' persoon' : ' personen'), val: r => r.n }))}
+    ${kaart('Toestel', `${pct(d.toestel.als_app, d.toestel.totaal)} gebruikt de app vanaf het beginscherm.`, hbars(d.toestel.os || [], { lab: r => ({ ios: 'iPhone / iPad', android: 'Android', windows: 'Windows', mac: 'Mac' }[r.os] || 'Overig'), val: r => r.n }))}
+    ${kaart('Extra boodschappen', 'Welke losse producten worden toegevoegd.', hbars(d.extra || [], { lab: r => r.product, val: r => r.n }))}
+    ${kaart('Alle acties', 'Alles wat er in deze periode is aangetikt.', hbars((d.events || []).slice(0, 25), { lab: r => EVNAAM[r.event] || r.event, val: r => r.n }))}
+    ${kaart('Foutmeldingen', 'Fouten die in de app zijn opgetreden.', (d.fouten || []).length ? `<div class="tabel"><table><thead><tr><th>Melding</th><th>Keer</th></tr></thead><tbody>${d.fouten.map(f => `<tr><td style="white-space:normal">${esc(f.msg)}</td><td>${nf(f.n)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="leeg"><span class="pill good">Geen fouten</span></p>')}
+  </div>
+  <footer>Alle cijfers zijn anoniem: per toestel een willekeurige code, geen namen of boodschappenteksten. Versies in gebruik: ${(d.versies || []).map(v => `${esc(v.versie)} (${nf(v.apparaten)})`).join(', ')}.</footer>`;
+}
+function filterNaam(r) {
+  const s = { allergie: 'Allergie', voorkeur: 'Voorkeur', snel: 'Kookboek: snel', binnen_budget: 'Kookboek: binnen budget', vaker_snel: 'Vaker snelle gerechten', wissen: 'Filters gewist' }[r.soort] || r.soort;
+  return r.waarde ? `${s}: ${r.waarde.replace(':', ' → ')}` : s;
+}
+const datum = s => new Date(s + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' });
+const datumKort = s => { const d = new Date(s + 'T12:00:00'); return `${d.getDate()}/${d.getMonth() + 1}`; };
+function vulDagen(rij, n) {   // dagen zonder gebruik als 0 tonen
+  const m = new Map(rij.map(r => [r.dag, r])), uit = [];
+  for (let i = Math.min(n, 90) - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    uit.push(m.get(k) || { dag: k, apparaten: 0, sessies: 0, nieuw: 0 });
+  }
+  return uit;
+}
+
+/* ---------- Bediening ---------- */
+root.addEventListener('submit', e => {
+  if (e.target.id !== 'login') return; e.preventDefault();
+  code = document.getElementById('code').value.trim(); if (!code) return;
+  opslag.set('code', code); haal();
+});
+root.addEventListener('click', e => {
+  const b = e.target.closest('[data-dagen],[data-ververs],[data-uitloggen],[data-sort]'); if (!b) return;
+  if (b.dataset.dagen) { dagen = Number(b.dataset.dagen); opslag.set('dagen', String(dagen)); haal(); }
+  else if (b.hasAttribute('data-ververs')) haal();
+  else if (b.hasAttribute('data-uitloggen')) { code = ''; data = null; opslag.set('code', null); fout = ''; teken(); }
+  else if (b.dataset.sort) { sorteer = b.dataset.sort; teken(); }
+});
+// Tooltip bij staven
+const tip = document.getElementById('tip');
+document.addEventListener('pointermove', e => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (!t) { tip.classList.remove('on'); return; }
+  tip.textContent = t.dataset.tip; tip.classList.add('on');
+  tip.style.left = Math.min(innerWidth - 90, Math.max(90, e.clientX)) + 'px'; tip.style.top = (e.clientY + scrollY - 8) + 'px';
+});
+teken(); if (code) haal();
+</script>
+</body>
+</html>
