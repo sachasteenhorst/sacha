@@ -15,6 +15,36 @@ aan een bewijsstuk (factuur, creditnota of bon). Deze tool:
    andersom) -- zodat jij dat oplost voordat je accountant met vraagposten
    komt.
 
+## Dashboard: "Vandaag voor jou"
+
+Bovenaan het dashboard staat één blok met alleen wat je vandaag moet doen,
+in volgorde van urgentie -- de rest van het dashboard (matches controleren,
+regels, voortgang per maand, techniek) staat er gewoon nog, maar niet meer
+als eerste. Drie grote tellers, elk met een knop naar de bijbehorende lijst:
+
+1. **Zelf betalen** -- open, niet-incasso inkoopfacturen (zie "Nog te
+   betalen" hieronder).
+2. **Banktransacties zonder factuur/bon** -- elke onopgeloste bankregel
+   (zie "Hoe het matcht"). Een vaste post zonder factuur (salaris, huur,
+   managementfee, prive-opname, een lease/fietsplan-ontvangst) hoort hier
+   nooit tussen zodra je er eenmalig een **regel** voor hebt gemaakt (zie
+   "Regels: automatisch afhandelen") -- dat is precies waarvoor Regels
+   bestaan.
+3. **Nog niet naar Basecone** -- gekoppelde facturen die de boekhouder nog
+   niet kan zien (zie "Basecone doorsturen"). CycleSoftware/Lease a
+   Bike/VWPFS/HelloRider-documenten (en andere niet-doorstuurbare
+   uitzonderingen) tellen hier nooit mee, om dezelfde reden dat ze nooit
+   doorgestuurd worden.
+
+Zijn alle drie op nul, dan staat er gewoon groot **"Alles in orde"**.
+Techniek (e-mail-/bank-/Ponto-synchronisatiestatus, "Nu verversen") staat
+onderaan de pagina in een klein statusbalkje -- leuk om te weten, maar niets
+om vandaag actie op te ondernemen.
+
+Dit blok en de dagelijkse pushmelding (zie "Push-meldingen op je telefoon")
+gebruiken dezelfde berekening (`app/vandaag.py`), dus het aantal op je
+telefoon klopt altijd met het aantal op het dashboard.
+
 ## Hoe het matcht
 
 - **Factuurnummer gevonden in omschrijving** -> automatisch bevestigd (hoge
@@ -476,18 +506,29 @@ abonneer 'm op jouw `NTFY_TOPIC` (verzin iets geheims/willekeurigs, bijv.
 authenticatie leesbaar voor wie de naam raadt) en vul die naam in als
 `NTFY_TOPIC`. Leeg = geen meldingen.
 
+Elke melding is kort en in gewone taal: geen factuurnummer, geen interne
+ID's, geen lange omschrijving -- alleen wat je moet doen en voor wanneer.
+Iets dat te laat is of binnen 3 dagen vervalt krijgt ntfy's hoogste
+prioriteit ("urgent") en een opvallende 🚨-tag; de rest krijgt gewoon
+prioriteit met een 💰-tag, zodat je in één oogopslag ziet wat er echt haast
+bij heeft.
+
 Je krijgt een melding:
 - **Bij een nieuwe factuur** (niet-incasso, dus iets voor "Nog te
-  betalen"): "Nieuwe factuur: Leverancier EUR x, uiterlijk dd-mm". Elke
-  factuur meldt maar één keer, ook na een reparse; een herinnering van
-  dezelfde factuur (zelfde leverancier+factuurnummer+bedrag) meldt
-  helemaal niet nog een keer. Bij een grote stapel tegelijk (bijv. na een
-  upgrade) worden hooguit 5 losse meldingen gestuurd -- de rest komt in
-  één samenvattende melding ("N nieuwe facturen, totaal EUR x").
-- **Dagelijks om 08:00** (Europe/Amsterdam), maar ALLEEN als er iets te
-  laat is of binnen 7 dagen vervalt: aantal, totaalbedrag en de top 5,
-  met hoge prioriteit als er iets te laat is. Nooit meer dan 1x per dag,
-  ook al draait de taak twee keer.
+  betalen"): titel "Betalen: Leverancier EUR x", tekst bijv. "Betaal voor
+  12-10 (nog 3 dagen)." of "Te laat sinds 12-10 (3 dagen).". Elke factuur
+  meldt maar één keer, ook na een reparse; een herinnering van dezelfde
+  factuur (zelfde leverancier+factuurnummer+bedrag) meldt helemaal niet nog
+  een keer. Bij een grote stapel tegelijk (bijv. na een upgrade) worden
+  hooguit 5 losse meldingen gestuurd -- de rest komt in één samenvattende
+  melding ("N facturen te betalen, totaal EUR x").
+- **Dagelijks om 08:00** (Europe/Amsterdam) -- de pushmelding-versie van
+  het dashboard-blok "Vandaag voor jou" (zie hieronder): "3 facturen te
+  betalen (EUR 1.234), 5 transacties zonder bon, 2 niet naar Basecone.".
+  Urgent (met het aantal te laat in de titel) zodra er iets te laat is,
+  anders gewone prioriteit met titel "Vandaag voor jou". Helemaal stil als
+  alles in orde is. Nooit meer dan 1x per dag, ook al draait de taak twee
+  keer.
 - **Bij een probleem**: de Microsoft Graph-login is verlopen, doorsturen
   naar Basecone mislukt, of de Ponto-banksync mislukt -- maximaal één keer
   per dag per soort probleem, zodat een aanhoudend probleem je telefoon

@@ -1,18 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
 
+<section class="today-hero" aria-label="Vandaag voor jou">
+  {% if vandaag.alles_in_orde %}
+  <div class="today-ok">
+    <span class="today-ok-icon">🎉</span>
+    <span class="today-ok-text">Alles in orde</span>
+  </div>
+  {% else %}
+  <h2 class="today-heading">Vandaag voor jou</h2>
+  <div class="today-grid">
+    <a href="#nog-te-betalen" class="today-tile{% if vandaag.facturen_te_betalen %} today-tile-open{% endif %}">
+      <span class="today-number">{{ vandaag.facturen_te_betalen|length }}</span>
+      <span class="today-label">Zelf betalen</span>
+      <span class="today-cta">Bekijk facturen &rarr;</span>
+    </a>
+    <a href="#betalingen-zonder-factuur" class="today-tile{% if vandaag.banktransacties_zonder_factuur %} today-tile-open{% endif %}">
+      <span class="today-number">{{ vandaag.banktransacties_zonder_factuur|length }}</span>
+      <span class="today-label">Banktransacties zonder factuur/bon</span>
+      <span class="today-cta">Bekijk lijst &rarr;</span>
+    </a>
+    <a href="#niet-naar-basecone" class="today-tile{% if vandaag.niet_naar_basecone %} today-tile-open{% endif %}">
+      <span class="today-number">{{ vandaag.niet_naar_basecone|length }}</span>
+      <span class="today-label">Nog niet naar Basecone</span>
+      <span class="today-cta">Bekijk facturen &rarr;</span>
+    </a>
+  </div>
+  {% endif %}
+</section>
+
 <section class="stats-row" aria-label="Overzicht">
-  <a href="#nog-te-betalen" class="stat-tile{% if counters.nog_te_betalen > 0 %} stat-open{% endif %}">
-    <span class="stat-number">{{ counters.nog_te_betalen }}</span>
-    <span class="stat-label">Nog te betalen</span>
-  </a>
   <a href="#te-controleren" class="stat-tile{% if counters.te_controleren > 0 %} stat-open{% endif %}">
     <span class="stat-number">{{ counters.te_controleren }}</span>
     <span class="stat-label">Te controleren</span>
-  </a>
-  <a href="#betalingen-zonder-factuur" class="stat-tile{% if counters.betalingen_zonder_factuur > 0 %} stat-open{% endif %}">
-    <span class="stat-number">{{ counters.betalingen_zonder_factuur }}</span>
-    <span class="stat-label">Betalingen zonder factuur</span>
   </a>
   <a href="#facturen-niet-betaald" class="stat-tile{% if counters.facturen_niet_betaald > 0 %} stat-open{% endif %}">
     <span class="stat-number">{{ counters.facturen_niet_betaald }}</span>
@@ -26,41 +46,6 @@
     <span class="stat-number">{{ counters.automatisch_afgehandeld }}</span>
     <span class="stat-label">Automatisch afgehandeld</span>
   </a>
-  <a href="#niet-naar-basecone" class="stat-tile{% if counters.niet_naar_basecone > 0 %} stat-open{% endif %}">
-    <span class="stat-number">{{ counters.niet_naar_basecone }}</span>
-    <span class="stat-label">Niet naar Basecone</span>
-  </a>
-</section>
-
-<section class="status-bar">
-  <span class="status-chip">
-    <span class="status-dot status-{{ status_bar.email_status }}"></span> E-mail
-    {% if status_bar.last_sync_label %}
-      &mdash; laatst opgehaald {{ status_bar.last_sync_label }}
-    {% endif %}
-  </span>
-  <span class="status-chip">
-    <span class="status-dot status-{{ status_bar.bank_status }}"></span> Bank
-    {% if status_bar.last_upload_label %}
-      &mdash; laatste upload {{ status_bar.last_upload_label }}, afschriften t/m {{ status_bar.latest_statement_label }}
-    {% else %}
-      &mdash; nog geen afschrift geüpload
-    {% endif %}
-  </span>
-  {% if status_bar.ponto_enabled %}
-  <span class="status-chip">
-    <span class="status-dot status-{{ status_bar.ponto_status }}"></span> Bank: Ponto
-    {% if status_bar.ponto_synced_label %}
-      &mdash; laatst gesynchroniseerd door Ponto {{ status_bar.ponto_synced_label }}
-    {% else %}
-      &mdash; nog niet gesynchroniseerd
-    {% endif %}
-  </span>
-  <form method="post" action="/bank/ponto/refresh" class="inline-form">
-    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
-    <button type="submit" class="btn btn-secondary">Nu verversen</button>
-  </form>
-  {% endif %}
 </section>
 
 <section class="upload-box">
@@ -456,6 +441,38 @@
   </div>
   {% else %}
   <p class="empty">Nog geen afschriften geüpload.</p>
+  {% endif %}
+</section>
+
+<section class="status-bar status-bar-footer">
+  <span class="status-bar-title">Technisch</span>
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.email_status }}"></span> E-mail
+    {% if status_bar.last_sync_label %}
+      &mdash; laatst opgehaald {{ status_bar.last_sync_label }}
+    {% endif %}
+  </span>
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.bank_status }}"></span> Bank
+    {% if status_bar.last_upload_label %}
+      &mdash; laatste upload {{ status_bar.last_upload_label }}, afschriften t/m {{ status_bar.latest_statement_label }}
+    {% else %}
+      &mdash; nog geen afschrift geüpload
+    {% endif %}
+  </span>
+  {% if status_bar.ponto_enabled %}
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.ponto_status }}"></span> Bank: Ponto
+    {% if status_bar.ponto_synced_label %}
+      &mdash; laatst gesynchroniseerd door Ponto {{ status_bar.ponto_synced_label }}
+    {% else %}
+      &mdash; nog niet gesynchroniseerd
+    {% endif %}
+  </span>
+  <form method="post" action="/bank/ponto/refresh" class="inline-form">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+    <button type="submit" class="btn btn-secondary">Nu verversen</button>
+  </form>
   {% endif %}
 </section>
 

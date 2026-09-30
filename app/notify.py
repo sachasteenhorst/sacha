@@ -1,7 +1,14 @@
 """Push notifications via ntfy (https://ntfy.sh, or a self-hosted ntfy
-server) -- so Sacha sees "nieuwe factuur"/"X te laat" on his phone without
-opening the dashboard. Off entirely (send_notification is a silent no-op)
-until NTFY_TOPIC is configured.
+server) -- so Sacha sees what he needs to do on his phone without opening
+the dashboard. Off entirely (send_notification is a silent no-op) until
+NTFY_TOPIC is configured.
+
+Kept deliberately short and jargon-free: a title with just the supplier and
+amount, a message that says only what to do and by when -- never a
+factuurnummer, an internal id, or a long omschrijving. Urgency (overdue, or
+due within URGENT_DUE_WITHIN_DAYS days) gets ntfy's "urgent" priority and a
+red-flag tag so it actually stands out on the phone; everything else is
+"default" priority with a plain money-bag tag.
 
 Every push carries Click = DASHBOARD_PUBLIC_URL + "/dashboard#nog-te-betalen"
 so tapping the notification jumps straight to the relevant section.
@@ -17,13 +24,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Invoice, NotificationLog
-from app.payments import days_until_due, get_payable_invoices, is_duplicate_of_existing, is_payable_invoice
+from app.payments import days_until_due, is_duplicate_of_existing, is_payable_invoice
+from app.vandaag import build_vandaag_overzicht
 
 logger = logging.getLogger("notify")
 
-# A late/soon-due invoice is worth reminding about within this many days --
-# matches the task's "binnen 7 dagen vervalt" rule for the daily summary.
-DAILY_SUMMARY_WINDOW_DAYS = 7
+# An invoice this close to (or past) its due date is worth flagging as
+# urgent -- everything further out just gets a plain, non-intrusive push.
+URGENT_DUE_WITHIN_DAYS = 3
 DASHBOARD_CLICK_PATH = "/dashboard#nog-te-betalen"
 # Safety cap: a bulk backlog of new invoices (e.g. right after an upgrade,
 # or a mailbox that was unreachable for a while) sends at most this many
@@ -80,16 +88,42 @@ def _format_amount(cents: int) -> str:
     return f"{cents / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _plural(n: int, singular: str, plural: str) -> str:
+    return singular if n == 1 else plural
+
+
+def _urgency(days: int) -> tuple[str, str]:
+    """ntfy priority+tag for a given "days until due" number -- shared by
+    every push that's about a specific due date."""
+    if days <= URGENT_DUE_WITHIN_DAYS:
+        return "urgent", "rotating_light"
+    return "default", "moneybag"
+
+
+def _due_message(invoice: Invoice, today: date) -> str:
+    """Plain-language sentence saying only what to do and by when -- no
+    factuurnummer, no internal details."""
+    if invoice.due_date is None:
+        return "Vervaldatum onbekend -- controleer de factuur."
+    days = days_until_due(invoice, today)
+    due = invoice.due_date.strftime("%d-%m")
+    if days < 0:
+        dagen = abs(days)
+        return f"Te laat sinds {due} ({dagen} {_plural(dagen, 'dag', 'dagen')})."
+    if days == 0:
+        return f"Betaal vandaag ({due})."
+    return f"Betaal voor {due} (nog {days} {_plural(days, 'dag', 'dagen')})."
+
+
 def notify_new_payable_invoices(session: Session) -> int:
-    """Sends a push per still-unnotified payable invoice ("nieuwe factuur:
-    Leverancier EUR x, uiterlijk dd-mm") and marks it notified so it's never
-    sent twice, however many sync runs it survives. A supplier's reminder
-    e-mail of an invoice already seen (same leverancier+factuurnummer+
-    bedrag) is marked notified WITHOUT sending -- see
-    app.payments.is_duplicate_of_existing. Caps individual pushes at
-    MAX_NEW_INVOICE_PUSHES_PER_SYNC; anything beyond that is rolled into one
-    summary push instead. Returns how many pushes were actually sent
-    (summary counts as one)."""
+    """Sends a short "Betalen: Leverancier EUR x" push per still-unnotified
+    payable invoice and marks it notified so it's never sent twice, however
+    many sync runs it survives. A supplier's reminder e-mail of an invoice
+    already seen (same leverancier+factuurnummer+bedrag) is marked notified
+    WITHOUT sending -- see app.payments.is_duplicate_of_existing. Caps
+    individual pushes at MAX_NEW_INVOICE_PUSHES_PER_SYNC; anything beyond
+    that is rolled into one summary push instead. Returns how many pushes
+    were actually sent (summary counts as one)."""
     if not ntfy_configured():
         return 0
 
@@ -111,28 +145,31 @@ def notify_new_payable_invoices(session: Session) -> int:
     if not to_notify:
         return 0
 
+    today = date.today()
     sent = 0
     individual, rest = to_notify[:MAX_NEW_INVOICE_PUSHES_PER_SYNC], to_notify[MAX_NEW_INVOICE_PUSHES_PER_SYNC:]
 
     for invoice in individual:
-        due_label = invoice.due_date.strftime("%d-%m") if invoice.due_date else "?"
-        ok = send_notification(
-            "Nieuwe factuur",
-            f"Nieuwe factuur: {invoice.supplier_name or 'onbekende leverancier'} "
-            f"EUR {_format_amount(invoice.amount_cents)}, uiterlijk {due_label}",
-            tags="receipt",
-        )
+        supplier = invoice.supplier_name or "onbekende leverancier"
+        title = f"Betalen: {supplier}  EUR {_format_amount(invoice.amount_cents)}"
+        message = _due_message(invoice, today)
+        days = days_until_due(invoice, today) if invoice.due_date else URGENT_DUE_WITHIN_DAYS + 1
+        priority, tags = _urgency(days)
+        ok = send_notification(title, message, priority=priority, tags=tags)
         if ok:
             invoice.notified_new_invoice = True
             sent += 1
 
     if rest:
+        n = len(rest)
         total_cents = sum(inv.amount_cents for inv in rest)
-        ok = send_notification(
-            "Nieuwe facturen",
-            f"{len(rest)} nieuwe facturen, totaal EUR {_format_amount(total_cents)} -- zie 'Nog te betalen'.",
-            tags="receipt",
+        any_urgent = any(
+            days_until_due(inv, today) <= URGENT_DUE_WITHIN_DAYS for inv in rest if inv.due_date
         )
+        priority, tags = ("urgent", "rotating_light") if any_urgent else ("default", "moneybag")
+        title = f"{n} {_plural(n, 'factuur', 'facturen')} te betalen"
+        message = f"Totaal EUR {_format_amount(total_cents)}. Bekijk de lijst in de app."
+        ok = send_notification(title, message, priority=priority, tags=tags)
         if ok:
             for invoice in rest:
                 invoice.notified_new_invoice = True
@@ -152,35 +189,42 @@ def _mark_sent_today(session: Session, key: str) -> None:
 
 
 def send_daily_payment_summary(session: Session) -> bool:
-    """The 08:00 Europe/Amsterdam daily summary -- only sent when there's
-    actually something to act on (something overdue, or due within
-    DAILY_SUMMARY_WINDOW_DAYS days); silent otherwise. Idempotent per
-    calendar day even if the scheduler fires the job twice."""
+    """The 08:00 Europe/Amsterdam push -- the phone version of the
+    dashboard's "Vandaag voor jou" block (see app.vandaag), so the numbers
+    on the notification always match the dashboard exactly. Silent when
+    everything is in order; idempotent per calendar day even if the
+    scheduler fires the job twice."""
     if not ntfy_configured() or _already_sent_today(session, "daily-summary"):
         return False
 
-    today = date.today()
-    payable = get_payable_invoices(session)
-    due_soon = [inv for inv in payable if days_until_due(inv, today) <= DAILY_SUMMARY_WINDOW_DAYS]
-    if not due_soon:
+    overzicht = build_vandaag_overzicht(session)
+    if overzicht.alles_in_orde:
         _mark_sent_today(session, "daily-summary")
         return False
 
-    overdue = [inv for inv in due_soon if days_until_due(inv, today) < 0]
-    due_soon.sort(key=lambda inv: inv.due_date)
-    total_cents = sum(inv.amount_cents for inv in due_soon)
-    top5 = due_soon[:5]
-    lines = [
-        f"- {inv.supplier_name or '?'} EUR {_format_amount(inv.amount_cents)} "
-        f"({'te laat' if days_until_due(inv, today) < 0 else f'nog {days_until_due(inv, today)}d'})"
-        for inv in top5
-    ]
-    message = (
-        f"{len(due_soon)} factu(u)r(en), totaal EUR {_format_amount(total_cents)}:\n"
-        + "\n".join(lines)
-    )
-    title = f"{len(overdue)} te laat" if overdue else "Facturen bijna te laat"
-    send_notification(title, message, priority="high" if overdue else "default", tags="warning" if overdue else "hourglass")
+    today = date.today()
+    parts = []
+    if overzicht.facturen_te_betalen:
+        n = len(overzicht.facturen_te_betalen)
+        total_cents = sum(inv.amount_cents for inv in overzicht.facturen_te_betalen)
+        parts.append(f"{n} {_plural(n, 'factuur', 'facturen')} te betalen (EUR {_format_amount(total_cents)})")
+    if overzicht.banktransacties_zonder_factuur:
+        n = len(overzicht.banktransacties_zonder_factuur)
+        parts.append(f"{n} {_plural(n, 'transactie', 'transacties')} zonder bon")
+    if overzicht.niet_naar_basecone:
+        n = len(overzicht.niet_naar_basecone)
+        parts.append(f"{n} niet naar Basecone")
+    message = ", ".join(parts) + "."
+
+    overdue_count = sum(1 for inv in overzicht.facturen_te_betalen if days_until_due(inv, today) < 0)
+    if overdue_count:
+        title = f"{overdue_count} {_plural(overdue_count, 'factuur', 'facturen')} te laat"
+        priority, tags = "urgent", "rotating_light"
+    else:
+        title = "Vandaag voor jou"
+        priority, tags = "default", "moneybag"
+
+    send_notification(title, message, priority=priority, tags=tags)
     _mark_sent_today(session, "daily-summary")
     return True
 

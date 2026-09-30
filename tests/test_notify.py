@@ -99,12 +99,54 @@ def test_notify_new_payable_invoices_sends_once_and_marks_notified(session, sent
     sent = notify.notify_new_payable_invoices(session)
     assert sent == 1
     assert inv.notified_new_invoice is True
-    assert "Kruitbosch" in sent_notifications[0]["data"].decode("utf-8")
+    # Short, plain-language push: supplier + amount in the title, only the
+    # due date (no factuurnummer/omschrijving/technical details) in the body.
+    call = sent_notifications[0]
+    assert call["headers"]["Title"] == "Betalen: Kruitbosch  EUR 120,00"
+    assert "F-1" not in call["data"].decode("utf-8")
 
     # A second call must never re-notify the same invoice.
     sent_again = notify.notify_new_payable_invoices(session)
     assert sent_again == 0
     assert len(sent_notifications) == 1
+
+
+def test_notify_new_payable_invoices_urgent_when_due_soon(session, sent_notifications):
+    inv = make_invoice(due_date=date.today() + timedelta(days=2))
+    session.add(inv)
+    session.commit()
+
+    notify.notify_new_payable_invoices(session)
+
+    call = sent_notifications[0]
+    assert call["headers"]["Priority"] == "urgent"
+    assert call["headers"]["Tags"] == "rotating_light"
+    assert "nog 2 dagen" in call["data"].decode("utf-8")
+
+
+def test_notify_new_payable_invoices_urgent_when_overdue(session, sent_notifications):
+    inv = make_invoice(due_date=date.today() - timedelta(days=5))
+    session.add(inv)
+    session.commit()
+
+    notify.notify_new_payable_invoices(session)
+
+    call = sent_notifications[0]
+    assert call["headers"]["Priority"] == "urgent"
+    assert "Te laat sinds" in call["data"].decode("utf-8")
+    assert "5 dagen" in call["data"].decode("utf-8")
+
+
+def test_notify_new_payable_invoices_default_priority_when_due_later(session, sent_notifications):
+    inv = make_invoice(due_date=date.today() + timedelta(days=20))
+    session.add(inv)
+    session.commit()
+
+    notify.notify_new_payable_invoices(session)
+
+    call = sent_notifications[0]
+    assert call["headers"]["Priority"] == "default"
+    assert call["headers"]["Tags"] == "moneybag"
 
 
 def test_notify_new_payable_invoices_skips_incasso_and_already_notified(session, sent_notifications):
@@ -135,7 +177,7 @@ def test_notify_new_payable_invoices_caps_individual_pushes_and_sends_one_summar
     assert len(sent_notifications) == notify.MAX_NEW_INVOICE_PUSHES_PER_SYNC + 1
     assert all(inv.notified_new_invoice for inv in invoices)
     summary_call = sent_notifications[-1]
-    assert "3 nieuwe facturen" in summary_call["data"].decode("utf-8")
+    assert summary_call["headers"]["Title"] == "3 facturen te betalen"
 
 
 def test_notify_new_payable_invoices_marks_reminder_notified_without_sending(session, sent_notifications):
@@ -154,6 +196,14 @@ def test_notify_new_payable_invoices_marks_reminder_notified_without_sending(ses
 
 
 # -- send_daily_payment_summary --
+#
+# This is the push-notification version of the dashboard's "Vandaag voor
+# jou" block (app.vandaag) -- same three buckets, same "alles_in_orde"
+# silence rule, so what's fired here always matches what's on the
+# dashboard. Note this is a deliberate behaviour change from the old
+# "due-soon window" rule: a payable invoice due in 30 days now DOES trigger
+# a push (it's still something Sacha has to pay), it just isn't flagged
+# urgent.
 
 def test_daily_summary_sends_when_something_overdue(session, sent_notifications):
     inv = make_invoice(due_date=date.today() - timedelta(days=2))
@@ -163,17 +213,43 @@ def test_daily_summary_sends_when_something_overdue(session, sent_notifications)
     sent = notify.send_daily_payment_summary(session)
     assert sent is True
     assert len(sent_notifications) == 1
-    assert sent_notifications[0]["headers"]["Priority"] == "high"
+    call = sent_notifications[0]
+    assert call["headers"]["Priority"] == "urgent"
+    assert call["headers"]["Title"] == "1 factuur te laat"
+    assert "1 factuur te betalen (EUR 120,00)" in call["data"].decode("utf-8")
 
 
-def test_daily_summary_silent_when_nothing_due_soon(session, sent_notifications):
+def test_daily_summary_sends_but_not_urgent_when_due_later(session, sent_notifications):
     inv = make_invoice(due_date=date.today() + timedelta(days=30))
     session.add(inv)
     session.commit()
 
     sent = notify.send_daily_payment_summary(session)
+    assert sent is True
+    call = sent_notifications[0]
+    assert call["headers"]["Priority"] == "default"
+    assert call["headers"]["Title"] == "Vandaag voor jou"
+
+
+def test_daily_summary_silent_when_alles_in_orde(session, sent_notifications):
+    sent = notify.send_daily_payment_summary(session)
     assert sent is False
     assert sent_notifications == []
+
+
+def test_daily_summary_includes_transactions_without_invoice(session, sent_notifications):
+    from app.models import Transaction
+
+    session.add(Transaction(
+        external_ref="tx-1", booking_date=date.today(), amount_cents=-5000,
+        counterparty_name="Onbekend", raw_data={},
+    ))
+    session.commit()
+
+    sent = notify.send_daily_payment_summary(session)
+    assert sent is True
+    message = sent_notifications[0]["data"].decode("utf-8")
+    assert "1 transactie zonder bon" in message
 
 
 def test_daily_summary_only_sent_once_per_day(session, sent_notifications):

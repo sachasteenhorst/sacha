@@ -37,6 +37,7 @@ from app.payments import days_until_due, get_payable_invoices, learn_incasso_sup
 from app.rules import apply_rules
 from app.scheduler import start_scheduler
 from app.sync import import_bank_file, run_sync
+from app.vandaag import VandaagOverzicht
 from app.vraagposten import build_vraagposten
 
 app = FastAPI(title="Fietsenwinkel administratie")
@@ -335,6 +336,15 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     # -- Nog te betalen: never filtered by q/maand, its own worklist --
     te_betalen = get_payable_invoices(session)
 
+    # -- "Vandaag voor jou": reuses the lists already fetched above, so this
+    # costs no extra queries -- see app/vandaag.py for why these three and
+    # nothing else.
+    vandaag = VandaagOverzicht(
+        facturen_te_betalen=te_betalen,
+        banktransacties_zonder_factuur=unmatched_transactions_all,
+        niet_naar_basecone=not_yet_in_basecone,
+    )
+
     # -- Counters (always totals, unaffected by the active filter) --
     now_ams = datetime.now(ZoneInfo("Europe/Amsterdam"))
     confirmed_dates = session.scalars(select(Match.created_at).where(Match.confirmed.is_(True))).all()
@@ -425,6 +435,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "forward_error": request.query_params.get("forward_error"),
             "forward_ok": request.query_params.get("forward_ok"),
             "te_betalen": te_betalen,
+            "vandaag": vandaag,
             "cs_upload_new": request.query_params.get("cs_upload_new"),
             "cs_upload_matched": request.query_params.get("cs_upload_matched"),
             "cs_upload_error": request.query_params.get("cs_upload_error"),

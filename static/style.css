@@ -88,6 +88,55 @@ select[multiple] { min-width: 220px; }
 
 select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
 
+/* -- "Vandaag voor jou" hero -- */
+.today-hero {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.today-heading { margin: 0 0 0.9rem; font-size: 1.1rem; }
+
+.today-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.9rem;
+}
+
+.today-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: var(--text);
+  transition: box-shadow 0.15s ease;
+}
+.today-tile:hover { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); }
+
+.today-tile.today-tile-open { border-left-color: var(--orange); background: var(--orange-bg); }
+
+.today-number { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+.today-label { font-size: 0.9rem; font-weight: 600; margin-top: 0.15rem; }
+.today-tile.today-tile-open .today-label { color: var(--warning-text); }
+.today-cta { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+
+.today-ok {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+}
+.today-ok-icon { font-size: 2.2rem; }
+.today-ok-text { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+
 /* -- Stat counters -- */
 .stats-row {
   display: grid;
@@ -134,6 +183,17 @@ select { padding: 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
 }
+
+.status-bar-footer {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.status-bar-footer .status-dot { width: 0.5rem; height: 0.5rem; }
+
+.status-bar-title { font-weight: 600; color: var(--muted); }
 
 .status-chip { display: inline-flex; align-items: center; gap: 0.4rem; }
 
@@ -192,6 +252,8 @@ tr.muted td { color: var(--muted); }
 /* -- Mobile -- */
 @media (max-width: 640px) {
   main { padding: 0 1rem; }
+  .today-grid { grid-template-columns: 1fr; }
+  .today-number { font-size: 2rem; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .checkbox-cell { text-align: center; }
   .topbar { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
