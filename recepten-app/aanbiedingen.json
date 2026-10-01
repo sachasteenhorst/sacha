@@ -1,11 +1,11 @@
 {
- "bijgewerkt": "2026-09-29T22:30:34Z",
+ "bijgewerkt": "2026-10-01T04:32:16Z",
  "winkels": {
   "Jumbo": {
    "status": "ok",
    "geldig": "wo 30 sep t/m di 6 okt",
    "bron": "https://www.jumbo.com/aanbiedingen/nu",
-   "aantal": 40,
+   "aantal": 41,
    "items": [
     {
      "k": "stoofvlees",
@@ -261,7 +261,7 @@
    "status": "ok",
    "geldig": "t/m ma 5 okt",
    "bron": "https://www.dekamarkt.nl/aanbiedingen",
-   "aantal": 118,
+   "aantal": 119,
    "items": [
     {
      "k": "banaan",
@@ -356,12 +356,20 @@
   "Vomar": {
    "status": "ok",
    "geldig": "week 40",
-   "bron": "https://view.publitas.com/folder-deze-week/online-weekfolder-week-40/",
-   "aantal": 802,
+   "bron": "https://view.publitas.com/folder-deze-week/weekendfolder-week-40-ed6jror4ja79/",
+   "aantal": 817,
    "items": [
     {
      "k": "kaas",
      "titel": "Beemster Gesneden Kaas",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "room",
+     "titel": "Slagroom-, Mokka- of Citroenschnitte",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -378,6 +386,14 @@
     {
      "k": "kaas",
      "titel": "Beemster Gesneden Kaas Alle soorten 125-150 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "gehakt",
+     "titel": "Rundergehakt Per kilo",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -410,14 +426,6 @@
     {
      "k": "banaan",
      "titel": "Bananen",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "gehakt",
-     "titel": "Rundergehakt Per kilo",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -458,14 +466,6 @@
     {
      "k": "pindakaas",
      "titel": "G'woon 100% Pindakaas Alle soorten 1 kilo",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "room",
-     "titel": "Slagroom-, Mokka- of Citroenschnitte",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
