@@ -1,7 +1,7 @@
 {% extends "base.html" %}
+{% from "_macros.html" import vraagpost_action %}
+{% block breadcrumb %}Bonnetjes/vraagposten{% endblock %}
 {% block content %}
-
-<p><a href="/dashboard" class="clear-filter">&larr; Terug naar dashboard</a></p>
 
 <section id="vraagposten">
   <h2>Vraagposten ({{ items|length }})</h2>
@@ -35,28 +35,9 @@
         </td>
         <td>{{ item.label }}</td>
         <td class="actions">
-          {% if item.kind == "controleren" %}
-          <a class="btn btn-secondary" href="/dashboard?q={{ tx.counterparty_name|urlencode }}">Bekijk in dashboard</a>
-          {% elif item.kind == "regel" %}
-          <a class="btn btn-secondary" href="/regels?counterparty={{ tx.counterparty_name|urlencode }}&amp;iban={{ tx.counterparty_iban|urlencode }}&amp;code={{ tx.bank_code|urlencode }}&amp;direction={{ tx|transaction_direction }}">Maak regel</a>
-          {% elif item.kind == "bon" %}
-          <form method="post" action="/transactions/{{ tx.id }}/receipt-in-basecone">
-            <button class="btn btn-secondary">Bon staat in Basecone</button>
-          </form>
-          {% elif item.kind == "opvragen" %}
-          <a class="btn btn-secondary" href="{{ item.mailto }}">Opvragen per mail</a>
-          {% elif item.kind == "doorsturen" and inv %}
-          <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone">
-            <button class="btn btn-secondary">Stuur naar Basecone</button>
-          </form>
-          {% elif item.kind in ("te_betalen_te_laat", "betaald_niet_gekoppeld", "oud_controleren") and inv %}
-          <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
-            <button class="btn btn-secondary">Betaald</button>
-          </form>
-          <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
-            <button class="btn btn-secondary">Loopt via incasso</button>
-          </form>
-          {% if inv.pdf_path %}<a class="btn btn-secondary" href="/invoices/{{ inv.id }}/pdf" target="_blank">PDF</a>{% endif %}
+          {{ vraagpost_action(item) }}
+          {% if item.kind in ("te_betalen_te_laat", "betaald_niet_gekoppeld", "oud_controleren") and inv and inv.pdf_path %}
+          <a class="btn btn-secondary" href="/invoices/{{ inv.id }}/pdf" target="_blank">PDF</a>
           {% endif %}
         </td>
       </tr>

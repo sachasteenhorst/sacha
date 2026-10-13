@@ -3,24 +3,82 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Fietsenwinkel administratie{% endblock %}</title>
+  <title>{% block title %}Administratie{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1>🚲 Administratie &ndash; afschriften &amp; facturen</h1>
-    <nav class="topbar-nav">
-      <a href="/vraagposten" class="btn btn-secondary">Vraagposten</a>
-      <a href="/regels" class="btn btn-secondary">Regels</a>
-    </nav>
-    <form method="post" action="/sync">
-      <input type="hidden" name="q" value="{{ q|default('') }}">
-      <input type="hidden" name="maand" value="{{ maand|default('') }}">
-      <button type="submit" class="btn btn-primary">Nu ophalen</button>
-    </form>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu" aria-expanded="false">&#9776;</button>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">&#128690; Administratie</div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Overzicht</div>
+          <a href="/dashboard" class="sidebar-link{% if active_nav == 'vandaag' %} active{% endif %}">
+            <span class="sidebar-icon">&#127968;</span> Vandaag
+          </a>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Geld</div>
+          <a href="/dashboard#nog-te-betalen" class="sidebar-link">
+            <span class="sidebar-icon">&#128181;</span> Te betalen
+          </a>
+          <a href="/dashboard#betalingen-zonder-factuur" class="sidebar-link">
+            <span class="sidebar-icon">&#127974;</span> Bank &amp; transacties
+          </a>
+          <a href="/dashboard#cyclesoftware" class="sidebar-link">
+            <span class="sidebar-icon">&#128722;</span> Verkoop/CycleSoftware
+          </a>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Documenten</div>
+          <a href="/dashboard#facturen-niet-betaald" class="sidebar-link">
+            <span class="sidebar-icon">&#128196;</span> Inkoopfacturen
+          </a>
+          <a href="/dashboard#niet-naar-basecone" class="sidebar-link">
+            <span class="sidebar-icon">&#128228;</span> Basecone
+          </a>
+          <a href="/vraagposten" class="sidebar-link{% if active_nav == 'vraagposten' %} active{% endif %}">
+            <span class="sidebar-icon">&#129534;</span> Bonnetjes/vraagposten
+          </a>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Instellingen</div>
+          <a href="/regels" class="sidebar-link{% if active_nav == 'regels' %} active{% endif %}">
+            <span class="sidebar-icon">&#9881;&#65039;</span> Regels
+          </a>
+          <a href="/dashboard#status" class="sidebar-link">
+            <span class="sidebar-icon">&#128268;</span> Koppelingen &amp; status
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="sidebar-user">&#128100; {{ user|default("") }}</span>
+        <a href="/logout" class="sidebar-logout">Uitloggen</a>
+      </div>
+    </aside>
+    <div class="app-main">
+      <header class="topbar">
+        <nav class="breadcrumb" aria-label="Kruimelpad">
+          <span class="breadcrumb-root">Administratie</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current">{% block breadcrumb %}Vandaag{% endblock %}</span>
+        </nav>
+        <form method="post" action="/sync" class="inline-form">
+          <input type="hidden" name="q" value="{{ q|default('') }}">
+          <input type="hidden" name="maand" value="{{ maand|default('') }}">
+          <button type="submit" class="btn btn-refresh" title="Nu ophalen">&#8635; Verversen</button>
+        </form>
+      </header>
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
 </body>
 </html>

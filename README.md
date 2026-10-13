@@ -15,35 +15,62 @@ aan een bewijsstuk (factuur, creditnota of bon). Deze tool:
    andersom) -- zodat jij dat oplost voordat je accountant met vraagposten
    komt.
 
-## Dashboard: "Vandaag voor jou"
+## Dashboard-indeling
 
-Bovenaan het dashboard staat één blok met alleen wat je vandaag moet doen,
-in volgorde van urgentie -- de rest van het dashboard (matches controleren,
-regels, voortgang per maand, techniek) staat er gewoon nog, maar niet meer
-als eerste. Drie grote tellers, elk met een knop naar de bijbehorende lijst:
+Een vaste linker zijbalk (op de telefoon ingeklapt achter een menuknop)
+groepeert alle pagina's: **Overzicht** (Vandaag), **Geld** (Te betalen,
+Bank & transacties, Verkoop/CycleSoftware), **Documenten** (Inkoopfacturen,
+Basecone, Bonnetjes/vraagposten) en **Instellingen** (Regels, Koppelingen &
+status) -- met een kruimelpad en een ververs-knop bovenin. Dezelfde
+indeling staat op elke pagina (`templates/base.html`), dus het voelt als
+één geheel in plaats van losse pagina's.
 
-1. **Zelf betalen** -- open, niet-incasso inkoopfacturen (zie "Nog te
-   betalen" hieronder).
-2. **Banktransacties zonder factuur/bon** -- elke onopgeloste bankregel
-   (zie "Hoe het matcht"). Een vaste post zonder factuur (salaris, huur,
-   managementfee, prive-opname, een lease/fietsplan-ontvangst) hoort hier
-   nooit tussen zodra je er eenmalig een **regel** voor hebt gemaakt (zie
-   "Regels: automatisch afhandelen") -- dat is precies waarvoor Regels
-   bestaan.
-3. **Nog niet naar Basecone** -- gekoppelde facturen die de boekhouder nog
-   niet kan zien (zie "Basecone doorsturen"). CycleSoftware/Lease a
-   Bike/VWPFS/HelloRider-documenten (en andere niet-doorstuurbare
-   uitzonderingen) tellen hier nooit mee, om dezelfde reden dat ze nooit
-   doorgestuurd worden.
+De startpagina zelf, van boven naar beneden:
 
-Zijn alle drie op nul, dan staat er gewoon groot **"Alles in orde"**.
-Techniek (e-mail-/bank-/Ponto-synchronisatiestatus, "Nu verversen") staat
-onderaan de pagina in een klein statusbalkje -- leuk om te weten, maar niets
-om vandaag actie op te ondernemen.
+1. **Begroeting** -- "Goedemorgen/middag/avond, Sacha." met een statuskaart
+   ernaast: **"Alles bijgewerkt"** als er niets open staat, anders **"Er
+   wachten N dingen op je"** met een knop naar de belangrijkste lijst.
+2. **Vier tegels**: Zelf betalen (aantal + totaalbedrag), Zonder bon, Niet
+   naar Basecone, Eerstvolgende vervaldatum. Een vaste post zonder factuur
+   (salaris, huur, managementfee, prive-opname, een lease/fietsplan-
+   ontvangst) telt nooit mee bij "Zonder bon" zodra je er eenmalig een
+   **regel** voor hebt gemaakt (zie "Regels: automatisch afhandelen");
+   CycleSoftware/Lease a Bike/VWPFS/HelloRider-documenten tellen nooit mee
+   bij "Niet naar Basecone", om dezelfde reden dat ze nooit doorgestuurd
+   worden.
+3. **Maandafsluiting**: een voortgangsbalk met de stappen Afschrift binnen
+   -> Transacties gekoppeld -> Facturen naar Basecone -> Klaar voor
+   boekhouder, met een vinkje per afgeronde stap.
+4. **Twee kolommen**: links **"Actie nodig"** -- de urgentste
+   vraagposten (oudste/grootste eerst, dezelfde berekening als de
+   Vraagposten-pagina) met een knop per item; rechts **"Binnenkort te
+   betalen"** (een agenda voor de komende 14 dagen) en daaronder een
+   donkere kaart met de koppelingsstatus (e-mail/bank/Ponto) in gewone
+   taal.
 
-Dit blok en de dagelijkse pushmelding (zie "Push-meldingen op je telefoon")
-gebruiken dezelfde berekening (`app/vandaag.py`), dus het aantal op je
-telefoon klopt altijd met het aantal op het dashboard.
+Daaronder staan de bekende werklijsten (Nog te betalen, Betalingen zonder
+factuur, Facturen nog niet betaald, Niet naar Basecone, ...) gewoon nog,
+inclusief paginering zodra een lijst lang wordt (zie "Prestaties" hieronder).
+Techniek (sync-status, "Nu verversen") staat onderaan de pagina in een klein
+statusbalkje.
+
+De tegels/statuskaart bovenaan en de dagelijkse pushmelding (zie
+"Push-meldingen op je telefoon") gebruiken dezelfde berekening
+(`app/vandaag.py`), dus het aantal op je telefoon klopt altijd met het
+aantal op het dashboard.
+
+### Prestaties: koppel-zoekveld in plaats van een enorme keuzelijst
+
+Productie-incident: elke onopgeloste banktransactie kreeg een keuzelijst
+met ALLE openstaande facturen als `<option>` -- bij 565 transacties en
+~4000 facturen was dat 2,3 miljoen `<option>`-tags en een 235MB
+dashboardpagina, die op de telefoon nauwelijks laadde. Het "Koppel
+handmatig aan factu(u)r(en)"-veld is nu een klein zoekveld: typ je iets, dan
+matcht het op leverancier/factuurnummer; laat je het leeg, dan toont het
+facturen met een bedrag dicht bij de transactie (`/invoices/search-options`,
+altijd afgekapt op 20 resultaten). Lange werklijsten (Betalingen zonder
+factuur, Facturen nog niet betaald, Nog te betalen, Niet naar Basecone)
+zijn daarnaast gepagineerd (50 per pagina) zodra ze lang worden.
 
 ## Hoe het matcht
 
@@ -357,9 +384,21 @@ want die betaalt zichzelf al): een combinatie van vier signalen --
 incasso, ook niet als een van bovenstaande signalen wél afgaat (voor het
 zeldzame geval dat een leverancier overstapt van incasso naar factuur).
 
-Bij elke rij: knop **"Betaald"** (zet 'm direct van de lijst af, ongeacht
+Bij elke rij: knop **"Al betaald"** (zet 'm direct van de lijst af, ongeacht
 of de bankregel al binnen is) en **"Loopt via incasso"** (voor als de
 detectie een leverancier gemist heeft).
+
+**Oude facturen automatisch voorstellen**: een factuur die al meer dan 60
+dagen te laat is (zoals een paar Tenways-facturen die 234 dagen open
+stonden) wordt elke sync automatisch vergeleken met bestaande, nog
+onopgeloste banktransacties -- niet alleen binnen het normale matchvenster
+van 60 dagen rond de factuurdatum, maar in een veel breder venster van 120
+dagen rond de vervaldatum. Is er precies ÉÉN transactie met exact hetzelfde
+bedrag in dat venster, dan wordt dat een **voorstel** onder "Te
+controleren" (nooit automatisch bevestigd) -- klopt het, dan is het één
+klik. Zijn er meerdere kandidaten met hetzelfde bedrag, dan wordt er
+helemaal niets voorgesteld (te onzeker om te raden); dan blijft alleen de
+"Al betaald"-knop over.
 
 **`PAY_FROM_DATE`** (standaard `2026-09-01`) is een harde ondergrens: een
 factuur ontvangen vóór die datum komt nooit in "Nog te betalen" of een
@@ -466,6 +505,38 @@ voor het laatst heeft gesynchroniseerd (`synchronizedAt`, uitgelezen uit
 het `meta`-veld van het account -- niet `attributes`, waar het op
 productie altijd leeg terugkwam). Verloopt de toestemming binnen 14 dagen,
 of mislukt het lezen, dan komt er een pushmelding (zie hieronder).
+
+**Fouten worden nooit meer stil geslikt**: een echte productiebug liet de
+chip wekenlang op "nog niet gesynchroniseerd" staan zonder enige foutmelding
+-- oorzaak was dat een gewone netwerk-/verbindingsfout (geen HTTP-foutcode,
+dus geen "PontoError") dwars door elke foutafhandeling heen de hele
+sync-taak liet crashen, stil, elke keer opnieuw. Dat is gefixt op het niveau
+waar de fout ontstaat (`app/bank_ponto.py`'s `_request`/token-ophalen vangt
+nu ook een verbindingsfout af), plus een extra vangnet in de scheduler voor
+elke toekomstige onverwachte bug. Gaat er nu iets mis, dan wordt de
+oorzaak altijd: (1) rood in de statuschip gezet, (2) vertaald naar een
+duidelijke actie ("Ponto-autorisatie lijkt verlopen -- vernieuw 'm in het
+Ponto-dashboard", "server kan Ponto niet bereiken -- controleer
+netwerk/DNS", ...), en (3) als pushmelding gestuurd (max. 1x per dag).
+
+Zelf controleren of de Ponto-sync werkt (in de container op de VPS):
+
+```bash
+docker logs fietsenwinkel-admin --since 24h | grep -i ponto
+docker exec -it fietsenwinkel-admin python3 -c "
+from app.db import SessionLocal
+from app.bank_ponto import run_ponto_sync, get_state
+with SessionLocal() as s:
+    result = run_ponto_sync(s)
+    s.commit()
+    print(result)
+    print(get_state())
+"
+```
+
+Dit draait exact dezelfde (alleen-lezen) sync als de achtergrondtaak, meteen
+en zichtbaar in je terminal -- geen `/synchronizations`-aanroep, dus veilig
+om zo vaak te draaien als je wilt.
 
 ### Ponto/CSV-dedupe
 

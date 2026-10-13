@@ -19,12 +19,12 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app import sync_state
 from app.bank_ponto import PontoError, get_state as get_ponto_state
-from app.bank_ponto import ponto_configured, run_manual_ponto_refresh
+from app.bank_ponto import ponto_configured, ponto_error_hint, run_manual_ponto_refresh
 from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
 from app.cyclesoftware_upload import CycleSoftwareImportError, import_sales_invoices
@@ -51,6 +51,8 @@ MONTHS_NL = [
     "juli", "augustus", "september", "oktober", "november", "december",
 ]
 
+DAYS_NL = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
+
 METHOD_LABELS = {
     MatchMethod.REFERENCE: "factuurnummer",
     MatchMethod.AMOUNT_DATE: "bedrag + datum",
@@ -72,6 +74,18 @@ def require_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
+
+
+@app.get("/logout")
+def logout():
+    """No real server-side session to end (HTTP Basic Auth) -- returning a
+    fresh 401 is the standard trick to make the browser forget the cached
+    credentials, so the sidebar's "Uitloggen" link actually does something."""
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Uitgelogd",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 
 @app.on_event("startup")
@@ -116,6 +130,35 @@ templates.env.filters["transaction_direction"] = _transaction_direction
 templates.env.filters["rule_action_label"] = _rule_action_label
 templates.env.filters["basecone_status_label"] = basecone_status_label
 templates.env.filters["days_until_due"] = days_until_due
+
+
+PAGE_SIZE = 50
+
+
+def _paginate(items: list, page_param: str, request: Request) -> tuple[list, dict]:
+    """Slices a long worklist to PAGE_SIZE items -- these lists only ever
+    grow (every unresolved bank transaction/invoice stays on it until
+    handled), so without this a backlog of hundreds renders every single
+    row's HTML on every request. Returns (page_items, pagination) where
+    pagination carries what the template needs to render prev/next links
+    without losing the OTHER list's page or the active q/maand filter."""
+    try:
+        page = max(1, int(request.query_params.get(page_param, "1")))
+    except ValueError:
+        page = 1
+    total = len(items)
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = min(page, total_pages)
+    start = (page - 1) * PAGE_SIZE
+    pagination = {
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "param": page_param,
+    }
+    return items[start:start + PAGE_SIZE], pagination
 
 
 def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:
@@ -235,6 +278,7 @@ def _monthly_progress(session: Session) -> list[dict]:
         pct = round(100 * bucket["resolved"] / bucket["total"]) if bucket["total"] else 0
         result.append(
             {
+                "_key": key,
                 "label": f"{MONTHS_NL[month - 1]} {year}",
                 "total": bucket["total"],
                 "resolved": bucket["resolved"],
@@ -250,6 +294,48 @@ def _dot_status(configured: bool, error: str | None) -> str:
     if configured:
         return "green"
     return "grey"
+
+
+def _greeting(now: datetime) -> str:
+    hour = now.hour
+    if hour < 12:
+        return "Goedemorgen"
+    if hour < 18:
+        return "Goedemiddag"
+    return "Goedenavond"
+
+
+MONTH_CLOSING_STEP_LABELS = [
+    "Afschrift binnen",
+    "Transacties gekoppeld",
+    "Facturen naar Basecone",
+    "Klaar voor boekhouder",
+]
+
+
+def _month_closing_progress(monthly_progress: list[dict], now_ams: datetime, niet_naar_basecone_count: int) -> list[dict]:
+    """A simple, visible checklist for "is deze maand klaar voor de
+    boekhouder" -- not a precise accounting close, just the four things
+    this tool itself tracks, in the order they naturally happen. Step 3/4
+    deliberately look at the GLOBAL "niet naar Basecone" count rather than
+    only this month's -- a document from an earlier month still blocks
+    "klaar voor de boekhouder" just as much as one from the current month."""
+    this_month_key = f"{now_ams.year:04d}-{now_ams.month:02d}"
+    this_month = next((m for m in monthly_progress if m.get("_key") == this_month_key), None)
+    statement_in = this_month is not None and this_month["total"] > 0
+    all_linked = this_month is not None and this_month["pct"] == 100
+    basecone_done = niet_naar_basecone_count == 0
+    done_flags = [statement_in, statement_in and all_linked, basecone_done, statement_in and all_linked and basecone_done]
+    steps = []
+    current_set = False
+    for label, done in zip(MONTH_CLOSING_STEP_LABELS, done_flags):
+        is_current = not done and not current_set
+        if is_current:
+            current_set = True
+        steps.append({"label": label, "done": done, "current": is_current})
+    if not current_set:
+        steps[-1]["current"] = True
+    return steps
 
 
 def _client_ip(request: Request) -> str:
@@ -319,15 +405,6 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     basecone_todo = [inv for inv in not_yet_in_basecone if is_confident(inv)]
     basecone_review = [inv for inv in not_yet_in_basecone if not is_confident(inv)]
 
-    # For the manual-match dropdown -- never filtered by q/maand.
-    all_open_invoices = list(
-        session.scalars(
-            select(Invoice)
-            .where(Invoice.status.in_([MatchStatus.UNMATCHED, MatchStatus.SUGGESTED]))
-            .order_by(Invoice.received_at.desc())
-        )
-    )
-
     oldest_unmatched_days = None
     if unmatched_transactions_all:
         oldest = min(t.booking_date for t in unmatched_transactions_all)
@@ -395,6 +472,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "ponto_enabled": ponto_configured(),
         "ponto_status": _dot_status(ponto_state.last_read_at is not None, ponto_state.last_error),
         "ponto_synced_label": ponto_synced_label,
+        "ponto_error_hint": ponto_error_hint(ponto_state.last_error),
     }
 
     # -- Month dropdown options --
@@ -410,10 +488,73 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         for (y, m) in sorted(month_set, reverse=True)
     ]
 
+    unmatched_transactions_page, tx_pagination = _paginate(
+        _filter_transactions(unmatched_transactions_all, q, maand), "tx_page", request
+    )
+    unmatched_invoices_page, inv_pagination = _paginate(
+        _filter_invoices(unmatched_invoices_all, q, maand), "inv_page", request
+    )
+    te_betalen_page, betalen_pagination = _paginate(te_betalen, "betalen_page", request)
+    basecone_todo_page, basecone_pagination = _paginate(basecone_todo, "basecone_page", request)
+
+    # -- "Vandaag voor jou" header: greeting, 4 tiles, month-closing steps --
+    monthly_progress = _monthly_progress(session)
+    greeting = f"{_greeting(now_ams)}, Sacha."
+    now_label = f"{DAYS_NL[now_ams.weekday()]} {now_ams.day} {MONTHS_NL[now_ams.month - 1]}".upper()
+    today = date.today()
+    eerstvolgende_vervaldatum = te_betalen[0].due_date if te_betalen else None
+    eerstvolgende_dagen = days_until_due(te_betalen[0], today) if te_betalen else None
+    tiles = {
+        "zelf_betalen_aantal": len(te_betalen),
+        "zelf_betalen_bedrag": sum(inv.amount_cents or 0 for inv in te_betalen),
+        "zonder_bon_aantal": len(unmatched_transactions_all),
+        "niet_naar_basecone_aantal": len(not_yet_in_basecone),
+        "eerstvolgende_vervaldatum": eerstvolgende_vervaldatum,
+        "eerstvolgende_dagen": eerstvolgende_dagen,
+    }
+    month_closing_steps = _month_closing_progress(monthly_progress, now_ams, len(not_yet_in_basecone))
+
+    # -- "Actie nodig": the same prioritized worklist as the Vraagposten
+    # page (oldest/biggest first), just the top handful -- see
+    # app/vraagposten.py for how each item's suggested action is picked.
+    actie_nodig = build_vraagposten(session)[:8]
+
+    # -- "Binnenkort te betalen": a 14-day agenda, already sorted by
+    # due_date via get_payable_invoices.
+    binnenkort_te_betalen = [inv for inv in te_betalen if 0 <= days_until_due(inv, today) <= 14]
+
+    if last.email_error:
+        email_line = f"E-mail: {last.email_error}"
+    elif not email_configured:
+        email_line = "E-mail: nog niet ingesteld"
+    elif last_sync_label:
+        email_line = f"E-mail: laatst opgehaald {last_sync_label}"
+    else:
+        email_line = "E-mail: nog niet opgehaald"
+
+    if bank_error:
+        bank_line = f"Bank: {bank_error}"
+    elif status_bar["latest_statement_label"]:
+        bank_line = f"Bank: {transaction_count} transacties, laatste afschrift {status_bar['latest_statement_label']}"
+    else:
+        bank_line = "Bank: nog geen afschrift geupload"
+
+    status_lines = [
+        {"ok": not last.email_error, "text": email_line},
+        {"ok": bank_error is None, "text": bank_line},
+    ]
+    if status_bar["ponto_enabled"]:
+        status_lines.append({"ok": status_bar["ponto_error_hint"] is None, "text": (
+            f"Ponto: laatst gesynchroniseerd {ponto_synced_label}" if ponto_synced_label and status_bar["ponto_error_hint"] is None
+            else status_bar["ponto_error_hint"] or "Ponto: nog niet gesynchroniseerd"
+        )})
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
+            "user": user,
+            "active_nav": "vandaag",
             "q": q,
             "maand": maand,
             "upload_new": upload_new,
@@ -422,25 +563,81 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "month_options": month_options,
             "counters": counters,
             "status_bar": status_bar,
-            "unmatched_transactions": _filter_transactions(unmatched_transactions_all, q, maand),
-            "unmatched_invoices": _filter_invoices(unmatched_invoices_all, q, maand),
+            "unmatched_transactions": unmatched_transactions_page,
+            "tx_pagination": tx_pagination,
+            "unmatched_invoices": unmatched_invoices_page,
+            "inv_pagination": inv_pagination,
             "suggested_groups": _group_and_filter_matches(suggested_matches_all, q, maand),
             "recent_groups": _group_and_filter_matches(recent_matches_all, q, maand),
-            "all_open_invoices": all_open_invoices,
             "oldest_unmatched_days": oldest_unmatched_days,
             "rule_handled_transactions": _filter_transactions(rule_handled_all, q, maand),
-            "monthly_progress": _monthly_progress(session),
-            "basecone_todo": basecone_todo,
+            "monthly_progress": monthly_progress,
+            "basecone_todo": basecone_todo_page,
+            "basecone_pagination": basecone_pagination,
             "basecone_review": basecone_review,
             "forward_error": request.query_params.get("forward_error"),
             "forward_ok": request.query_params.get("forward_ok"),
-            "te_betalen": te_betalen,
+            "te_betalen": te_betalen_page,
+            "betalen_pagination": betalen_pagination,
             "vandaag": vandaag,
+            "greeting": greeting,
+            "now_label": now_label,
+            "tiles": tiles,
+            "month_closing_steps": month_closing_steps,
+            "actie_nodig": actie_nodig,
+            "binnenkort_te_betalen": binnenkort_te_betalen,
+            "status_lines": status_lines,
             "cs_upload_new": request.query_params.get("cs_upload_new"),
             "cs_upload_matched": request.query_params.get("cs_upload_matched"),
             "cs_upload_error": request.query_params.get("cs_upload_error"),
         },
     )
+
+
+INVOICE_SEARCH_LIMIT = 20
+# "In de buurt" voor het koppel-zoekveld -- ruim genoeg voor een kleine
+# betalingskorting, krap genoeg om niet elke factuur van elk bedrag te tonen.
+INVOICE_SEARCH_AMOUNT_TOLERANCE_CENTS = 2000
+
+
+@app.get("/invoices/search-options")
+def search_invoice_options(
+    q: str = "",
+    amount_cents: int | None = None,
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    """Backs the dashboard's koppel-zoekveld: used to be a single <select>
+    with EVERY open factuur as an <option>, rendered once per onopgeloste
+    transactie -- 565 rijen x ~4000 facturen = 2,3 miljoen <option>-tags en
+    een 235MB dashboardpagina op productie. Now it's a small on-demand
+    search instead: typed tekst matcht op leverancier/factuurnummer, geen
+    tekst valt terug op facturen met een bedrag dicht bij de transactie
+    (INVOICE_SEARCH_AMOUNT_TOLERANCE_CENTS), en zonder allebei gewoon de
+    meest recente open facturen -- altijd afgekapt op INVOICE_SEARCH_LIMIT."""
+    base = select(Invoice).where(Invoice.status.in_([MatchStatus.UNMATCHED, MatchStatus.SUGGESTED]))
+    q = q.strip()
+    if q:
+        like = f"%{q}%"
+        candidates = list(
+            session.scalars(
+                base.where(or_(Invoice.supplier_name.ilike(like), Invoice.invoice_number.ilike(like)))
+                .order_by(Invoice.received_at.desc())
+                .limit(INVOICE_SEARCH_LIMIT)
+            )
+        )
+    elif amount_cents is not None:
+        low, high = amount_cents - INVOICE_SEARCH_AMOUNT_TOLERANCE_CENTS, amount_cents + INVOICE_SEARCH_AMOUNT_TOLERANCE_CENTS
+        candidates = list(session.scalars(base.where(Invoice.amount_cents.between(low, high))))
+        candidates.sort(key=lambda inv: abs((inv.amount_cents or 0) - amount_cents))
+        candidates = candidates[:INVOICE_SEARCH_LIMIT]
+    else:
+        candidates = list(session.scalars(base.order_by(Invoice.received_at.desc()).limit(INVOICE_SEARCH_LIMIT)))
+
+    return [
+        {"id": inv.id, "label": f"{inv.supplier_name or '?'} – {inv.invoice_number or 'geen nr'} ({_euros(inv.amount_cents)})"}
+        for inv in candidates
+    ]
 
 
 @app.get("/invoices/{invoice_id}/pdf")
@@ -506,7 +703,12 @@ def refresh_ponto(
         result = run_manual_ponto_refresh(session, _client_ip(request))
     except PontoError as exc:
         session.rollback()
-        return _dashboard_redirect(q, maand, upload_error=str(exc))
+        return _dashboard_redirect(q, maand, upload_error=ponto_error_hint(str(exc)) or str(exc))
+    except Exception as exc:
+        # Same safety net as the scheduler's _ponto_job -- an unexpected bug
+        # here must show up as a clear banner, never a bare 500.
+        session.rollback()
+        return _dashboard_redirect(q, maand, upload_error=ponto_error_hint(str(exc)) or str(exc))
     session.commit()
     if result.errors:
         return _dashboard_redirect(q, maand, upload_error=result.errors[0])
@@ -736,6 +938,8 @@ def rules_page(request: Request, user: str = Depends(require_auth), session: Ses
         "rules.html",
         {
             "request": request,
+            "user": user,
+            "active_nav": "regels",
             "rules": rules,
             "rule_counts": rule_counts,
             "prefill": prefill,
@@ -847,7 +1051,10 @@ def forward_to_basecone_bulk(
 @app.get("/vraagposten")
 def vraagposten_page(request: Request, user: str = Depends(require_auth), session: Session = Depends(get_session)):
     items = build_vraagposten(session)
-    return templates.TemplateResponse("vraagposten.html", {"request": request, "items": items})
+    return templates.TemplateResponse(
+        "vraagposten.html",
+        {"request": request, "user": user, "active_nav": "vraagposten", "items": items},
+    )
 
 
 @app.get("/vraagposten/export.csv")

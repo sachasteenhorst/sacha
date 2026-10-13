@@ -9,7 +9,8 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.bank_ponto import ponto_configured, run_ponto_sync
+from app.bank_ponto import get_state as get_ponto_state
+from app.bank_ponto import ponto_configured, ponto_error_hint, run_ponto_sync
 from app.config import settings
 from app.db import SessionLocal
 from app.notify import notify_new_payable_invoices, send_daily_payment_summary, send_warning_once_per_day
@@ -61,15 +62,34 @@ def _ponto_job() -> None:
     """Read-only: Ponto synchronizes each account with the bank itself
     (about 4x/day); this only ever reads whatever Ponto already has, never
     triggers a synchronization (see app/bank_ponto.py's module docstring --
-    that's only allowed from an actual user click)."""
+    that's only allowed from an actual user click).
+
+    Wrapped in a broad except on top of run_ponto_sync's own PontoError
+    handling: a real production incident showed the dashboard's "Bank:
+    Ponto" chip stuck on "nog niet gesynchroniseerd" for weeks with no
+    error anywhere, because a plain network/connection failure wasn't a
+    PontoError and crashed this job silently every single run -- caught now
+    at the network layer itself (see app/bank_ponto.py's _request), but
+    this outer catch is a safety net so ANY future bug in here still shows
+    up on the status bar and in the logs instead of vanishing again."""
     if not ponto_configured():
         return
     session = SessionLocal()
     try:
-        result = run_ponto_sync(session)
+        try:
+            result = run_ponto_sync(session)
+        except Exception as exc:
+            logger.exception("Ponto-sync onverwacht mislukt")
+            get_ponto_state().last_error = str(exc)
+            send_warning_once_per_day(
+                session, "ponto_sync", "Bank-sync (Ponto) mislukt",
+                ponto_error_hint(str(exc)) or str(exc),
+            )
+            session.commit()
+            return
         for err in result.errors:
             logger.warning("Ponto-sync fout: %s", err)
-            send_warning_once_per_day(session, "ponto_sync", "Bank-sync (Ponto) mislukt", err)
+            send_warning_once_per_day(session, "ponto_sync", "Bank-sync (Ponto) mislukt", ponto_error_hint(err) or err)
         session.commit()
     finally:
         session.close()

@@ -15,7 +15,7 @@ from app.basecone_client import BaseconeClient
 from app.basecone_forward import auto_forward_new_invoices, check_backlog_against_sent_items
 from app.config import settings
 from app.email_client import fetch_invoice_attachments, invoice_dedup_key
-from app.matcher import MatchingSummary, run_matching
+from app.matcher import MatchingSummary, retro_match_overdue_invoices, run_matching
 from app.models import DocumentKind, Invoice, MatchStatus, Transaction
 from app.payments import determine_payment_method
 from app.rules import apply_rules
@@ -208,6 +208,7 @@ def import_bank_file(session: Session, filename: str, content: bytes) -> BankImp
     # first, and let rules mop up only what's still open afterwards.
     result.matching = run_matching(session)
     apply_rules(session)
+    retro_match_overdue_invoices(session)
     session.commit()
     return result
 
@@ -222,6 +223,7 @@ def run_sync(session: Session) -> SyncResult:
 
     result.matching = run_matching(session)
     apply_rules(session)
+    retro_match_overdue_invoices(session)
     session.commit()
 
     # Independent of matching -- purely about getting documents to the

@@ -1,7 +1,6 @@
 {% extends "base.html" %}
+{% block breadcrumb %}Regels{% endblock %}
 {% block content %}
-
-<p><a href="/dashboard" class="clear-filter">&larr; Terug naar dashboard</a></p>
 
 {% if notify_test == "ok" %}
 <div class="banner banner-ok">✅ Testmelding verstuurd -- check je telefoon.</div>

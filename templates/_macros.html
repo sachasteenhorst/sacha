@@ -1,0 +1,42 @@
+{% macro vraagpost_action(item) %}
+  {% set tx = item.transaction %}
+  {% set inv = item.invoice %}
+  {% if item.kind == "controleren" %}
+  <a class="btn btn-secondary" href="/dashboard?q={{ tx.counterparty_name|urlencode }}">Bekijk in dashboard</a>
+  {% elif item.kind == "regel" %}
+  <a class="btn btn-secondary" href="/regels?counterparty={{ tx.counterparty_name|urlencode }}&amp;iban={{ tx.counterparty_iban|urlencode }}&amp;code={{ tx.bank_code|urlencode }}&amp;direction={{ tx|transaction_direction }}">Maak regel</a>
+  {% elif item.kind == "bon" %}
+  <form method="post" action="/transactions/{{ tx.id }}/receipt-in-basecone" class="inline-form">
+    <button class="btn btn-secondary">Bon staat in Basecone</button>
+  </form>
+  {% elif item.kind == "opvragen" %}
+  <a class="btn btn-secondary" href="{{ item.mailto }}">Opvragen per mail</a>
+  {% elif item.kind == "doorsturen" and inv %}
+  <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone" class="inline-form">
+    <button class="btn btn-secondary">Stuur naar Basecone</button>
+  </form>
+  {% elif item.kind in ("te_betalen_te_laat", "betaald_niet_gekoppeld", "oud_controleren") and inv %}
+  <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
+    <button class="btn btn-secondary">Al betaald</button>
+  </form>
+  <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
+    <button class="btn btn-ignore">Loopt via incasso</button>
+  </form>
+  {% endif %}
+{% endmacro %}
+
+{% macro pagination_links(pagination, extra_params) %}
+  {% if pagination.total_pages > 1 %}
+  <div class="pagination">
+    <span class="pagination-info">Pagina {{ pagination.page }} van {{ pagination.total_pages }} ({{ pagination.total }} in totaal)</span>
+    <span class="pagination-links">
+      {% if pagination.has_prev %}
+      <a class="btn btn-secondary" href="?{{ extra_params }}&amp;{{ pagination.param }}={{ pagination.page - 1 }}">&larr; Vorige</a>
+      {% endif %}
+      {% if pagination.has_next %}
+      <a class="btn btn-secondary" href="?{{ extra_params }}&amp;{{ pagination.param }}={{ pagination.page + 1 }}">Volgende &rarr;</a>
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
+{% endmacro %}

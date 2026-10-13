@@ -102,6 +102,25 @@ def get_state() -> PontoSyncState:
     return _state
 
 
+def ponto_error_hint(error: str | None) -> str | None:
+    """Turns a raw Ponto error into one short, actionable Dutch sentence for
+    the dashboard's status bar -- "er ging iets mis, zoek het zelf maar uit
+    in de logs" isn't good enough when Sacha has no reason to know what a
+    401 or a connection error even means here."""
+    if not error:
+        return None
+    lowered = error.lower()
+    if "401" in lowered or "invalid_client" in lowered or "unauthorized" in lowered:
+        return "Ponto-autorisatie lijkt verlopen of ongeldig -- vernieuw 'm in het Ponto-dashboard en controleer PONTO_CLIENT_ID/PONTO_CLIENT_SECRET."
+    if "403" in lowered or "forbidden" in lowered:
+        return "Ponto weigert toegang (403) -- controleer de rechten van de Integration in het Ponto-dashboard."
+    if "niet bereikbaar" in lowered or "connection" in lowered or "timeout" in lowered or "timed out" in lowered:
+        return "De server kan Ponto niet bereiken (netwerk/DNS) -- controleer de internetverbinding/firewall van de VPS."
+    if "ingesteld" in lowered:
+        return "PONTO_CLIENT_ID/PONTO_CLIENT_SECRET zijn niet (goed) ingesteld."
+    return "Controleer de Ponto-koppeling -- zie de container-logs voor het volledige foutbericht."
+
+
 class _PontoAuth:
     def __init__(self) -> None:
         self._access_token: str | None = None
@@ -113,12 +132,15 @@ class _PontoAuth:
         if not ponto_configured():
             raise PontoError("PONTO_CLIENT_ID/PONTO_CLIENT_SECRET zijn niet ingesteld.")
 
-        response = requests.post(
-            settings.ponto_token_url,
-            data={"grant_type": "client_credentials"},
-            auth=(settings.ponto_client_id, settings.ponto_client_secret),
-            timeout=30,
-        )
+        try:
+            response = requests.post(
+                settings.ponto_token_url,
+                data={"grant_type": "client_credentials"},
+                auth=(settings.ponto_client_id, settings.ponto_client_secret),
+                timeout=30,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise PontoError(f"Ponto-token ophalen mislukt (verbindingsfout): {exc}") from exc
         if response.status_code != 200:
             raise PontoError(f"Ponto-token ophalen mislukt ({response.status_code}): {response.text}")
         payload = response.json()
@@ -138,7 +160,19 @@ def _request(method: str, path: str, extra_headers: dict | None = None, **kwargs
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.api+json"}
     if extra_headers:
         headers.update(extra_headers)
-    response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    try:
+        response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+    except requests.exceptions.RequestException as exc:
+        # A connection/timeout/DNS/SSL failure used to propagate straight
+        # out of here as a bare requests exception -- not a PontoError, so
+        # every "except PontoError" handler up the call chain (run_ponto_sync,
+        # the scheduler, the "Nu verversen" button) missed it completely.
+        # That crashed the whole sync silently: _state.last_read_at was
+        # never reached, no error was ever recorded, and the dashboard's
+        # "Bank: Ponto" chip just sat on "nog niet gesynchroniseerd" forever
+        # with no hint anything was wrong. Converting it to a PontoError
+        # here is what makes every one of those handlers actually catch it.
+        raise PontoError(f"Ponto niet bereikbaar ({method} {path}): {exc}") from exc
     if response.status_code >= 300:
         raise PontoError(f"Ponto API-fout ({response.status_code}) bij {method} {path}: {response.text}")
     return response.json() if response.content else {}
@@ -394,11 +428,12 @@ def _apply_post_import(session: Session, result: PontoSyncResult) -> None:
         return
     session.flush()
     from app.basecone_forward import auto_forward_new_invoices
-    from app.matcher import run_matching
+    from app.matcher import retro_match_overdue_invoices, run_matching
     from app.rules import apply_rules
 
     run_matching(session)
     apply_rules(session)
+    retro_match_overdue_invoices(session)
     auto_forward_new_invoices(session)
 
 

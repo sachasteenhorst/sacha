@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine
@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.matcher import _name_similarity, run_matching
-from app.models import Direction, DocumentKind, Invoice, MatchStatus, Transaction
+from app.models import Direction, DocumentKind, Invoice, Match, MatchMethod, MatchStatus, Transaction
 
 
 @pytest.fixture()
@@ -455,3 +455,104 @@ def test_cyclesoftware_sales_invoice_matches_incoming_customer_payment(session):
     assert summary.auto_matched == 1
     assert tx.status == MatchStatus.MATCHED
     assert inv.status == MatchStatus.MATCHED
+
+
+# -- retro_match_overdue_invoices: a long-overdue "Nog te betalen" invoice
+# that's almost certainly already paid, but outside the normal matcher's
+# window (settings.match_date_window_days) or whose transaction was already
+# claimed by something else when the normal matcher last ran -- real
+# production case: Tenways invoices sitting 234 days overdue. Only ever
+# proposes a SUGGESTED match (never auto-confirms) and only when the amount
+# uniquely identifies a single still-unmatched transaction.
+
+from app.config import settings
+from app.matcher import retro_match_overdue_invoices
+
+
+@pytest.fixture(autouse=True)
+def _no_pay_from_date_cutoff(monkeypatch):
+    # These tests use dates relative to date.today() (an overdue due_date
+    # only makes sense "today"-relative) -- decouple from the fixed
+    # PAY_FROM_DATE cutoff so they don't start failing once that date is in
+    # the past relative to whenever this suite happens to run.
+    monkeypatch.setattr(settings, "pay_from_date", "2000-01-01")
+
+
+def make_overdue_invoice(days_overdue: int, **kwargs):
+    due_date = date.today() - timedelta(days=days_overdue)
+    defaults = dict(received_at=date.today() - timedelta(days=days_overdue + 30), due_date=due_date)
+    defaults.update(kwargs)
+    return make_invoice(**defaults)
+
+
+def test_retro_match_proposes_suggestion_for_unique_old_amount_match(session):
+    from datetime import timedelta as td
+
+    inv = make_overdue_invoice(90, amount_cents=23400, supplier_name="Tenways")
+    # Booked well outside the normal 60-day matcher window around the due
+    # date, but inside the wider retro-match window.
+    tx = make_transaction(
+        amount_cents=-23400, booking_date=inv.due_date - td(days=100), counterparty_name="Tenways",
+    )
+    session.add_all([inv, tx])
+    session.commit()
+
+    created = retro_match_overdue_invoices(session)
+
+    assert created == 1
+    assert inv.status == MatchStatus.SUGGESTED
+    assert tx.status == MatchStatus.SUGGESTED
+    match = session.query(Match).one()
+    assert match.confirmed is False
+    assert match.method == MatchMethod.AMOUNT_DATE
+    assert match.confidence == "low"
+
+
+def test_retro_match_skips_when_amount_is_ambiguous(session):
+    inv = make_overdue_invoice(90, amount_cents=5000)
+    tx1 = make_transaction(external_ref="tx-1", amount_cents=-5000, booking_date=inv.due_date)
+    tx2 = make_transaction(external_ref="tx-2", amount_cents=-5000, booking_date=inv.due_date - timedelta(days=5))
+    session.add_all([inv, tx1, tx2])
+    session.commit()
+
+    created = retro_match_overdue_invoices(session)
+
+    assert created == 0
+    assert inv.status == MatchStatus.UNMATCHED
+
+
+def test_retro_match_leaves_invoices_not_overdue_enough_alone(session):
+    inv = make_overdue_invoice(10, amount_cents=5000)  # under RETRO_MATCH_MIN_DAYS_OVERDUE
+    tx = make_transaction(amount_cents=-5000, booking_date=inv.due_date)
+    session.add_all([inv, tx])
+    session.commit()
+
+    created = retro_match_overdue_invoices(session)
+
+    assert created == 0
+    assert inv.status == MatchStatus.UNMATCHED
+
+
+def test_retro_match_ignores_transactions_already_claimed_elsewhere(session):
+    inv = make_overdue_invoice(90, amount_cents=5000)
+    tx = make_transaction(amount_cents=-5000, booking_date=inv.due_date, status=MatchStatus.MATCHED)
+    session.add_all([inv, tx])
+    session.commit()
+
+    created = retro_match_overdue_invoices(session)
+
+    assert created == 0
+    assert inv.status == MatchStatus.UNMATCHED
+
+
+def test_retro_match_never_matches_incasso_invoices(session):
+    from app.models import PaymentMethod
+
+    inv = make_overdue_invoice(90, amount_cents=5000, payment_method=PaymentMethod.INCASSO.value)
+    tx = make_transaction(amount_cents=-5000, booking_date=inv.due_date)
+    session.add_all([inv, tx])
+    session.commit()
+
+    created = retro_match_overdue_invoices(session)
+
+    assert created == 0

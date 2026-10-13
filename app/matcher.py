@@ -31,6 +31,7 @@ import itertools
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -393,3 +394,64 @@ def run_matching(session: Session) -> MatchingSummary:
         list(session.scalars(select(Invoice).where(Invoice.status == MatchStatus.UNMATCHED)))
     )
     return summary
+
+
+# A normal AMOUNT_DATE match only ever looks at CURRENTLY unmatched
+# transactions within a fairly tight window (settings.match_date_window_days,
+# 60 by default) -- fine for day-to-day sync, but it can never find a
+# payment that's genuinely old: real production case, an invoice sitting on
+# "Nog te betalen" 234 days overdue (Tenways) that was almost certainly
+# already paid long ago by a transaction the regular matcher's window never
+# reaches, or that was already consumed by a different (correct) match
+# before this invoice was reparsed/reclassified.
+RETRO_MATCH_MIN_DAYS_OVERDUE = 60
+RETRO_MATCH_WINDOW_DAYS = 120
+
+
+def retro_match_overdue_invoices(session: Session) -> int:
+    """For payable invoices overdue by at least RETRO_MATCH_MIN_DAYS_OVERDUE:
+    look for a transaction with the EXACT same amount, anywhere within
+    RETRO_MATCH_WINDOW_DAYS of the due date (not just the normal window),
+    among transactions STILL unmatched today. Only ever proposes a
+    SUGGESTED match (never auto-confirms -- this is a much weaker signal
+    than the normal matcher's, since the only thing backing it is the
+    amount) and only when EXACTLY ONE such transaction exists; more than one
+    is ambiguous and is left alone rather than guessed at. Confirming one
+    takes a single click on the existing "Te controleren" list, same as any
+    other suggested match -- never silently marks anything paid.
+
+    Only ever considers an invoice still at UNMATCHED (not already
+    SUGGESTED by this OR the normal matcher), so a later run never proposes
+    the same invoice again while a suggestion from an earlier run is still
+    awaiting Sacha's confirm/reject."""
+    from app.payments import days_until_due, is_payable_invoice  # avoid a circular import at module load time
+
+    today = date.today()
+    created = 0
+    overdue_invoices = [
+        inv for inv in session.scalars(select(Invoice).where(Invoice.status == MatchStatus.UNMATCHED))
+        if inv.due_date is not None
+        and is_payable_invoice(inv)
+        and -days_until_due(inv, today) >= RETRO_MATCH_MIN_DAYS_OVERDUE
+    ]
+    for invoice in overdue_invoices:
+        target_amount = -abs(invoice.amount_cents)  # an outgoing invoice is settled by a negative transaction
+        window_start = invoice.due_date - timedelta(days=RETRO_MATCH_WINDOW_DAYS)
+        window_end = invoice.due_date + timedelta(days=RETRO_MATCH_WINDOW_DAYS)
+        candidates = list(
+            session.scalars(
+                select(Transaction).where(
+                    Transaction.status == MatchStatus.UNMATCHED,
+                    Transaction.amount_cents == target_amount,
+                    Transaction.booking_date >= window_start,
+                    Transaction.booking_date <= window_end,
+                )
+            )
+        )
+        if len(candidates) != 1:
+            continue  # nothing, or too ambiguous to guess at
+        _create_match_group(session, candidates[0], [invoice], MatchMethod.AMOUNT_DATE, "low", confirmed=False)
+        created += 1
+    if created:
+        session.flush()
+    return created

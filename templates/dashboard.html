@@ -1,51 +1,121 @@
 {% extends "base.html" %}
+{% from "_macros.html" import vraagpost_action, pagination_links %}
+{% block breadcrumb %}Vandaag{% endblock %}
 {% block content %}
 
-<section class="today-hero" aria-label="Vandaag voor jou">
+<section class="greeting-row">
+  <div class="greeting">
+    <div class="greeting-date">{{ now_label }}</div>
+    <h1 class="greeting-title">{{ greeting[:-1] }}<span class="greeting-dot">.</span></h1>
+    <p class="greeting-subtitle">Hier is wat er vandaag voor je klaarstaat.</p>
+  </div>
   {% if vandaag.alles_in_orde %}
-  <div class="today-ok">
-    <span class="today-ok-icon">🎉</span>
-    <span class="today-ok-text">Alles in orde</span>
+  <div class="status-card status-card-ok">
+    <div class="status-card-title">Alles bijgewerkt</div>
+    <div class="status-card-text">Er staat nu niets voor je klaar.</div>
   </div>
   {% else %}
-  <h2 class="today-heading">Vandaag voor jou</h2>
-  <div class="today-grid">
-    <a href="#nog-te-betalen" class="today-tile{% if vandaag.facturen_te_betalen %} today-tile-open{% endif %}">
-      <span class="today-number">{{ vandaag.facturen_te_betalen|length }}</span>
-      <span class="today-label">Zelf betalen</span>
-      <span class="today-cta">Bekijk facturen &rarr;</span>
-    </a>
-    <a href="#betalingen-zonder-factuur" class="today-tile{% if vandaag.banktransacties_zonder_factuur %} today-tile-open{% endif %}">
-      <span class="today-number">{{ vandaag.banktransacties_zonder_factuur|length }}</span>
-      <span class="today-label">Banktransacties zonder factuur/bon</span>
-      <span class="today-cta">Bekijk lijst &rarr;</span>
-    </a>
-    <a href="#niet-naar-basecone" class="today-tile{% if vandaag.niet_naar_basecone %} today-tile-open{% endif %}">
-      <span class="today-number">{{ vandaag.niet_naar_basecone|length }}</span>
-      <span class="today-label">Nog niet naar Basecone</span>
-      <span class="today-cta">Bekijk facturen &rarr;</span>
-    </a>
+  <div class="status-card">
+    <div class="status-card-title">Er wachten {{ vandaag.totaal }} dingen op je</div>
+    <a href="#actie-nodig" class="btn btn-dark">Bekijk belangrijkste lijst</a>
   </div>
   {% endif %}
 </section>
 
-<section class="stats-row" aria-label="Overzicht">
-  <a href="#te-controleren" class="stat-tile{% if counters.te_controleren > 0 %} stat-open{% endif %}">
-    <span class="stat-number">{{ counters.te_controleren }}</span>
-    <span class="stat-label">Te controleren</span>
+<section class="tiles-row" aria-label="Kerncijfers">
+  <a href="#nog-te-betalen" class="tile{% if tiles.zelf_betalen_aantal %} tile-open{% endif %}">
+    <span class="tile-icon">&#128181;</span>
+    <span class="tile-label">Zelf betalen</span>
+    <span class="tile-number">{{ tiles.zelf_betalen_aantal }}</span>
+    <span class="tile-sub">{% if tiles.zelf_betalen_aantal %}{{ tiles.zelf_betalen_bedrag|euros }}{% else %}niets open{% endif %}</span>
   </a>
-  <a href="#facturen-niet-betaald" class="stat-tile{% if counters.facturen_niet_betaald > 0 %} stat-open{% endif %}">
-    <span class="stat-number">{{ counters.facturen_niet_betaald }}</span>
-    <span class="stat-label">Facturen nog niet betaald</span>
+  <a href="#betalingen-zonder-factuur" class="tile{% if tiles.zonder_bon_aantal %} tile-open{% endif %}">
+    <span class="tile-icon">&#129534;</span>
+    <span class="tile-label">Zonder bon</span>
+    <span class="tile-number">{{ tiles.zonder_bon_aantal }}</span>
+    <span class="tile-sub">transacties</span>
   </a>
-  <a href="#recent-gekoppeld" class="stat-tile stat-positive">
-    <span class="stat-number">{{ counters.gekoppeld_deze_maand }}</span>
-    <span class="stat-label">Gekoppeld in {{ counters.maand_label }}</span>
+  <a href="#niet-naar-basecone" class="tile{% if tiles.niet_naar_basecone_aantal %} tile-open{% endif %}">
+    <span class="tile-icon">&#128228;</span>
+    <span class="tile-label">Niet naar Basecone</span>
+    <span class="tile-number">{{ tiles.niet_naar_basecone_aantal }}</span>
+    <span class="tile-sub">facturen</span>
   </a>
-  <a href="#automatisch-afgehandeld" class="stat-tile stat-positive">
-    <span class="stat-number">{{ counters.automatisch_afgehandeld }}</span>
-    <span class="stat-label">Automatisch afgehandeld</span>
+  <a href="#nog-te-betalen" class="tile">
+    <span class="tile-icon">&#128197;</span>
+    <span class="tile-label">Eerstvolgende vervaldatum</span>
+    {% if tiles.eerstvolgende_vervaldatum %}
+    <span class="tile-number tile-number-small">{{ tiles.eerstvolgende_vervaldatum|dutch_date }}</span>
+    <span class="tile-sub">{% if tiles.eerstvolgende_dagen < 0 %}{{ -tiles.eerstvolgende_dagen }} dagen te laat{% else %}nog {{ tiles.eerstvolgende_dagen }} dagen{% endif %}</span>
+    {% else %}
+    <span class="tile-number tile-number-small">&mdash;</span>
+    <span class="tile-sub">niets open</span>
+    {% endif %}
   </a>
+</section>
+
+<section class="month-closing" aria-label="Maandafsluiting">
+  <div class="month-closing-title">Maandafsluiting {{ counters.maand_label }}</div>
+  <ol class="month-closing-steps">
+    {% for step in month_closing_steps %}
+    <li class="month-closing-step{% if step.done %} done{% endif %}{% if step.current %} current{% endif %}">
+      <span class="month-closing-dot">{% if step.done %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>
+      <span class="month-closing-label">{{ step.label }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="two-column">
+  <div class="column-main">
+    <div class="panel" id="actie-nodig">
+      <h2>Actie nodig</h2>
+      <p class="hint">De urgentste punten, oudste/grootste eerst -- de volledige lijst staat op de <a href="/vraagposten">vraagposten-pagina</a>.</p>
+      {% if actie_nodig %}
+      <ul class="action-list">
+        {% for item in actie_nodig %}
+        <li class="action-item">
+          <div class="action-item-main">
+            <span class="action-item-label">{{ item.label }}</span>
+            <span class="action-item-meta">{{ item.age_days }} dagen oud</span>
+          </div>
+          <div class="action-item-cta">{{ vraagpost_action(item) }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">Niets dat dringend is. 🎉</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="column-side">
+    <div class="panel">
+      <h2>Binnenkort te betalen</h2>
+      <p class="hint">De komende 14 dagen.</p>
+      {% if binnenkort_te_betalen %}
+      <ul class="agenda-list">
+        {% for inv in binnenkort_te_betalen %}
+        {% set dagen = inv|days_until_due %}
+        <li class="agenda-item">
+          <span class="agenda-date">{% if inv.due_date_estimated %}~{% endif %}{{ inv.due_date|dutch_date }}</span>
+          <span class="agenda-supplier">{{ inv.supplier_name or "?" }}</span>
+          <span class="agenda-amount">{{ inv.amount_cents|euros }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">Niets binnen 14 dagen.</p>
+      {% endif %}
+    </div>
+    <div class="panel panel-dark">
+      <h2>Koppelingen &amp; status</h2>
+      <ul class="status-line-list">
+        {% for line in status_lines %}
+        <li class="status-line{% if not line.ok %} status-line-error{% endif %}">{{ line.text }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
 </section>
 
 <section class="upload-box">
@@ -65,7 +135,7 @@
   {% elif cs_upload_new is not none %}
   <div class="banner banner-ok">✅ {{ cs_upload_new }} verkoopfactu(u)r(en) toegevoegd.</div>
   {% endif %}
-  <form method="post" action="/cyclesoftware/upload" enctype="multipart/form-data" class="filter-form">
+  <form method="post" action="/cyclesoftware/upload" enctype="multipart/form-data" class="filter-form" id="cyclesoftware">
     <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
     <input type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
     <button type="submit" class="btn btn-secondary">CycleSoftware verkoopfacturen uploaden</button>
@@ -74,7 +144,7 @@
 </section>
 
 <section id="nog-te-betalen">
-  <h2>Nog te betalen ({{ te_betalen|length }})</h2>
+  <h2>Nog te betalen ({{ counters.nog_te_betalen }})</h2>
   <p class="hint">Openstaande inkoopfacturen die je zelf moet overmaken (geen incasso) -- gesorteerd op vervaldatum. Een vervaldatum met "~" is geschat (niet letterlijk op de factuur gevonden).</p>
   {% if te_betalen %}
   <div class="table-scroll">
@@ -99,7 +169,7 @@
         <td class="actions">
           <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
-            <button class="btn btn-confirm">Betaald</button>
+            <button class="btn btn-confirm">Al betaald</button>
           </form>
           <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
@@ -111,6 +181,7 @@
     </tbody>
   </table>
   </div>
+  {{ pagination_links(betalen_pagination, "q=" ~ (q|urlencode) ~ "&maand=" ~ (maand|urlencode)) }}
   {% else %}
   <p class="empty">Niets om over te maken. 🎉</p>
   {% endif %}
@@ -182,12 +253,12 @@
   </table>
   </div>
   {% else %}
-  <p class="empty">Niets om te controleren.</p>
+  <p class="empty">Niets te controleren.</p>
   {% endif %}
 </section>
 
 <section id="betalingen-zonder-factuur">
-  <h2>Betalingen zonder factuur ({{ unmatched_transactions|length }})</h2>
+  <h2>Betalingen zonder factuur ({{ counters.betalingen_zonder_factuur }})</h2>
   {% if unmatched_transactions %}
   <div class="table-scroll">
   <table>
@@ -204,14 +275,12 @@
           {% if t.description %}<br><small class="muted-text">{{ t.description }}</small>{% endif %}
         </td>
         <td>
-          <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form">
+          <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form invoice-picker" data-amount-cents="{{ t.amount_cents }}">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
-            <select name="invoice_ids" multiple size="3">
-              {% for inv in all_open_invoices %}
-              <option value="{{ inv.id }}">{{ inv.supplier_name }} &ndash; {{ inv.invoice_number or "geen nr" }} ({{ inv.amount_cents|euros }})</option>
-              {% endfor %}
-            </select>
-            <button class="btn btn-secondary" type="submit">Koppel</button>
+            <div class="invoice-picker-chips"></div>
+            <input type="text" class="invoice-picker-search" placeholder="Zoek op leverancier of factuurnummer..." autocomplete="off">
+            <div class="invoice-picker-results" hidden></div>
+            <button class="btn btn-secondary" type="submit" disabled>Koppel</button>
           </form>
         </td>
         <td class="actions">
@@ -231,13 +300,14 @@
     </tbody>
   </table>
   </div>
+  {{ pagination_links(tx_pagination, "q=" ~ (q|urlencode) ~ "&maand=" ~ (maand|urlencode) ~ "&inv_page=" ~ inv_pagination.page) }}
   {% else %}
   <p class="empty">Alle betalingen zijn gekoppeld. 🎉</p>
   {% endif %}
 </section>
 
 <section id="facturen-niet-betaald">
-  <h2>Facturen nog niet betaald ({{ unmatched_invoices|length }})</h2>
+  <h2>Facturen nog niet betaald ({{ counters.facturen_niet_betaald }})</h2>
   {% if unmatched_invoices %}
   <div class="table-scroll">
   <table>
@@ -272,6 +342,7 @@
     </tbody>
   </table>
   </div>
+  {{ pagination_links(inv_pagination, "q=" ~ (q|urlencode) ~ "&maand=" ~ (maand|urlencode) ~ "&tx_page=" ~ tx_pagination.page) }}
   {% else %}
   <p class="empty">Geen openstaande facturen.</p>
   {% endif %}
@@ -347,7 +418,7 @@
 </section>
 
 <section id="niet-naar-basecone">
-  <h2>Niet naar Basecone ({{ basecone_todo|length }})</h2>
+  <h2>Niet naar Basecone ({{ counters.niet_naar_basecone }})</h2>
   <p class="hint">Deze facturen/creditnota's zijn nog niet naar de boekhouder (Basecone) gestuurd. Zonder dat ziet de accountant het document niet, ook al staat het hier als "gekoppeld".</p>
   {% if basecone_todo %}
   <form method="post" action="/invoices/forward-to-basecone-bulk">
@@ -378,6 +449,7 @@
     </div>
     <button class="btn btn-primary" type="submit">Stuur geselecteerde naar Basecone</button>
   </form>
+  {{ pagination_links(basecone_pagination, "q=" ~ (q|urlencode) ~ "&maand=" ~ (maand|urlencode)) }}
   {% else %}
   <p class="empty">Alles wat we konden versturen staat al in Basecone. 🎉</p>
   {% endif %}
@@ -444,7 +516,7 @@
   {% endif %}
 </section>
 
-<section class="status-bar status-bar-footer">
+<section class="status-bar status-bar-footer" id="status">
   <span class="status-bar-title">Technisch</span>
   <span class="status-chip">
     <span class="status-dot status-{{ status_bar.email_status }}"></span> E-mail
@@ -467,6 +539,9 @@
       &mdash; laatst gesynchroniseerd door Ponto {{ status_bar.ponto_synced_label }}
     {% else %}
       &mdash; nog niet gesynchroniseerd
+    {% endif %}
+    {% if status_bar.ponto_error_hint %}
+    <br><span class="status-error">&#9888; {{ status_bar.ponto_error_hint }}</span>
     {% endif %}
   </span>
   <form method="post" action="/bank/ponto/refresh" class="inline-form">

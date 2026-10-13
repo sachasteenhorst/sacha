@@ -425,3 +425,52 @@ def test_find_matching_transaction_ignores_already_reconciled_rows(session):
         counterparty_iban="NL00RABO0123456789", counterparty_name="Kruitbosch",
     )
     assert match is None
+
+
+# -- network failures must become PontoError, never crash the job silently --
+# Real production bug: a plain requests.RequestException (connection reset,
+# DNS failure, timeout) wasn't a PontoError, so it propagated straight out
+# of run_ponto_sync past every "except PontoError" handler -- the scheduled
+# job crashed every single run, _state.last_read_at was never set, and the
+# dashboard's "Bank: Ponto" chip sat on "nog niet gesynchroniseerd" forever
+# with no error shown anywhere.
+
+def test_connection_error_fetching_accounts_becomes_a_ponto_error(session, monkeypatch):
+    def fake_request(method, url, headers=None, timeout=None, params=None, json=None):
+        raise bank_ponto.requests.exceptions.ConnectionError("Name or service not known")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", _fake_token_post)
+    monkeypatch.setattr(bank_ponto.requests, "request", fake_request)
+
+    result = run_ponto_sync(session)
+
+    assert result.errors  # recorded, not raised
+    assert bank_ponto.get_state().last_error is not None
+    assert session.query(Transaction).count() == 0
+
+
+def test_connection_error_fetching_token_becomes_a_ponto_error(session, monkeypatch):
+    def failing_token_post(url, data=None, auth=None, timeout=None):
+        raise bank_ponto.requests.exceptions.ConnectTimeout("timed out")
+
+    monkeypatch.setattr(bank_ponto.requests, "post", failing_token_post)
+
+    result = run_ponto_sync(session)
+
+    assert result.errors
+    assert bank_ponto.get_state().last_error is not None
+
+
+def test_ponto_error_hint_for_connection_failure():
+    hint = bank_ponto.ponto_error_hint("Ponto niet bereikbaar (GET /accounts): Connection refused")
+    assert "netwerk" in hint.lower() or "dns" in hint.lower() or "verbinding" in hint.lower()
+
+
+def test_ponto_error_hint_for_auth_failure():
+    hint = bank_ponto.ponto_error_hint("Ponto API-fout (401) bij GET /accounts: invalid_client")
+    assert "autorisatie" in hint.lower()
+
+
+def test_ponto_error_hint_none_when_no_error():
+    assert bank_ponto.ponto_error_hint(None) is None
+    assert bank_ponto.ponto_error_hint("") is None
