@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -25,13 +25,25 @@ from sqlalchemy.orm import Session
 from app import sync_state
 from app.bank_ponto import PontoError, get_state as get_ponto_state
 from app.bank_ponto import ponto_configured, ponto_error_hint, run_manual_ponto_refresh
+from app.mail_labels import get_state as get_label_state
+from app.mail_labels import label_error_hint
 from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
 from app.config import settings
 from app.cyclesoftware_upload import CycleSoftwareImportError, import_sales_invoices
 from app.db import get_session, init_db
 from app.email_client import INVOICE_DIR, REFRESH_TOKEN_FILE, GraphApiError, GraphAuthError
 from app.matcher import _transaction_direction, run_matching
-from app.models import BaseconeForwardStatus, Invoice, Match, MatchMethod, MatchStatus, Rule, RuleAction, Transaction
+from app.models import (
+    BaseconeForwardStatus,
+    Invoice,
+    LearnedIncassoSupplier,
+    Match,
+    MatchMethod,
+    MatchStatus,
+    Rule,
+    RuleAction,
+    Transaction,
+)
 from app.notify import send_test_notification
 from app.payments import days_until_due, get_payable_invoices, learn_incasso_supplier, mark_paid
 from app.rules import apply_rules
@@ -161,10 +173,47 @@ def _paginate(items: list, page_param: str, request: Request) -> tuple[list, dic
     return items[start:start + PAGE_SIZE], pagination
 
 
-def _dashboard_redirect(q: str = "", maand: str = "", **extra: str) -> RedirectResponse:
+def _dashboard_redirect(q: str = "", maand: str = "", anchor: str | None = None, **extra: str) -> RedirectResponse:
     params = {k: v for k, v in {"q": q, "maand": maand, **extra}.items() if v}
     url = "/dashboard" + (f"?{urlencode(params)}" if params else "")
+    if anchor:
+        url += anchor
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+def _is_ajax(request: Request) -> bool:
+    """Set by static/app.js on every list-action form submit it intercepts
+    -- lets a mutating route skip the redirect (and the full-page reload
+    that comes with it, which is what used to throw you back to the top of
+    the page) and just confirm success instead."""
+    return request.headers.get("x-requested-with") == "fetch"
+
+
+def _next_anchor(ids: list[int], current_id: int, prefix: str, section_id: str) -> str:
+    """Where a list-action's redirect should land: the id of the row right
+    after the one just acted on (so clicking an action and landing back in
+    the same spot, ready for the next one, works even with JavaScript
+    turned off) -- or the section itself if this was the last row, or the
+    row was already gone from the list by the time this ran."""
+    try:
+        idx = ids.index(current_id)
+    except ValueError:
+        return f"#{section_id}"
+    if idx + 1 < len(ids):
+        return f"#row-{prefix}-{ids[idx + 1]}"
+    return f"#{section_id}"
+
+
+def _action_response(
+    request: Request, q: str = "", maand: str = "", *, anchor: str | None = None, **extra: str
+):
+    """What every list-row action route returns: a tiny JSON ack for the
+    JS-driven path (see static/app.js), or the normal redirect-with-anchor
+    otherwise -- same anchor-to-the-next-row behaviour either way, so this
+    degrades gracefully with JavaScript off."""
+    if _is_ajax(request):
+        return JSONResponse({"ok": True})
+    return _dashboard_redirect(q, maand, anchor=anchor, **extra)
 
 
 def _parse_amount_query(q: str) -> int | None:
@@ -286,6 +335,20 @@ def _monthly_progress(session: Session) -> list[dict]:
             }
         )
     return result
+
+
+def _relabel_invoice_best_effort(invoice: Invoice) -> None:
+    """Best-effort Outlook-category update after a manual dashboard action
+    that changes an invoice's desired label (currently: "Negeren") --
+    mirrors app.basecone_forward._relabel_after_basecone_change. Never
+    raises: a label-permission problem must never block the dashboard
+    action that triggered it, only show up in the status bar."""
+    from app.mail_labels import GraphApiError, GraphAuthError, note_single_label_error, set_invoice_category
+
+    try:
+        set_invoice_category(invoice)
+    except (GraphAuthError, GraphApiError) as exc:
+        note_single_label_error(str(exc))
 
 
 def _dot_status(configured: bool, error: str | None) -> str:
@@ -458,6 +521,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         ponto_state.last_ponto_synchronized_at.astimezone(ZoneInfo("Europe/Amsterdam")).strftime("%d-%m-%Y %H:%M")
         if ponto_state.last_ponto_synchronized_at else None
     )
+    label_state = get_label_state()
 
     status_bar = {
         "email_status": _dot_status(email_configured, last.email_error),
@@ -473,6 +537,8 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "ponto_status": _dot_status(ponto_state.last_read_at is not None, ponto_state.last_error),
         "ponto_synced_label": ponto_synced_label,
         "ponto_error_hint": ponto_error_hint(ponto_state.last_error),
+        "label_status": _dot_status(email_configured, label_state.last_error),
+        "label_error_hint": label_error_hint(label_state.last_error),
     }
 
     # -- Month dropdown options --
@@ -715,9 +781,17 @@ def refresh_ponto(
     return _dashboard_redirect(q, maand, upload_new=str(result.new_transactions))
 
 
+def _suggested_group_ids(session: Session, q: str, maand: str) -> list[str]:
+    suggested_matches_all = list(
+        session.scalars(select(Match).where(Match.confirmed.is_(False)).order_by(Match.created_at.desc()))
+    )
+    return [group[0].group_id for group in _group_and_filter_matches(suggested_matches_all, q, maand)]
+
+
 @app.post("/match-groups/{group_id}/confirm")
 def confirm_match_group(
     group_id: str,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -726,17 +800,19 @@ def confirm_match_group(
     matches = list(session.scalars(select(Match).where(Match.group_id == group_id)))
     if not matches:
         raise HTTPException(404, "Match niet gevonden")
+    anchor = _next_anchor(_suggested_group_ids(session, q, maand), group_id, "suggested", "te-controleren")
     for m in matches:
         m.confirmed = True
         m.invoice.status = MatchStatus.MATCHED
     matches[0].transaction.status = MatchStatus.MATCHED
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/match-groups/{group_id}/reject")
 def reject_match_group(
     group_id: str,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -745,18 +821,29 @@ def reject_match_group(
     matches = list(session.scalars(select(Match).where(Match.group_id == group_id)))
     if not matches:
         raise HTTPException(404, "Match niet gevonden")
+    anchor = _next_anchor(_suggested_group_ids(session, q, maand), group_id, "suggested", "te-controleren")
     transaction = matches[0].transaction
     for m in matches:
         m.invoice.status = MatchStatus.UNMATCHED
         session.delete(m)
     transaction.status = MatchStatus.UNMATCHED
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
+
+
+def _unmatched_transaction_ids(session: Session, q: str, maand: str) -> list[int]:
+    all_unmatched = list(
+        session.scalars(
+            select(Transaction).where(Transaction.status == MatchStatus.UNMATCHED).order_by(Transaction.booking_date.desc())
+        )
+    )
+    return [t.id for t in _filter_transactions(all_unmatched, q, maand)]
 
 
 @app.post("/transactions/{transaction_id}/match")
 def manual_match(
     transaction_id: int,
+    request: Request,
     invoice_ids: list[int] = Form(...),
     q: str = Form(""),
     maand: str = Form(""),
@@ -769,6 +856,7 @@ def manual_match(
     invoices = [session.get(Invoice, invoice_id) for invoice_id in invoice_ids]
     if not invoices or any(inv is None for inv in invoices):
         raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_unmatched_transaction_ids(session, q, maand), transaction_id, "tx-unmatched", "betalingen-zonder-factuur")
 
     for m in list(transaction.matches):
         if not m.confirmed:
@@ -790,12 +878,13 @@ def manual_match(
         invoice.status = MatchStatus.MATCHED
     transaction.status = MatchStatus.MATCHED
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/transactions/{transaction_id}/ignore")
 def ignore_transaction(
     transaction_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -804,14 +893,16 @@ def ignore_transaction(
     transaction = session.get(Transaction, transaction_id)
     if transaction is None:
         raise HTTPException(404, "Transactie niet gevonden")
+    anchor = _next_anchor(_unmatched_transaction_ids(session, q, maand), transaction_id, "tx-unmatched", "betalingen-zonder-factuur")
     transaction.status = MatchStatus.IGNORED
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/transactions/{transaction_id}/receipt-in-basecone")
 def receipt_in_basecone(
     transaction_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -820,14 +911,27 @@ def receipt_in_basecone(
     transaction = session.get(Transaction, transaction_id)
     if transaction is None:
         raise HTTPException(404, "Transactie niet gevonden")
+    anchor = _next_anchor(_unmatched_transaction_ids(session, q, maand), transaction_id, "tx-unmatched", "betalingen-zonder-factuur")
     transaction.status = MatchStatus.RECEIPT_ELSEWHERE
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
+
+
+def _unmatched_invoice_ids(session: Session, q: str, maand: str) -> list[int]:
+    all_unmatched = list(
+        session.scalars(select(Invoice).where(Invoice.status == MatchStatus.UNMATCHED).order_by(Invoice.received_at.desc()))
+    )
+    return [i.id for i in _filter_invoices(all_unmatched, q, maand)]
+
+
+def _te_betalen_ids(session: Session) -> list[int]:
+    return [inv.id for inv in get_payable_invoices(session)]
 
 
 @app.post("/invoices/{invoice_id}/ignore")
 def ignore_invoice(
     invoice_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -836,15 +940,18 @@ def ignore_invoice(
     invoice = session.get(Invoice, invoice_id)
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_unmatched_invoice_ids(session, q, maand), invoice_id, "inv-unmatched", "facturen-niet-betaald")
     invoice.status = MatchStatus.IGNORED
     invoice.manually_ignored = True
+    _relabel_invoice_best_effort(invoice)
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/invoices/{invoice_id}/mark-paid")
 def mark_invoice_paid(
     invoice_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -853,14 +960,16 @@ def mark_invoice_paid(
     invoice = session.get(Invoice, invoice_id)
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_te_betalen_ids(session), invoice_id, "te-betalen", "nog-te-betalen")
     mark_paid(invoice)
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/invoices/{invoice_id}/mark-incasso")
 def mark_invoice_incasso(
     invoice_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -869,9 +978,10 @@ def mark_invoice_incasso(
     invoice = session.get(Invoice, invoice_id)
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_te_betalen_ids(session), invoice_id, "te-betalen", "nog-te-betalen")
     learn_incasso_supplier(session, invoice.supplier_name)
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.post("/notify/test")
@@ -901,9 +1011,17 @@ async def upload_cyclesoftware_export(
     return _dashboard_redirect(q, maand, cs_upload_new=str(result.new_invoices))
 
 
+def _rule_handled_ids(session: Session, q: str, maand: str) -> list[int]:
+    all_handled = list(
+        session.scalars(select(Transaction).where(Transaction.status == MatchStatus.RULE_HANDLED).order_by(Transaction.booking_date.desc()))
+    )
+    return [t.id for t in _filter_transactions(all_handled, q, maand)]
+
+
 @app.post("/transactions/{transaction_id}/undo-rule")
 def undo_rule(
     transaction_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -912,10 +1030,11 @@ def undo_rule(
     transaction = session.get(Transaction, transaction_id)
     if transaction is None:
         raise HTTPException(404, "Transactie niet gevonden")
+    anchor = _next_anchor(_rule_handled_ids(session, q, maand), transaction_id, "rule-handled", "automatisch-afgehandeld")
     transaction.status = MatchStatus.UNMATCHED
     transaction.applied_rule_id = None
     session.commit()
-    return _dashboard_redirect(q, maand)
+    return _action_response(request, q, maand, anchor=anchor)
 
 
 @app.get("/regels")
@@ -934,6 +1053,7 @@ def rules_page(request: Request, user: str = Depends(require_auth), session: Ses
             .group_by(Transaction.applied_rule_id)
         ).all()
     )
+    learned_incasso = list(session.scalars(select(LearnedIncassoSupplier).order_by(LearnedIncassoSupplier.supplier_name_lower)))
     return templates.TemplateResponse(
         "rules.html",
         {
@@ -945,8 +1065,30 @@ def rules_page(request: Request, user: str = Depends(require_auth), session: Ses
             "prefill": prefill,
             "notify_test": request.query_params.get("notify_test"),
             "ntfy_configured": bool(settings.ntfy_topic),
+            "pay_incasso_suppliers": settings.pay_incasso_suppliers,
+            "learned_incasso": learned_incasso,
+            "incoming_suppliers": settings.incoming_suppliers,
         },
     )
+
+
+@app.post("/leveranciers/incasso/{supplier_id}/delete")
+def delete_learned_incasso_supplier(
+    supplier_id: int,
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    """Removes a supplier from LearnedIncassoSupplier (the "Loopt via
+    incasso" dashboard button's persistent list) -- never touches
+    PAY_INCASSO_SUPPLIERS (that's an env/deploy-time setting, not a runtime
+    one). A supplier removed here is only recognised as incasso again by a
+    future "Loopt via incasso" click, or via its own PAY_INCASSO_SUPPLIERS
+    entry if it has one."""
+    supplier = session.get(LearnedIncassoSupplier, supplier_id)
+    if supplier is not None:
+        session.delete(supplier)
+        session.commit()
+    return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/regels")
@@ -1000,9 +1142,19 @@ def delete_rule(rule_id: int, user: str = Depends(require_auth), session: Sessio
     return RedirectResponse(url="/regels", status_code=status.HTTP_303_SEE_OTHER)
 
 
+def _basecone_pending_ids(session: Session) -> list[int]:
+    return [
+        inv.id for inv in session.scalars(
+            select(Invoice).where(Invoice.in_basecone != BaseconeForwardStatus.YES.value).order_by(Invoice.received_at.asc())
+        )
+        if is_forwardable(inv)
+    ]
+
+
 @app.post("/invoices/{invoice_id}/forward-to-basecone")
 def forward_to_basecone(
     invoice_id: int,
+    request: Request,
     q: str = Form(""),
     maand: str = Form(""),
     user: str = Depends(require_auth),
@@ -1011,13 +1163,21 @@ def forward_to_basecone(
     invoice = session.get(Invoice, invoice_id)
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
+    # Both "Niet naar Basecone" (confident) and "Controleer eerst" post to
+    # this same route -- the pending list covers both, so this works as the
+    # next-anchor regardless of which section the click came from.
+    anchor = _next_anchor(_basecone_pending_ids(session), invoice_id, "basecone-pending", "niet-naar-basecone")
     try:
         send_invoice_to_basecone(invoice, method="manual")
     except (GraphAuthError, GraphApiError) as exc:
         session.rollback()
+        if _is_ajax(request):
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
         return _dashboard_redirect(q, maand, forward_error=str(exc))
     session.commit()
-    return _dashboard_redirect(q, maand, forward_ok="1")
+    if _is_ajax(request):
+        return JSONResponse({"ok": True})
+    return _dashboard_redirect(q, maand, anchor=anchor, forward_ok="1")
 
 
 @app.post("/invoices/forward-to-basecone-bulk")

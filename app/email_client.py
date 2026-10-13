@@ -496,6 +496,28 @@ def _assign_direction(supplier_name: str) -> str:
     return Direction.OUTGOING.value
 
 
+def reclassify_incoming_suppliers(session) -> int:
+    """Retroactively flips an invoice's direction to "incoming" if a
+    supplier was added to INCOMING_SUPPLIERS after some of its documents
+    were already ingested (real case: King verzekering/"Betalingscentrum
+    King" -- their payout notifications were stored as regular outgoing
+    inkoopfacturen before this setting existed). Only ever flips
+    outgoing -> incoming, never the reverse, and only touches a row whose
+    stored direction doesn't already match what _assign_direction would
+    give it today -- safe to call on every startup. Returns how many rows
+    changed."""
+    from sqlalchemy import select
+
+    from app.models import Direction, Invoice
+
+    changed = 0
+    for invoice in session.scalars(select(Invoice).where(Invoice.direction == Direction.OUTGOING.value)):
+        if _assign_direction(invoice.supplier_name) == Direction.INCOMING.value:
+            invoice.direction = Direction.INCOMING.value
+            changed += 1
+    return changed
+
+
 def _base_domain(domain: str) -> str:
     domain = domain.lower().strip()
     if domain.startswith("www."):
@@ -652,7 +674,20 @@ def _extract_fields(
 # switched off until that one manual step happens.
 GRAPH_READ_SCOPES = "https://graph.microsoft.com/Mail.Read.Shared"
 GRAPH_SEND_SCOPES = "https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Send.Shared"
-GRAPH_SCOPES = f"{GRAPH_READ_SCOPES} {GRAPH_SEND_SCOPES} offline_access"
+# Mail.ReadWrite.Shared: needed to PATCH a message's categories in a shared
+# mailbox (facturen@/info@) -- same "Shared" delegated-permission family as
+# Mail.Send.Shared above, so the existing Full Access delegate rights on
+# those mailboxes should cover it the same way. MailboxSettings.ReadWrite:
+# needed for the masterCategories list (so a category gets its intended
+# color) -- UNVERIFIED against a real shared mailbox as of writing (there is
+# no documented ".Shared" variant of this scope), so
+# app/mail_labels.py's ensure_categories_exist() treats a failure here as
+# non-fatal and keeps going (a category Outlook doesn't recognise yet in
+# masterCategories still gets applied to the message, just without the
+# intended color until it's registered -- by this call succeeding later, or
+# by creating it once by hand directly in Outlook).
+GRAPH_LABEL_SCOPES = "https://graph.microsoft.com/Mail.ReadWrite.Shared https://graph.microsoft.com/MailboxSettings.ReadWrite"
+GRAPH_SCOPES = f"{GRAPH_READ_SCOPES} {GRAPH_SEND_SCOPES} {GRAPH_LABEL_SCOPES} offline_access"
 REFRESH_TOKEN_FILE = "./data/graph_refresh_token.txt"
 
 
@@ -661,6 +696,7 @@ class _GraphAuth:
         self._access_token: str | None = None
         self._expires_at: float = 0.0
         self._has_send_scope: bool = False
+        self._has_label_scope: bool = False
 
     @staticmethod
     def _read_refresh_token() -> str | None:
@@ -701,15 +737,21 @@ class _GraphAuth:
         # left out here.
         token_url = f"https://login.microsoftonline.com/{settings.graph_tenant_id}/oauth2/v2.0/token"
 
-        # Try the full scope (read + send) first; an OLDER refresh token that
-        # was only ever consented for Mail.Read.Shared gets rejected for
-        # that, so fall back to read-only -- this is what keeps an upgrade
-        # from breaking an already-working sync (see the comment on
-        # GRAPH_SCOPES above). self._sent_scope records which one actually
-        # won, so callers that need to send can tell whether that's even
-        # possible with the current consent before trying.
+        # Try the full scope (read + send + label-write) first; an OLDER
+        # refresh token that was only ever consented for a narrower set gets
+        # rejected for that, so fall back progressively -- this is what
+        # keeps an upgrade from breaking an already-working sync (see the
+        # comment on GRAPH_SCOPES above). self._has_send_scope/
+        # _has_label_scope record which tier actually won, so callers that
+        # need to send/label can tell whether that's even possible with the
+        # current consent before trying.
         response = None
-        for scope, granted_send in ((GRAPH_SCOPES, True), (f"{GRAPH_READ_SCOPES} offline_access", False)):
+        scope_tiers = (
+            (GRAPH_SCOPES, True, True),
+            (f"{GRAPH_READ_SCOPES} {GRAPH_SEND_SCOPES} offline_access", True, False),
+            (f"{GRAPH_READ_SCOPES} offline_access", False, False),
+        )
+        for scope, granted_send, granted_label in scope_tiers:
             data = {
                 "grant_type": "refresh_token",
                 "client_id": settings.graph_client_id,
@@ -719,6 +761,7 @@ class _GraphAuth:
             response = requests.post(token_url, data=data, timeout=30)
             if response.status_code == 200:
                 self._has_send_scope = granted_send
+                self._has_label_scope = granted_label
                 break
 
         if response is None or response.status_code != 200:
@@ -744,6 +787,13 @@ class _GraphAuth:
         self.token()
         return self._has_send_scope
 
+    def has_label_scope(self) -> bool:
+        """Whether the current refresh token actually got
+        Mail.ReadWrite.Shared/MailboxSettings.ReadWrite consent -- see
+        app/mail_labels.py."""
+        self.token()
+        return self._has_label_scope
+
 
 _auth = _GraphAuth()
 
@@ -754,6 +804,38 @@ def _graph_get(url: str, params: dict | None = None) -> dict:
     if response.status_code != 200:
         raise GraphApiError(f"Graph API-fout ({response.status_code}) bij {url}: {response.text}")
     return response.json()
+
+
+def _label_permission_hint(mailbox: str, status_code: int) -> str:
+    return (
+        f"Geen rechten om e-mails te labelen in {mailbox} (fout {status_code}) -- "
+        "de gedelegeerde permissie Mail.ReadWrite.Shared (en/of "
+        "MailboxSettings.ReadWrite) ontbreekt of is nog niet opnieuw "
+        "geconsenteerd. Voeg 'm toe in Entra en log opnieuw in met "
+        "scripts/graph_login.py (zie README)."
+    )
+
+
+def _graph_patch(url: str, json_body: dict) -> dict:
+    token = _auth.token()
+    response = requests.patch(url, headers={"Authorization": f"Bearer {token}"}, json=json_body, timeout=30)
+    if response.status_code == 403:
+        mailbox = url.split("/users/", 1)[-1].split("/", 1)[0] if "/users/" in url else "me"
+        raise GraphApiError(_label_permission_hint(mailbox, 403))
+    if response.status_code not in (200, 204):
+        raise GraphApiError(f"Graph API-fout ({response.status_code}) bij PATCH {url}: {response.text}")
+    return response.json() if response.content else {}
+
+
+def _graph_post(url: str, json_body: dict) -> dict:
+    token = _auth.token()
+    response = requests.post(url, headers={"Authorization": f"Bearer {token}"}, json=json_body, timeout=30)
+    if response.status_code == 403:
+        mailbox = url.split("/users/", 1)[-1].split("/", 1)[0] if "/users/" in url else "me"
+        raise GraphApiError(_label_permission_hint(mailbox, 403))
+    if response.status_code not in (200, 201):
+        raise GraphApiError(f"Graph API-fout ({response.status_code}) bij POST {url}: {response.text}")
+    return response.json() if response.content else {}
 
 
 def _list_messages_since(mailbox: str, since: date) -> list[dict]:

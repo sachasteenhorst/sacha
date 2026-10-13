@@ -80,4 +80,40 @@
   {% endif %}
 </section>
 
+<section id="leveranciersinstellingen">
+  <h2>Leveranciersinstellingen</h2>
+  <p class="hint">
+    Vast ingesteld (via env op de server, hier alleen zichtbaar): leveranciers op
+    <strong>PAY_INCASSO_SUPPLIERS</strong> betalen altijd via incasso (nooit in "Nog te
+    betalen"/pushmelding), leveranciers op <strong>INCOMING_SUPPLIERS</strong> zijn altijd een
+    ontvangst (nooit iets om te betalen).
+  </p>
+  <table class="muted">
+    <tr><td><strong>Incasso (vast)</strong></td><td>{{ pay_incasso_suppliers }}</td></tr>
+    <tr><td><strong>Altijd ontvangst (vast)</strong></td><td>{{ incoming_suppliers }}</td></tr>
+  </table>
+
+  <p class="hint" style="margin-top:1rem;">
+    Zelf geleerd (via de knop "Loopt via incasso" bij een factuur) -- hier te verwijderen:
+  </p>
+  {% if learned_incasso %}
+  <table class="muted">
+    <tbody>
+      {% for supplier in learned_incasso %}
+      <tr>
+        <td>{{ supplier.supplier_name_lower }}</td>
+        <td class="actions">
+          <form method="post" action="/leveranciers/incasso/{{ supplier.id }}/delete">
+            <button class="btn btn-reject">Verwijderen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Nog niets zelf geleerd.</p>
+  {% endif %}
+</section>
+
 {% endblock %}

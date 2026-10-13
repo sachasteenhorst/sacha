@@ -1,6 +1,6 @@
 """SQLAlchemy engine/session setup."""
 import os
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
@@ -42,6 +42,7 @@ _COLUMN_MIGRATIONS = {
         ("payment_method", "VARCHAR DEFAULT 'onbekend'"),
         ("paid_at", "DATETIME"),
         ("notified_new_invoice", "BOOLEAN DEFAULT 0"),
+        ("graph_category", "VARCHAR DEFAULT ''"),
     ],
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),
@@ -199,6 +200,46 @@ def _backfill_transaction_source() -> None:
             session.commit()
 
 
+def _backfill_known_incasso_suppliers() -> None:
+    """Suppliers confirmed to pay by direct debit AFTER some of their
+    invoices were already ingested need the same retroactive
+    reclassification the dashboard's "Loopt via incasso" button already
+    does by hand -- reuses app.payments.learn_incasso_supplier so that
+    logic lives in exactly one place. Gated per name (via
+    LearnedIncassoSupplier) so each name is only ever backfilled once, not
+    rescanned on every single startup forever. Add a name here when Sacha
+    confirms a supplier switched to incasso and some of its invoices
+    predate that (real case: Tenways)."""
+    from app.models import LearnedIncassoSupplier
+    from app.payments import learn_incasso_supplier
+
+    names_to_backfill = ["Tenways"]
+    with SessionLocal() as session:
+        changed = False
+        for name in names_to_backfill:
+            name_lower = name.strip().lower()
+            already_learned = session.scalar(
+                select(LearnedIncassoSupplier).where(LearnedIncassoSupplier.supplier_name_lower == name_lower)
+            )
+            if already_learned:
+                continue
+            learn_incasso_supplier(session, name)
+            changed = True
+        if changed:
+            session.commit()
+
+
+def _backfill_incoming_supplier_direction() -> None:
+    """See app.email_client.reclassify_incoming_suppliers -- runs every
+    startup, but only ever touches a row whose direction doesn't already
+    match today's INCOMING_SUPPLIERS config."""
+    from app.email_client import reclassify_incoming_suppliers
+
+    with SessionLocal() as session:
+        if reclassify_incoming_suppliers(session):
+            session.commit()
+
+
 def init_db() -> None:
     from app import models  # noqa: F401  (registers models on Base.metadata)
 
@@ -208,6 +249,8 @@ def init_db() -> None:
     _backfill_bank_code_from_raw_data()
     _backfill_notified_new_invoice()
     _backfill_transaction_source()
+    _backfill_known_incasso_suppliers()
+    _backfill_incoming_supplier_direction()
 
 
 def get_session():

@@ -17,6 +17,7 @@ from app.email_client import (
     _parse_amount_to_cents,
     _text_suggests_incasso,
     invoice_dedup_key,
+    reclassify_incoming_suppliers,
 )
 from app.models import Direction, DocumentKind
 
@@ -262,6 +263,19 @@ def test_direction_incoming_for_configured_suppliers():
     assert _assign_direction("ENRA") == Direction.INCOMING.value
     assert _assign_direction("HelloRider") == Direction.INCOMING.value
     assert _assign_direction("Mobility Services") == Direction.INCOMING.value
+
+
+def test_direction_incoming_for_king_verzekering_variants():
+    # King verzekering pays OUT to this shop -- never a bill to pay. The
+    # configured value is the full "Betalingscentrum King", not the bare
+    # "King", specifically so an unrelated supplier whose name merely
+    # CONTAINS "king" (e.g. "Parking B.V.") never false-matches -- a short
+    # extracted name that's itself a prefix of the configured value (e.g.
+    # just "King") still matches the other way around.
+    assert _assign_direction("St. Betalingscentrum King") == Direction.INCOMING.value
+    assert _assign_direction("Betalingscentrum King B.V.") == Direction.INCOMING.value
+    assert _assign_direction("King") == Direction.INCOMING.value
+    assert _assign_direction("Parking B.V.") == Direction.OUTGOING.value
 
 
 def test_mobility_services_lease_a_bike_invoice_is_incoming_with_amount():
@@ -526,3 +540,45 @@ def test_text_suggests_incasso_variants():
     assert _text_suggests_incasso("Betaling via automatische incasso.") is True
     assert _text_suggests_incasso("Machtiging tot incasso: NL68ZZZ010542980000") is True
     assert _text_suggests_incasso("Gewone factuur, graag overmaken binnen 30 dagen.") is False
+
+
+# -- reclassify_incoming_suppliers (retroactive backfill for a supplier
+# added to INCOMING_SUPPLIERS after some of its invoices already existed) --
+
+def test_reclassify_incoming_suppliers_flips_existing_king_invoices():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db import Base
+    from app.models import Invoice, MatchStatus, PaymentMethod
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    try:
+        king_invoice = Invoice(
+            email_message_id="<king-1>", attachment_filename="f.pdf",
+            received_at=datetime(2026, 9, 1), supplier_name="St. Betalingscentrum King",
+            amount_cents=5000, document_kind=DocumentKind.INVOICE.value,
+            direction=Direction.OUTGOING.value, status=MatchStatus.UNMATCHED,
+            payment_method=PaymentMethod.ONBEKEND.value,
+        )
+        other_invoice = Invoice(
+            email_message_id="<other-1>", attachment_filename="f.pdf",
+            received_at=datetime(2026, 9, 1), supplier_name="Kruitbosch",
+            amount_cents=5000, document_kind=DocumentKind.INVOICE.value,
+            direction=Direction.OUTGOING.value, status=MatchStatus.UNMATCHED,
+            payment_method=PaymentMethod.ONBEKEND.value,
+        )
+        session.add_all([king_invoice, other_invoice])
+        session.commit()
+
+        changed = reclassify_incoming_suppliers(session)
+        session.commit()
+
+        assert changed == 1
+        assert king_invoice.direction == Direction.INCOMING.value
+        assert other_invoice.direction == Direction.OUTGOING.value
+    finally:
+        session.close()

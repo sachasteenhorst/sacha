@@ -58,7 +58,10 @@ class Settings(BaseSettings):
     # issues to a leasing company (VWPFS) for a customer's lease bike, so
     # the IBAN in the document is this shop's OWN account: it's money
     # coming in, not a bill to pay.
-    incoming_suppliers: str = "ENRA,HelloRider,Mobility Services"
+    # "Betalingscentrum King" (not the bare "King" -- too short, would
+    # false-match unrelated suppliers like "Parking"/"Booking") is King
+    # verzekering's actual sender name: a payout, never a bill to pay.
+    incoming_suppliers: str = "ENRA,HelloRider,Mobility Services,Betalingscentrum King"
     # A REFERENCE match (invoice number found in the transaction description)
     # doesn't have to line up exactly on amount -- some suppliers (Kruitbosch,
     # Accell) settle for slightly less than invoiced (betalingskorting /
@@ -110,6 +113,9 @@ class Settings(BaseSettings):
     # Safety cap: an auto-forward sync run never sends more than this many
     # documents, so a config mistake can't spam the accountant's inbox.
     auto_forward_max_per_sync: int = 50
+    # Safety cap: a sync run never relabels more than this many e-mails
+    # (see app/mail_labels.py) -- same reasoning as AUTO_FORWARD_MAX_PER_SYNC.
+    mail_label_max_per_sync: int = 50
 
     @property
     def graph_mailboxes(self) -> list[str]:
@@ -156,7 +162,7 @@ class Settings(BaseSettings):
     # Machtigingskenmerk/Incassant ID -- see app/payments.py), or once Sacha
     # clicks "Loopt via incasso" in the dashboard (see
     # LearnedIncassoSupplier).
-    pay_incasso_suppliers: str = "Accell,Gazelle,Pon,Giant,Kruitbosch,Odido,Exact,ENRA"
+    pay_incasso_suppliers: str = "Accell,Gazelle,Pon,Giant,Kruitbosch,Odido,Exact,ENRA,Tenways"
     # Override: suppliers here are NEVER treated as incasso, even if they're
     # on PAY_INCASSO_SUPPLIERS or a matching bank transaction looks like a
     # direct debit -- for the rare case a supplier switched from incasso to

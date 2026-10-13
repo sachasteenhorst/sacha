@@ -128,3 +128,24 @@ def test_search_options_falls_back_to_amount_when_no_query(client, session_facto
 def test_search_options_requires_auth(client):
     response = client.get("/invoices/search-options")
     assert response.status_code == 401
+
+
+def test_ignore_invoice_relabels_best_effort(client, session_factory, monkeypatch):
+    with session_factory() as s:
+        inv = Invoice(
+            email_message_id="<ignore-1>", attachment_filename="f.pdf",
+            received_at=datetime(2026, 9, 1), supplier_name="Kruitbosch",
+            amount_cents=5000, document_kind=DocumentKind.INVOICE.value,
+            status=MatchStatus.UNMATCHED, graph_message_id="msg-1",
+        )
+        s.add(inv)
+        s.commit()
+        inv_id = inv.id
+
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    response = client.post(f"/invoices/{inv_id}/ignore", data={}, auth=AUTH)
+
+    assert response.status_code in (200, 303, 307)
+    assert calls == [inv_id]

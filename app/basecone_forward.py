@@ -180,8 +180,24 @@ def send_invoice_to_basecone(invoice: Invoice, method: str) -> None:
         invoice.basecone_forwarded_at = datetime.utcnow()
         invoice.basecone_forward_method = method
         invoice.basecone_forwarded_to = settings.basecone_forward_address
+        _relabel_after_basecone_change(invoice)
         return
     raise last_error or GraphApiError("Versturen mislukt.")
+
+
+def _relabel_after_basecone_change(invoice: Invoice) -> None:
+    """Best-effort: a label update must never make an otherwise-successful
+    Basecone action look like it failed, and never block/raise -- deferred
+    import to avoid a circular import (app.mail_labels itself imports
+    is_forwardable from this module)."""
+    from app.mail_labels import GraphApiError as LabelGraphApiError
+    from app.mail_labels import GraphAuthError as LabelGraphAuthError
+    from app.mail_labels import note_single_label_error, set_invoice_category
+
+    try:
+        set_invoice_category(invoice)
+    except (LabelGraphAuthError, LabelGraphApiError) as exc:
+        note_single_label_error(str(exc))
 
 
 @dataclass
@@ -275,5 +291,6 @@ def check_backlog_against_sent_items(session: Session) -> int:
         if matched_subject or matched_filename:
             invoice.in_basecone = BaseconeForwardStatus.YES.value
             invoice.basecone_forward_method = "detected"
+            _relabel_after_basecone_change(invoice)
             updated += 1
     return updated

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.bank_import import BankImportError, parse_bank_file
 from app.basecone_client import BaseconeClient
 from app.basecone_forward import auto_forward_new_invoices, check_backlog_against_sent_items
+from app.mail_labels import invoices_needing_relabel, record_label_errors, relabel_invoices
 from app.config import settings
 from app.email_client import fetch_invoice_attachments, invoice_dedup_key
 from app.matcher import MatchingSummary, retro_match_overdue_invoices, run_matching
@@ -27,6 +28,7 @@ class SyncResult:
     new_transactions: int = 0
     new_invoices: int = 0
     basecone_auto_forwarded: int = 0
+    mails_relabeled: int = 0
     errors: list[str] = None
     matching: MatchingSummary | None = None
 
@@ -238,6 +240,22 @@ def run_sync(session: Session) -> SyncResult:
     except Exception as exc:  # noqa: BLE001 -- surface any Basecone-forward error to the dashboard
         session.rollback()
         result.errors.append(f"Basecone doorsturen: {exc}")
+
+    # Periodic label touch-up: picks up anything the per-action hooks in
+    # app.basecone_forward/app.main missed (e.g. a backlog invoice whose
+    # category was never set at all) -- cheap, since
+    # invoices_needing_relabel already filters down to only the ones whose
+    # label actually needs to change. Never lets a Graph/permission problem
+    # here abort the rest of the sync either.
+    try:
+        label_result = relabel_invoices(invoices_needing_relabel(session, limit=settings.mail_label_max_per_sync))
+        result.mails_relabeled = label_result.updated
+        result.errors.extend(label_result.errors)
+        record_label_errors(label_result.errors)
+        session.commit()
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        result.errors.append(f"E-mail labelen: {exc}")
 
     sync_state.record(result)
     return result

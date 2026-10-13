@@ -176,3 +176,55 @@ def test_backfill_transaction_source_leaves_real_csv_rows_alone(isolated_session
     with Session() as session:
         tx = session.get(Transaction, tx_id)
         assert tx.source == "csv"
+
+
+# -- known-supplier backfills (Tenways incasso, King incoming) --
+
+def test_backfill_known_incasso_suppliers_reclassifies_tenways(isolated_session_local):
+    from app.models import LearnedIncassoSupplier, PaymentMethod
+
+    Session = isolated_session_local
+    with Session() as session:
+        inv = make_invoice(supplier_name="Van Lotringen - Tenways", payment_method=PaymentMethod.ONBEKEND.value)
+        session.add(inv)
+        session.commit()
+        inv_id = inv.id
+
+    db_module._backfill_known_incasso_suppliers()
+
+    with Session() as session:
+        inv = session.get(Invoice, inv_id)
+        assert inv.payment_method == PaymentMethod.INCASSO.value
+        assert session.query(LearnedIncassoSupplier).filter(
+            LearnedIncassoSupplier.supplier_name_lower == "tenways"
+        ).count() == 1
+
+
+def test_backfill_known_incasso_suppliers_runs_only_once(isolated_session_local):
+    from app.models import LearnedIncassoSupplier
+
+    Session = isolated_session_local
+    db_module._backfill_known_incasso_suppliers()
+    db_module._backfill_known_incasso_suppliers()  # must not duplicate
+
+    with Session() as session:
+        assert session.query(LearnedIncassoSupplier).filter(
+            LearnedIncassoSupplier.supplier_name_lower == "tenways"
+        ).count() == 1
+
+
+def test_backfill_incoming_supplier_direction_flips_king(isolated_session_local):
+    from app.models import Direction
+
+    Session = isolated_session_local
+    with Session() as session:
+        inv = make_invoice(supplier_name="St. Betalingscentrum King", direction=Direction.OUTGOING.value)
+        session.add(inv)
+        session.commit()
+        inv_id = inv.id
+
+    db_module._backfill_incoming_supplier_direction()
+
+    with Session() as session:
+        inv = session.get(Invoice, inv_id)
+        assert inv.direction == Direction.INCOMING.value

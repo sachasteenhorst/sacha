@@ -273,6 +273,70 @@ moet inloggen met `scripts/graph_login.py`. Zonder die permissie blijft al
 het andere gewoon werken; de doorstuur-knop toont dan een duidelijke
 melding in plaats van te crashen.
 
+## E-maillabels (Outlook-categorieën)
+
+Elke factuurmail in `facturen@`/`info@` krijgt automatisch een Outlook-categorie,
+zodat je bij het openen van de mail zelf -- zonder naar het dashboard te
+hoeven wisselen -- meteen ziet of hij al naar Basecone is:
+
+- **"Basecone ✓"** (groen) -- al naar Basecone gestuurd.
+- **"Nog naar Basecone"** (oranje) -- een open inkoopfactuur/specificatie
+  die nog verstuurd moet worden.
+- **"Geen factuur"** (grijs) -- alles wat nooit naar Basecone gaat:
+  algemene post, een handmatig genegeerd document, of een
+  CycleSoftware/Lease a Bike-achtige verkoopkopie (zie "Basecone
+  doorsturen" hierboven).
+
+Je eigen bestaande categorieën op een mail blijven altijd staan -- dit zet
+alleen zijn eigen label erbij (of vervangt het eigen vorige label), nooit
+iets anders.
+
+**Wanneer het label wordt bijgewerkt:**
+- Meteen na een geslaagde "Stuur naar Basecone" (automatisch of via de
+  knop) -- wordt "Basecone ✓".
+- Meteen bij "Negeren" in het dashboard -- wordt "Geen factuur".
+- Elke sync-ronde loopt er daarnaast een lichte opschoonronde overheen
+  (hooguit `MAIL_LABEL_MAX_PER_SYNC`, standaard 50, per keer) die alleen
+  facturen aanraakt waarvan het label niet meer klopt met de huidige
+  situatie -- een factuur waarvan het label al goed staat kost dus geen
+  Graph-aanroep.
+
+**Benodigde permissies**: zie "Azure AD app-registratie" hieronder
+(`Mail.ReadWrite.Shared` en `MailboxSettings.ReadWrite`) voor de precieze
+stappen en hoe je controleert of je app-registratie ze al heeft.
+
+**Mislukt het labelen** (bijv. de permissie ontbreekt nog)? Dan zie je dat:
+- in de statusbalk onderaan het dashboard, chip **"E-maillabels"** (rode
+  stip + een duidelijke actie, bijv. "voeg Mail.ReadWrite.Shared toe in
+  Entra en log opnieuw in"),
+- in de container-logs,
+- en de rest van de sync (bankafschriften/facturen ophalen, matchen,
+  Basecone-doorsturen) gaat gewoon door -- een labelprobleem onderbreekt
+  nooit iets anders.
+
+**Bestaande factuurmails van vóór deze functie labelen** (eenmalig, daarna
+lopen nieuwe facturen vanzelf mee via de sync hierboven):
+
+```bash
+python3 scripts/label_mails.py
+```
+
+Standaard een dry-run: toont per factuur van de laatste 12 maanden welk
+label hij zou krijgen, zonder iets te wijzigen. Ziet dat er goed uit:
+
+```bash
+python3 scripts/label_mails.py --apply
+```
+
+**Als de categorieën geen kleur krijgen** (zie de kanttekening bij
+`MailboxSettings.ReadWrite` hierboven): open de mailbox (`facturen@`/
+`info@`) eenmalig zelf in Outlook, maak de drie categorieën met de hand aan
+met exact deze namen -- "Basecone ✓", "Nog naar Basecone", "Geen factuur"
+-- en geef ze een kleur (groen/oranje/grijs). Het labelen zelf (welke
+categorie een mail krijgt) blijft daarna gewoon via deze app lopen; alleen
+het *aanmaken met kleur* was de stap die mogelijk niet via de gedeelde
+mailbox kan.
+
 ## Vraagposten-pagina
 
 De pagina **`/vraagposten`** (knop bovenin) is het uiteindelijke doel van
@@ -676,8 +740,22 @@ beheercentrum moet dit doen:
    - `Mail.Send.Shared` -- om te versturen namens een gedeelde mailbox
      (`facturen@`/`info@`) in plaats van "me". Ook optioneel, ook alleen
      voor het versturen naar Basecone.
+   - `Mail.ReadWrite.Shared` -- om een factuurmail een Outlook-categorie
+     ("Basecone ✓" / "Nog naar Basecone" / "Geen factuur", zie hieronder)
+     te kunnen geven. Optioneel: zonder deze permissie blijft de rest
+     gewoon werken, alleen het labelen lukt dan niet (duidelijke melding in
+     de statusbalk, zie hieronder).
+   - `MailboxSettings.ReadWrite` -- om de drie categorieën met hun kleur aan
+     te maken in de mailbox (ook optioneel: zonder deze permissie wordt het
+     label nog steeds gezet, alleen zonder de bedoelde kleur totdat je de
+     drie categorieën zelf eenmalig aanmaakt in Outlook -- zie hieronder).
+     **Let op**: dit is nog niet tegen een echte gedeelde mailbox getest
+     (Microsoft documenteert geen aparte ".Shared"-variant van deze
+     permissie zoals bij Mail.Send.Shared) -- als dit niet blijkt te werken
+     voor `facturen@`/`info@`, is het aanmaken van de drie categorieën via
+     Outlook zelf (zie hieronder) de eenvoudige oplossing.
 
-   Deze drie zijn allemaal **gedelegeerd**, niet de toepassings-variant:
+   Deze vijf zijn allemaal **gedelegeerd**, niet de toepassings-variant:
    die laatste mag bij *elke* mailbox in de hele tenant en vereist een
    Globale beheerder om goed te keuren, terwijl de gedelegeerde versies
    geen beheerderstoestemming nodig hebben (te zien aan "Nee" in de kolom
@@ -698,11 +776,35 @@ beheercentrum moet dit doen:
    e-mail die op meerdere van die adressen tegelijk binnenkomt (bijv.
    CC'd) wordt niet dubbel opgeslagen.
 
-   **Mail.Send(.Shared) later toegevoegd?** Draai `scripts/graph_login.py`
-   opnieuw (zie hieronder) -- pas dan wordt er ook echt om die permissie
-   gevraagd. Tot die tweede keer inloggen blijft alles gewoon
-   read-only werken; er gaat nooit iets stuk door deze permissie later toe
-   te voegen.
+   **Mail.Send(.Shared)/Mail.ReadWrite.Shared/MailboxSettings.ReadWrite
+   later toegevoegd?** Draai `scripts/graph_login.py` opnieuw (zie
+   hieronder) -- pas dan wordt er ook echt om de nieuwe permissie(s)
+   gevraagd. Tot die tweede keer inloggen blijft alles gewoon werken op het
+   niveau waar het al was; er gaat nooit iets stuk door een permissie later
+   toe te voegen.
+
+   **Heeft de huidige app-registratie dit al?** Zo controleer je dat zonder
+   te hoeven raden:
+   1. **Entra admin center → App registrations → (je app) → API
+      permissions.** Staat `Mail.ReadWrite.Shared` en
+      `MailboxSettings.ReadWrite` er niet tussen? Dan ontbreekt de
+      permissie zelf nog -- voeg toe via stap 3 hierboven.
+   2. Staan ze er wél, maar labelt de app toch niets (zie de statusbalk op
+      het dashboard: chip **"E-maillabels"**)? Dan is de permissie wel
+      toegevoegd, maar nog niet geconsenteerd door een echte login --
+      draai `scripts/graph_login.py` opnieuw.
+   3. Zeker weten welke permissies het HUIDIGE refresh-token (dus niet de
+      app-registratie zelf, maar waar al voor ingelogd is) echt heeft:
+      ```bash
+      docker exec -it fietsenwinkel-admin python3 -c "
+      from app.email_client import _auth
+      _auth.token()
+      print('send:', _auth.has_send_scope())
+      print('labelen:', _auth.has_label_scope())
+      "
+      ```
+      `labelen: False` betekent dat er opnieuw ingelogd moet worden nadat
+      de permissie in Entra is toegevoegd.
 
 ## Eenmalig inloggen (device code flow)
 
@@ -859,6 +961,7 @@ app/
   cyclesoftware_upload.py  CSV/XLSX-import van CycleSoftware-verkoopfacturen
   cyclesoftware_api.py     skelet voor een toekomstige live CS-koppeling (nog niet geimplementeerd)
   basecone_forward.py   Basecone-doorstuurcontrole + versturen (sendMail via Graph)
+  mail_labels.py         Outlook-categorieën (labels) op factuurmails via Graph
   vraagposten.py         bouwt de Vraagposten-lijst + voorgestelde acties
   sync.py               orchestreert e-mailsync + bankupload, draait de matcher
   sync_state.py          laatste-sync-info in geheugen, voor de statusbalk

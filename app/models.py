@@ -229,6 +229,12 @@ class Invoice(Base):
     # Push-notification dedupe: "a new non-incasso invoice came in" is only
     # ever sent once per invoice, however many sync runs it survives.
     notified_new_invoice: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The Outlook category (see app/mail_labels.py) we last successfully set
+    # on this invoice's e-mail -- "" if never labelled. Lets a periodic
+    # relabel pass skip a Graph round-trip entirely for every invoice whose
+    # desired category hasn't actually changed since last time. Added after
+    # the first release -- see app/db.py's startup migration.
+    graph_category: Mapped[str] = mapped_column(String, default="")
 
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 

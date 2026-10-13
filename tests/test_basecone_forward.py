@@ -184,6 +184,36 @@ def test_send_invoice_to_basecone_success_records_method_and_recipient(tmp_path,
     assert inv.basecone_forwarded_at is not None
 
 
+def test_send_invoice_to_basecone_relabels_the_email_best_effort(tmp_path, monkeypatch):
+    monkeypatch.setattr(bf, "send_mail", lambda mailbox, message: None)
+    relabel_calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda inv: relabel_calls.append(inv.id) or True)
+
+    inv = make_invoice(tmp_path, graph_message_id="msg-1")
+    bf.send_invoice_to_basecone(inv, method="manual")
+
+    assert relabel_calls == [inv.id]
+
+
+def test_send_invoice_to_basecone_label_failure_never_breaks_the_forward(tmp_path, monkeypatch):
+    from app.mail_labels import GraphApiError as LabelGraphApiError
+
+    monkeypatch.setattr(bf, "send_mail", lambda mailbox, message: None)
+
+    def boom(_inv):
+        raise LabelGraphApiError("geen rechten")
+
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", boom)
+    notes = []
+    monkeypatch.setattr("app.mail_labels.note_single_label_error", lambda e: notes.append(e))
+
+    inv = make_invoice(tmp_path, graph_message_id="msg-1")
+    bf.send_invoice_to_basecone(inv, method="manual")  # must not raise
+
+    assert inv.in_basecone == BaseconeForwardStatus.YES.value  # the forward itself still succeeded
+    assert notes == ["geen rechten"]
+
+
 def test_send_invoice_to_basecone_falls_back_to_me_on_403(tmp_path, monkeypatch):
     calls = []
 

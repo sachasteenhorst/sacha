@@ -26,19 +26,19 @@
   <a href="#nog-te-betalen" class="tile{% if tiles.zelf_betalen_aantal %} tile-open{% endif %}">
     <span class="tile-icon">&#128181;</span>
     <span class="tile-label">Zelf betalen</span>
-    <span class="tile-number">{{ tiles.zelf_betalen_aantal }}</span>
+    <span class="tile-number" data-counter="zelf_betalen_aantal">{{ tiles.zelf_betalen_aantal }}</span>
     <span class="tile-sub">{% if tiles.zelf_betalen_aantal %}{{ tiles.zelf_betalen_bedrag|euros }}{% else %}niets open{% endif %}</span>
   </a>
   <a href="#betalingen-zonder-factuur" class="tile{% if tiles.zonder_bon_aantal %} tile-open{% endif %}">
     <span class="tile-icon">&#129534;</span>
     <span class="tile-label">Zonder bon</span>
-    <span class="tile-number">{{ tiles.zonder_bon_aantal }}</span>
+    <span class="tile-number" data-counter="zonder_bon_aantal">{{ tiles.zonder_bon_aantal }}</span>
     <span class="tile-sub">transacties</span>
   </a>
   <a href="#niet-naar-basecone" class="tile{% if tiles.niet_naar_basecone_aantal %} tile-open{% endif %}">
     <span class="tile-icon">&#128228;</span>
     <span class="tile-label">Niet naar Basecone</span>
-    <span class="tile-number">{{ tiles.niet_naar_basecone_aantal }}</span>
+    <span class="tile-number" data-counter="niet_naar_basecone_aantal">{{ tiles.niet_naar_basecone_aantal }}</span>
     <span class="tile-sub">facturen</span>
   </a>
   <a href="#nog-te-betalen" class="tile">
@@ -144,7 +144,7 @@
 </section>
 
 <section id="nog-te-betalen">
-  <h2>Nog te betalen ({{ counters.nog_te_betalen }})</h2>
+  <h2>Nog te betalen (<span data-counter="nog_te_betalen">{{ counters.nog_te_betalen }}</span>)</h2>
   <p class="hint">Openstaande inkoopfacturen die je zelf moet overmaken (geen incasso) -- gesorteerd op vervaldatum. Een vervaldatum met "~" is geschat (niet letterlijk op de factuur gevonden).</p>
   {% if te_betalen %}
   <div class="table-scroll">
@@ -155,7 +155,7 @@
     <tbody>
       {% for inv in te_betalen %}
       {% set dagen = inv|days_until_due %}
-      <tr>
+      <tr id="row-te-betalen-{{ inv.id }}">
         <td>{{ inv.supplier_name or "?" }}</td>
         <td>{{ inv.invoice_number or "?" }}</td>
         <td class="amount">{{ inv.amount_cents|euros }}</td>
@@ -167,11 +167,11 @@
           {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
         </td>
         <td class="actions">
-          <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form">
+          <form method="post" action="/invoices/{{ inv.id }}/mark-paid" class="inline-form ajax-row-form" data-counter-targets="nog_te_betalen,zelf_betalen_aantal">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-confirm">Al betaald</button>
           </form>
-          <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form">
+          <form method="post" action="/invoices/{{ inv.id }}/mark-incasso" class="inline-form ajax-row-form" data-counter-targets="nog_te_betalen,zelf_betalen_aantal">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-secondary">Loopt via incasso</button>
           </form>
@@ -214,7 +214,7 @@
 </form>
 
 <section id="te-controleren">
-  <h2>Te controleren ({{ suggested_groups|length }})</h2>
+  <h2>Te controleren (<span data-counter="te_controleren">{{ suggested_groups|length }}</span>)</h2>
   <p class="hint">Bedrag en datum komen overeen, maar dit is niet 100% zeker &mdash; controleer even. Eén betaling kan meerdere documenten dekken.</p>
   {% if suggested_groups %}
   <div class="table-scroll">
@@ -225,7 +225,7 @@
     <tbody>
       {% for group in suggested_groups %}
       {% set tx = group[0].transaction %}
-      <tr>
+      <tr id="row-suggested-{{ group[0].group_id }}">
         <td>{{ tx.booking_date|dutch_date }}</td>
         <td class="amount">{{ tx.amount_cents|euros }}</td>
         <td>
@@ -238,11 +238,11 @@
           {% endfor %}
         </td>
         <td class="actions">
-          <form method="post" action="/match-groups/{{ group[0].group_id }}/confirm">
+          <form method="post" action="/match-groups/{{ group[0].group_id }}/confirm" class="ajax-row-form" data-counter-targets="te_controleren">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-confirm">Klopt</button>
           </form>
-          <form method="post" action="/match-groups/{{ group[0].group_id }}/reject">
+          <form method="post" action="/match-groups/{{ group[0].group_id }}/reject" class="ajax-row-form" data-counter-targets="te_controleren">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-reject">Klopt niet</button>
           </form>
@@ -258,7 +258,7 @@
 </section>
 
 <section id="betalingen-zonder-factuur">
-  <h2>Betalingen zonder factuur ({{ counters.betalingen_zonder_factuur }})</h2>
+  <h2>Betalingen zonder factuur (<span data-counter="betalingen_zonder_factuur">{{ counters.betalingen_zonder_factuur }}</span>)</h2>
   {% if unmatched_transactions %}
   <div class="table-scroll">
   <table>
@@ -267,7 +267,7 @@
     </thead>
     <tbody>
       {% for t in unmatched_transactions %}
-      <tr>
+      <tr id="row-tx-unmatched-{{ t.id }}">
         <td>{{ t.booking_date|dutch_date }}</td>
         <td class="amount">{{ t.amount_cents|euros }}</td>
         <td>
@@ -275,7 +275,7 @@
           {% if t.description %}<br><small class="muted-text">{{ t.description }}</small>{% endif %}
         </td>
         <td>
-          <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form invoice-picker" data-amount-cents="{{ t.amount_cents }}">
+          <form method="post" action="/transactions/{{ t.id }}/match" class="inline-form invoice-picker ajax-row-form" data-amount-cents="{{ t.amount_cents }}" data-counter-targets="betalingen_zonder_factuur,zonder_bon_aantal">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <div class="invoice-picker-chips"></div>
             <input type="text" class="invoice-picker-search" placeholder="Zoek op leverancier of factuurnummer..." autocomplete="off">
@@ -284,11 +284,11 @@
           </form>
         </td>
         <td class="actions">
-          <form method="post" action="/transactions/{{ t.id }}/ignore">
+          <form method="post" action="/transactions/{{ t.id }}/ignore" class="ajax-row-form" data-counter-targets="betalingen_zonder_factuur,zonder_bon_aantal">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-ignore">Geen factuur nodig</button>
           </form>
-          <form method="post" action="/transactions/{{ t.id }}/receipt-in-basecone">
+          <form method="post" action="/transactions/{{ t.id }}/receipt-in-basecone" class="ajax-row-form" data-counter-targets="betalingen_zonder_factuur,zonder_bon_aantal">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-ignore">Bon staat in Basecone</button>
           </form>
@@ -307,7 +307,7 @@
 </section>
 
 <section id="facturen-niet-betaald">
-  <h2>Facturen nog niet betaald ({{ counters.facturen_niet_betaald }})</h2>
+  <h2>Facturen nog niet betaald (<span data-counter="facturen_niet_betaald">{{ counters.facturen_niet_betaald }}</span>)</h2>
   {% if unmatched_invoices %}
   <div class="table-scroll">
   <table>
@@ -316,7 +316,7 @@
     </thead>
     <tbody>
       {% for inv in unmatched_invoices %}
-      <tr>
+      <tr id="row-inv-unmatched-{{ inv.id }}">
         <td>{{ inv.received_at|dutch_date }}</td>
         <td>
           <strong>{{ inv.supplier_name or "?" }}</strong>
@@ -332,7 +332,7 @@
           {% endif %}
         </td>
         <td class="actions">
-          <form method="post" action="/invoices/{{ inv.id }}/ignore">
+          <form method="post" action="/invoices/{{ inv.id }}/ignore" class="ajax-row-form" data-counter-targets="facturen_niet_betaald">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-ignore">Negeren</button>
           </form>
@@ -377,7 +377,7 @@
 </section>
 
 <section id="automatisch-afgehandeld">
-  <h2>Automatisch afgehandeld ({{ rule_handled_transactions|length }})</h2>
+  <h2>Automatisch afgehandeld (<span data-counter="automatisch_afgehandeld">{{ rule_handled_transactions|length }}</span>)</h2>
   <p class="hint">Deze betalingen zijn door een <a href="/regels">regel</a> afgehandeld, dus ze tellen niet meer mee bij "Betalingen zonder factuur". Klopt het niet? Zet 'm terug.</p>
   {% if rule_handled_transactions %}
   <div class="table-scroll">
@@ -387,7 +387,7 @@
     </thead>
     <tbody>
       {% for t in rule_handled_transactions %}
-      <tr>
+      <tr id="row-rule-handled-{{ t.id }}">
         <td>{{ t.booking_date|dutch_date }}</td>
         <td class="amount">{{ t.amount_cents|euros }}</td>
         <td>
@@ -402,7 +402,7 @@
           {% endif %}
         </td>
         <td class="actions">
-          <form method="post" action="/transactions/{{ t.id }}/undo-rule">
+          <form method="post" action="/transactions/{{ t.id }}/undo-rule" class="ajax-row-form" data-counter-targets="automatisch_afgehandeld">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-secondary">Terugzetten</button>
           </form>
@@ -418,7 +418,7 @@
 </section>
 
 <section id="niet-naar-basecone">
-  <h2>Niet naar Basecone ({{ counters.niet_naar_basecone }})</h2>
+  <h2>Niet naar Basecone (<span data-counter="niet_naar_basecone">{{ counters.niet_naar_basecone }}</span>)</h2>
   <p class="hint">Deze facturen/creditnota's zijn nog niet naar de boekhouder (Basecone) gestuurd. Zonder dat ziet de accountant het document niet, ook al staat het hier als "gekoppeld".</p>
   {% if basecone_todo %}
   <form method="post" action="/invoices/forward-to-basecone-bulk">
@@ -430,7 +430,7 @@
       </thead>
       <tbody>
         {% for inv in basecone_todo %}
-        <tr>
+        <tr id="row-basecone-pending-{{ inv.id }}">
           <td class="checkbox-cell"><input type="checkbox" name="invoice_ids" value="{{ inv.id }}"></td>
           <td>{{ inv.received_at|dutch_date }}</td>
           <td>{{ inv.supplier_name or "?" }}</td>
@@ -440,7 +440,7 @@
             {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
           </td>
           <td class="actions">
-            <button class="btn btn-secondary" type="submit" formaction="/invoices/{{ inv.id }}/forward-to-basecone">Stuur naar Basecone</button>
+            <button class="btn btn-secondary ajax-row-button" type="submit" formaction="/invoices/{{ inv.id }}/forward-to-basecone" data-counter-targets="niet_naar_basecone,niet_naar_basecone_aantal">Stuur naar Basecone</button>
           </td>
         </tr>
         {% endfor %}
@@ -456,7 +456,7 @@
 </section>
 
 <section id="basecone-controleer">
-  <h2>Controleer eerst ({{ basecone_review|length }})</h2>
+  <h2>Controleer eerst (<span data-counter="basecone_review">{{ basecone_review|length }}</span>)</h2>
   <p class="hint">Van deze documenten is het factuurnummer of bedrag niet goed herkend -- controleer ze zelf voordat je ze naar Basecone stuurt (daarom worden ze nooit automatisch verstuurd).</p>
   {% if basecone_review %}
   <div class="table-scroll">
@@ -466,7 +466,7 @@
     </thead>
     <tbody>
       {% for inv in basecone_review %}
-      <tr>
+      <tr id="row-basecone-pending-{{ inv.id }}">
         <td>{{ inv.received_at|dutch_date }}</td>
         <td>{{ inv.supplier_name or "?" }}</td>
         <td>{{ inv.invoice_number or "?" }}</td>
@@ -475,7 +475,7 @@
           {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
         </td>
         <td class="actions">
-          <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone">
+          <form method="post" action="/invoices/{{ inv.id }}/forward-to-basecone" class="ajax-row-form" data-counter-targets="basecone_review">
             <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
             <button class="btn btn-secondary">Stuur toch naar Basecone</button>
           </form>
@@ -549,6 +549,12 @@
     <button type="submit" class="btn btn-secondary">Nu verversen</button>
   </form>
   {% endif %}
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.label_status }}"></span> E-maillabels
+    {% if status_bar.label_error_hint %}
+    <br><span class="status-error">&#9888; {{ status_bar.label_error_hint }}</span>
+    {% endif %}
+  </span>
 </section>
 
 {% endblock %}

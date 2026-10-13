@@ -336,3 +336,28 @@ def test_learn_incasso_supplier_does_not_duplicate_on_repeated_calls(session):
     learn_incasso_supplier(session, "Herhaal Leverancier")
     session.commit()
     assert session.query(LearnedIncassoSupplier).count() == 1
+
+
+# -- Tenways (incasso) / King (incoming, never payable) supplier defaults --
+
+def test_tenways_variant_is_recognised_as_configured_incasso_supplier():
+    assert determine_payment_method.__module__ == "app.payments"
+    assert "tenways" in settings.pay_incasso_supplier_names
+
+
+def test_determine_payment_method_tenways_variant_is_incasso(session):
+    method = determine_payment_method(session, "Van Lotringen - Tenways", incasso_hint=False)
+    assert method == PaymentMethod.INCASSO.value
+
+
+def test_tenways_invoice_never_shows_up_in_nog_te_betalen(session):
+    inv = make_invoice(
+        supplier_name="Van Lotringen - Tenways", payment_method=PaymentMethod.INCASSO.value,
+    )
+    session.add(inv)
+    session.commit()
+    assert is_payable_invoice(inv) is False
+
+
+def test_king_is_a_configured_incoming_supplier():
+    assert "betalingscentrum king" in settings.incoming_supplier_names
