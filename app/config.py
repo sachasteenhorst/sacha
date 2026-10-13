@@ -61,7 +61,15 @@ class Settings(BaseSettings):
     # "Betalingscentrum King" (not the bare "King" -- too short, would
     # false-match unrelated suppliers like "Parking"/"Booking") is King
     # verzekering's actual sender name: a payout, never a bill to pay.
-    incoming_suppliers: str = "ENRA,HelloRider,Mobility Services,Betalingscentrum King"
+    # "King Verzekering" is a SECOND, separate entry (not just a longer
+    # variant of the one above -- neither is a substring of the other) for
+    # the sender name production actually uses: "King Verzekeringen BV".
+    # Its singular form is a deliberate choice: "king verzekering" is a
+    # literal prefix of "king verzekeringen", so this one entry matches
+    # both the singular and plural spelling via the existing bidirectional
+    # substring check in _assign_direction, without needing a bare "King"
+    # that would false-match "Parking"/"Booking".
+    incoming_suppliers: str = "ENRA,HelloRider,Mobility Services,Betalingscentrum King,King Verzekering"
     # A REFERENCE match (invoice number found in the transaction description)
     # doesn't have to line up exactly on amount -- some suppliers (Kruitbosch,
     # Accell) settle for slightly less than invoiced (betalingskorting /

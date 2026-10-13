@@ -267,15 +267,25 @@ def test_direction_incoming_for_configured_suppliers():
 
 def test_direction_incoming_for_king_verzekering_variants():
     # King verzekering pays OUT to this shop -- never a bill to pay. The
-    # configured value is the full "Betalingscentrum King", not the bare
-    # "King", specifically so an unrelated supplier whose name merely
-    # CONTAINS "king" (e.g. "Parking B.V.") never false-matches -- a short
-    # extracted name that's itself a prefix of the configured value (e.g.
-    # just "King") still matches the other way around.
+    # configured values are the full "Betalingscentrum King" and "King
+    # Verzekering", never the bare "King", specifically so an unrelated
+    # supplier whose name merely CONTAINS "king" (e.g. "Parking B.V.")
+    # never false-matches -- a short extracted name that's itself a prefix
+    # of a configured value (e.g. just "King") still matches the other way
+    # around.
     assert _assign_direction("St. Betalingscentrum King") == Direction.INCOMING.value
     assert _assign_direction("Betalingscentrum King B.V.") == Direction.INCOMING.value
     assert _assign_direction("King") == Direction.INCOMING.value
     assert _assign_direction("Parking B.V.") == Direction.OUTGOING.value
+    # Real production bug: King's actual sender name turned out to be "King
+    # Verzekeringen BV" -- neither "Betalingscentrum King" nor "King
+    # Verzekeringen BV" is a substring of the other, so this needs its own
+    # configured entry ("King Verzekering", which matches both the plural
+    # "Verzekeringen" and the singular "verzekering" spelling via the
+    # existing prefix/substring check).
+    assert _assign_direction("King Verzekeringen BV") == Direction.INCOMING.value
+    assert _assign_direction("King verzekering") == Direction.INCOMING.value
+    assert _assign_direction("Booking.com") == Direction.OUTGOING.value
 
 
 def test_mobility_services_lease_a_bike_invoice_is_incoming_with_amount():
@@ -580,5 +590,44 @@ def test_reclassify_incoming_suppliers_flips_existing_king_invoices():
         assert changed == 1
         assert king_invoice.direction == Direction.INCOMING.value
         assert other_invoice.direction == Direction.OUTGOING.value
+    finally:
+        session.close()
+
+
+def test_reclassify_incoming_suppliers_flips_king_verzekeringen_bv_invoices():
+    # Real production bug (facturen 7468408 en 7538818): the sender name
+    # actually used, "King Verzekeringen BV", didn't match the
+    # "Betalingscentrum King"-only configured value, so these two stayed
+    # outgoing and kept showing up in "Zelf betalen".
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db import Base
+    from app.models import Invoice, MatchStatus, PaymentMethod
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    try:
+        invoices = [
+            Invoice(
+                email_message_id=f"<king-bv-{number}>", attachment_filename="f.pdf",
+                received_at=datetime(2026, 9, 1), supplier_name="King Verzekeringen BV",
+                invoice_number=number, amount_cents=5000,
+                document_kind=DocumentKind.INVOICE.value,
+                direction=Direction.OUTGOING.value, status=MatchStatus.UNMATCHED,
+                payment_method=PaymentMethod.ONBEKEND.value,
+            )
+            for number in ("7468408", "7538818")
+        ]
+        session.add_all(invoices)
+        session.commit()
+
+        changed = reclassify_incoming_suppliers(session)
+        session.commit()
+
+        assert changed == 2
+        assert all(inv.direction == Direction.INCOMING.value for inv in invoices)
     finally:
         session.close()

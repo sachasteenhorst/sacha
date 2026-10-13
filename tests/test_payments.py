@@ -350,6 +350,11 @@ def test_determine_payment_method_tenways_variant_is_incasso(session):
     assert method == PaymentMethod.INCASSO.value
 
 
+def test_determine_payment_method_tenways_bv_variant_is_incasso(session):
+    method = determine_payment_method(session, "Tenways B.V.", incasso_hint=False)
+    assert method == PaymentMethod.INCASSO.value
+
+
 def test_tenways_invoice_never_shows_up_in_nog_te_betalen(session):
     inv = make_invoice(
         supplier_name="Van Lotringen - Tenways", payment_method=PaymentMethod.INCASSO.value,
@@ -361,3 +366,7 @@ def test_tenways_invoice_never_shows_up_in_nog_te_betalen(session):
 
 def test_king_is_a_configured_incoming_supplier():
     assert "betalingscentrum king" in settings.incoming_supplier_names
+    # Real production bug: King's actual sender name turned out to be "King
+    # Verzekeringen BV", which neither contains nor is contained in
+    # "Betalingscentrum King" -- it needs its own configured entry.
+    assert "king verzekering" in settings.incoming_supplier_names
