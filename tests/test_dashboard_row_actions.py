@@ -188,7 +188,42 @@ def test_mark_invoice_incasso_ajax_returns_json_ack(client, session_factory):
     assert response.json() == {"ok": True}
 
 
-# -- Betalingen zonder factuur ("Geen factuur nodig" / "Bon staat in Basecone") --
+def test_mark_invoice_paid_relabels_best_effort(client, session_factory, monkeypatch):
+    inv_id = make_payable_invoice(session_factory)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/invoices/{inv_id}/mark-paid", data={}, auth=AUTH)
+
+    assert calls == [inv_id]
+
+
+def test_mark_invoice_incasso_relabels_every_reclassified_invoice(client, session_factory, monkeypatch):
+    # learn_incasso_supplier reclassifies every invoice from that supplier
+    # at once -- the Outlook relabel must follow all of them, not just the
+    # one clicked.
+    inv1_id = make_payable_invoice(session_factory, invoice_number="F-A", supplier_name="Acme B.V.")
+    inv2_id = make_payable_invoice(session_factory, invoice_number="F-B", supplier_name="Acme B.V.")
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/invoices/{inv1_id}/mark-incasso", data={}, auth=AUTH)
+
+    assert sorted(calls) == sorted([inv1_id, inv2_id])
+
+
+# -- Betalingen zonder factuur ("Geen factuur nodig" / "Bon staat in Basecone" / "Koppelen") --
+
+def test_manual_match_relabels_the_matched_invoice_best_effort(client, session_factory, monkeypatch):
+    tx_id = make_unmatched_transaction(session_factory)
+    inv_id = make_unmatched_invoice(session_factory, amount_cents=5000)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/transactions/{tx_id}/match", data={"invoice_ids": [inv_id]}, auth=AUTH)
+
+    assert calls == [inv_id]
+
 
 def test_ignore_transaction_redirects_with_anchor_to_next_row(client, session_factory):
     # Sorted by booking_date descending -> the newest comes first.
@@ -256,6 +291,26 @@ def test_confirm_match_group_ajax_returns_json_ack(client, session_factory):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+
+
+def test_confirm_match_group_relabels_the_invoice_best_effort(client, session_factory, monkeypatch):
+    group_id = _make_suggested_match_group(session_factory)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/match-groups/{group_id}/confirm", data={}, auth=AUTH)
+
+    assert len(calls) == 1
+
+
+def test_reject_match_group_relabels_the_invoice_best_effort(client, session_factory, monkeypatch):
+    group_id = _make_suggested_match_group(session_factory)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/match-groups/{group_id}/reject", data={}, auth=AUTH)
+
+    assert len(calls) == 1
 
 
 def test_reject_match_group_redirects_with_section_anchor_when_last(client, session_factory):

@@ -93,7 +93,14 @@ class Settings(BaseSettings):
     # onze eigen kassaverkoop via CycleSoftware, die al automatisch via
     # Twinfield wordt geboekt -- nogmaals doorsturen zou een dubbele
     # boeking veroorzaken.
-    basecone_exclude_suppliers: str = "Mobility Services,Lease a Bike,VWPFS,HelloRider,CycleSoftware"
+    # Let op: GEEN "CycleSoftware" hier -- dat matchte per ongeluk ook
+    # CycleSoftware B.V. zelf (de softwareleverancier van het kassasysteem),
+    # die ons net als elke andere leverancier een echte inkoopfactuur stuurt
+    # (via noreply@twsc.nl). Onze EIGEN verkoopfacturen uit de
+    # CycleSoftware-export hebben altijd document_kind SALES_INVOICE, dat
+    # nooit in FORWARDABLE_DOCUMENT_KINDS zit -- deze lijst was daar dus
+    # nooit voor nodig en sloot alleen de echte leverancier per ongeluk uit.
+    basecone_exclude_suppliers: str = "Mobility Services,Lease a Bike,VWPFS,HelloRider"
     # Uitzondering op de incoming-documenten-worden-nooit-doorgestuurd-regel:
     # leveranciers (kommagescheiden, hoofdletterongevoelig) van wie een
     # INKOMEND document (zie INCOMING_SUPPLIERS) wél naar Basecone moet.
@@ -125,6 +132,29 @@ class Settings(BaseSettings):
     # (see app/mail_labels.py) -- same reasoning as AUTO_FORWARD_MAX_PER_SYNC.
     mail_label_max_per_sync: int = 50
 
+    # -- Basecone confirmation mails (see app/mail_filing.py) --
+    # The Outlook folder (in each configured mailbox) a "successfully
+    # processed" confirmation from Basecone's mail-processing address gets
+    # moved into and marked read. Created automatically if it doesn't exist.
+    basecone_confirmation_folder: str = "Succesvol naar Basecone"
+    # Sender domains (comma-separated, case-insensitive) a confirmation mail
+    # comes from. UNVERIFIED against a real confirmation mail as of writing
+    # (this app has never seen one) -- defaults to the accountant's own
+    # mail-processing domain (same one BASECONE_FORWARD_ADDRESS sends to,
+    # which very likely sends the confirmation back too) plus a generic
+    # "basecone.com" guess. Check an actual confirmation mail's sender and
+    # adjust this if it doesn't match.
+    basecone_confirmation_sender_domains: str = "mailvanderlaangroep.nl,basecone.com"
+    # Subject keywords (comma-separated, case-insensitive, matched as a
+    # substring) that, together with the sender domain above, identify a
+    # confirmation mail -- requiring BOTH avoids silently filing away other,
+    # unrelated mail from that same domain. Also UNVERIFIED; adjust to match
+    # the real wording once you've seen one.
+    basecone_confirmation_subject_keywords: str = "succesvol verwerkt,successfully processed,is verwerkt,ontvangen en verwerkt"
+    # Safety cap: a sync run never files away more than this many confirmation
+    # mails per mailbox, same reasoning as AUTO_FORWARD_MAX_PER_SYNC.
+    basecone_confirmation_max_per_sync: int = 50
+
     @property
     def graph_mailboxes(self) -> list[str]:
         return [m.strip() for m in self.graph_mailbox.split(",") if m.strip()]
@@ -149,6 +179,14 @@ class Settings(BaseSettings):
     def basecone_include_incoming_names(self) -> list[str]:
         return [s.strip().lower() for s in self.basecone_include_incoming.split(",") if s.strip()]
 
+    @property
+    def basecone_confirmation_sender_domain_list(self) -> list[str]:
+        return [s.strip().lower() for s in self.basecone_confirmation_sender_domains.split(",") if s.strip()]
+
+    @property
+    def basecone_confirmation_subject_keyword_list(self) -> list[str]:
+        return [s.strip().lower() for s in self.basecone_confirmation_subject_keywords.split(",") if s.strip()]
+
     # -- Sync scheduling --
     sync_interval_minutes: int = 60
     # How many days to look back on every sync (covers late-arriving mail/statements).
@@ -170,7 +208,7 @@ class Settings(BaseSettings):
     # Machtigingskenmerk/Incassant ID -- see app/payments.py), or once Sacha
     # clicks "Loopt via incasso" in the dashboard (see
     # LearnedIncassoSupplier).
-    pay_incasso_suppliers: str = "Accell,Gazelle,Pon,Giant,Kruitbosch,Odido,Exact,ENRA,Tenways"
+    pay_incasso_suppliers: str = "Accell,Gazelle,Pon,Giant,Kruitbosch,Odido,Exact,ENRA,Tenways,Cycletech"
     # Override: suppliers here are NEVER treated as incasso, even if they're
     # on PAY_INCASSO_SUPPLIERS or a matching bank transaction looks like a
     # direct debit -- for the rare case a supplier switched from incasso to

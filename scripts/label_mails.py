@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """One-off (and re-runnable) pass that labels every existing factuurmail of
-the last 12 months with the right Outlook category -- see
-app/mail_labels.py for the three categories and how the right one is
-picked. Needed once after this feature shipped (there's a backlog of
-already-ingested invoices that were never labelled), and safe to re-run any
-time afterwards: app.mail_labels.set_invoice_category always skips an
-invoice whose label is already correct, so a second run only touches what
-actually changed since the first.
+the last 12 months with the right Outlook categories -- see
+app/mail_labels.py for the Basecone-status AND payment-status categories
+and how they're picked. Needed once after either feature shipped (there's
+a backlog of already-ingested invoices that were never labelled, or only
+labelled for Basecone status), and safe to re-run any time afterwards:
+app.mail_labels.set_invoice_category always skips an invoice whose labels
+are already correct, so a second run only touches what actually changed
+since the first.
 
 DRY-RUN by default: prints exactly what it would label and changes nothing
 on Graph or in the database. Pass --apply to actually send the label
@@ -21,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.db import SessionLocal
 from app.email_client import GraphApiError, GraphAuthError
-from app.mail_labels import desired_category, record_label_errors, set_invoice_category
+from app.mail_labels import desired_category, desired_payment_category, record_label_errors, set_invoice_category
 from app.models import Invoice
 
 MONTHS_BACK = 12
@@ -45,18 +46,25 @@ def main() -> None:
         print(f"{len(invoices)} factuurmails van de laatste {MONTHS_BACK} maanden gevonden met een gekoppelde e-mail.\n")
 
         counts: dict[str, int] = {}
+        payment_counts: dict[str, int] = {}
         would_change = 0
         errors: list[str] = []
         stopped_early = False
 
         for invoice in invoices:
             target = desired_category(invoice)
+            payment_target = desired_payment_category(invoice) or "(geen)"
             counts[target] = counts.get(target, 0) + 1
-            if invoice.graph_category == target:
+            payment_counts[payment_target] = payment_counts.get(payment_target, 0) + 1
+            if invoice.graph_category == target and invoice.graph_payment_category == (desired_payment_category(invoice) or ""):
                 continue
             would_change += 1
             label = invoice.supplier_name or invoice.attachment_filename or f"factuur {invoice.id}"
-            print(f"  {invoice.received_at.date()}  {label:<40.40}  {invoice.graph_category or '(geen)':<20} -> {target}")
+            print(
+                f"  {invoice.received_at.date()}  {label:<40.40}  "
+                f"{invoice.graph_category or '(geen)':<20} -> {target}  |  "
+                f"{invoice.graph_payment_category or '(geen)':<12} -> {payment_target}"
+            )
 
             if args.apply:
                 try:
@@ -70,8 +78,11 @@ def main() -> None:
                     errors.append(f"{label}: {exc}")
                     continue
 
-        print("\nVerdeling (gewenste categorie, ongeacht of 'm al klopte):")
+        print("\nVerdeling Basecone-status (gewenste categorie, ongeacht of 'm al klopte):")
         for name, count in counts.items():
+            print(f"  {name}: {count}")
+        print("\nVerdeling betaalstatus:")
+        for name, count in payment_counts.items():
             print(f"  {name}: {count}")
 
         if args.apply:

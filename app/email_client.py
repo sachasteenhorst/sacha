@@ -155,7 +155,14 @@ KNOWN_SUPPLIER_DOMAINS = {
     "accell.nl": "Accell",
     "tenways.com": "Tenways",
     "enra.nl": "ENRA",
-    "twsc.nl": "TWSC",
+    # CycleSoftware's own invoicing domain (not to be confused with this
+    # shop's OWN sales-export rows, which always get document_kind
+    # SALES_INVOICE and a customer name as supplier_name -- see
+    # app/cyclesoftware_upload.py). Was mapped to "TWSC" (the domain's own
+    # label) before Sacha pointed out their invoices should show as
+    # "CycleSoftware B.V.", same as how they're actually branded.
+    "twsc.nl": "CycleSoftware B.V.",
+    "cycletech.nl": "Cycletech",
     "gazelle.nl": "Gazelle",
     "wrutteman.nl": "Wrutteman",
     "hellorider.com": "HelloRider",
@@ -209,6 +216,71 @@ SPECIFICATION_RE = re.compile(
 INVOICE_LIKE_RE = re.compile(
     r"factuur|invoice|creditnota|credit\s*note|specificatie|rekening|\bnota\b", re.IGNORECASE
 )
+
+# -- Tenways-specific classification (see _classify_tenways_document) --
+# Real production bug: Tenways invoices/credit notes were ending up
+# DocumentKind.OTHER ("Geen factuur") because the generic classifier above
+# apparently false-matches something in their boilerplate (the same class
+# of bug as the Accell "algemene voorwaarden" footer fix) -- rather than
+# guess at which exact generic regex collides, Tenways' own filename/
+# subject conventions are unambiguous enough to classify these directly,
+# overriding whatever the generic classifier decided. Checked in this
+# priority order: filename, then subject, then (only if neither is
+# conclusive) PDF text -- filename/subject are always present and
+# trustworthy, text extraction can fail or vary per PDF.
+TENWAYS_QUOTE_FILENAME_RE = re.compile(r"^S0\d", re.IGNORECASE)
+TENWAYS_QUOTE_SUBJECT_RE = re.compile(r"\bquotation\b|\boffertes?\b", re.IGNORECASE)
+TENWAYS_QUOTE_TEXT_RE = re.compile(r"\bquotation\b|\boffertes?\b", re.IGNORECASE)
+TENWAYS_INVOICE_FILENAME_RE = re.compile(r"^R?INV[_-]", re.IGNORECASE)
+TENWAYS_INVOICE_SUBJECT_RE = re.compile(r"\binvoice\b|\bcredit\b", re.IGNORECASE)
+TENWAYS_INVOICE_TEXT_RE = re.compile(r"\binvoice\b|\bfactuur\b|credit\s*note|creditnota", re.IGNORECASE)
+
+
+def _classify_tenways_document(filename: str, subject: str, text: str) -> str | None:
+    """Tenways' own classification, used only for documents whose supplier
+    was identified as Tenways (see _derive_supplier_name): a quote/
+    offerte (filename starting "S0", or "Quotation"/"Offerte" in the
+    subject or text) is Geen factuur and never something to pay or
+    forward; an invoice or credit note (INV_*/RINV_* filename, or
+    "Invoice"/"Credit" in the subject or text) always is. Returns None
+    (falls through to the generic classifier) only for the rare document
+    that matches none of these -- in practice this always returns a
+    definite answer for real Tenways mail."""
+    if TENWAYS_QUOTE_FILENAME_RE.search(filename) or TENWAYS_QUOTE_SUBJECT_RE.search(subject):
+        return DocumentKind.OTHER.value
+    if TENWAYS_INVOICE_FILENAME_RE.search(filename) or TENWAYS_INVOICE_SUBJECT_RE.search(subject):
+        return DocumentKind.INVOICE.value
+    excerpt = text[:1500]
+    if TENWAYS_QUOTE_TEXT_RE.search(excerpt):
+        return DocumentKind.OTHER.value
+    if TENWAYS_INVOICE_TEXT_RE.search(excerpt):
+        return DocumentKind.INVOICE.value
+    return None
+
+
+# -- Cycletech-specific classification + invoice number (see
+# _classify_cycletech_document/_extract_cycletech_invoice_number) --
+# Real production bug: Cycletech's invoice PDFs (filename
+# "Factuur_<klantnummer>-<factuurnummer>.pdf", sometimes with a trailing
+# "(1)" when the same file lands twice -- once standalone, once bundled in
+# a "CYCLETECH | Incasso overzicht" mail) were ending up DocumentKind.OTHER,
+# and the generic number extraction sometimes picked up the KLANTNUMMER
+# (the first number) instead of the real factuurnummer (the second). Both
+# are fixed the same way: trust the filename directly, which also makes the
+# two copies of the same invoice dedupe correctly (see invoice_dedup_key --
+# it keys on supplier+invoice_number+amount when content_hash differs).
+CYCLETECH_INVOICE_FILENAME_RE = re.compile(r"^Factuur[_-]\d+-(\d+)", re.IGNORECASE)
+
+
+def _classify_cycletech_document(filename: str) -> str | None:
+    if CYCLETECH_INVOICE_FILENAME_RE.search(filename):
+        return DocumentKind.INVOICE.value
+    return None
+
+
+def _extract_cycletech_invoice_number(filename: str) -> str:
+    m = CYCLETECH_INVOICE_FILENAME_RE.search(filename)
+    return m.group(1) if m else ""
 
 
 class GraphAuthError(RuntimeError):
@@ -538,6 +610,18 @@ def _domain_to_supplier_name(domain: str) -> str:
 def _derive_supplier_name(address: str, display_name: str) -> str:
     address = (address or "").strip()
     display_name = (display_name or "").strip()
+    # A KNOWN supplier domain (see KNOWN_SUPPLIER_DOMAINS) is a confident,
+    # authoritative identity -- a human sender's personal display name must
+    # never override it, or the same supplier's invoices end up scattered
+    # across several different "supplier names" depending on who happened
+    # to send that particular one. Real production bug: Tenways' automated
+    # notifications@tenways.com later started sending with display name
+    # "Derk ten Kleij" (a person at Tenways, same address) instead of a
+    # generic sender name, which then became the stored supplier_name.
+    if "@" in address:
+        known = KNOWN_SUPPLIER_DOMAINS.get(_base_domain(address.split("@", 1)[1]))
+        if known:
+            return known
     # A real display name beats a guess from the domain -- unless it's
     # missing, or is itself just the address again (some senders set both
     # to the same value).
@@ -633,6 +717,17 @@ def _extract_fields(
         amount_cents = _parse_amount_to_cents(text, direction)
         invoice_number = _extract_invoice_number(text, filename) or _extract_invoice_number_from_subject(subject)
     document_kind = _classify_document_kind(filename, subject, text, amount_cents)
+    if supplier_name.lower() == "tenways":
+        tenways_kind = _classify_tenways_document(filename, subject, text)
+        if tenways_kind is not None:
+            document_kind = tenways_kind
+    if supplier_name.lower() == "cycletech":
+        cycletech_kind = _classify_cycletech_document(filename)
+        if cycletech_kind is not None:
+            document_kind = cycletech_kind
+        cycletech_number = _extract_cycletech_invoice_number(filename)
+        if cycletech_number:
+            invoice_number = cycletech_number
     if _is_own_company(address, display_name):
         # A verkoopfactuur we sent ourselves is never a purchase to pay --
         # never let it show up as an open inkoopfactuur.
@@ -885,6 +980,49 @@ def list_message_attachment_names(mailbox: str, message_id: str) -> list[str]:
     except GraphApiError:
         return []
     return [a.get("name", "") for a in payload.get("value", [])]
+
+
+def list_inbox_messages_since(mailbox: str, since: date) -> list[dict]:
+    """Every message in `mailbox`'s inbox (no attachment required, unlike
+    _list_messages_since -- used for app.mail_filing's confirmation-mail
+    detection, which looks at sender/subject, not attachments)."""
+    since_iso = f"{since.isoformat()}T00:00:00Z"
+    url = f"{GRAPH_BASE_URL}/users/{mailbox}/mailFolders/{settings.graph_mail_folder}/messages"
+    params = {
+        "$filter": f"receivedDateTime ge {since_iso}",
+        "$select": "id,subject,from,receivedDateTime,isRead",
+        "$top": "50",
+    }
+    messages: list[dict] = []
+    while url:
+        payload = _graph_get(url, params)
+        messages.extend(payload.get("value", []))
+        url = payload.get("@odata.nextLink")
+        params = None
+    return messages
+
+
+def find_mail_folder_id(mailbox: str, folder_name: str) -> str | None:
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    payload = _graph_get(f"{base}/mailFolders", {"$filter": f"displayName eq '{folder_name}'"})
+    folders = payload.get("value") or []
+    return folders[0]["id"] if folders else None
+
+
+def create_mail_folder(mailbox: str, folder_name: str) -> str:
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    created = _graph_post(f"{base}/mailFolders", {"displayName": folder_name})
+    return created["id"]
+
+
+def mark_message_read(mailbox: str, message_id: str) -> None:
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    _graph_patch(f"{base}/messages/{message_id}", {"isRead": True})
+
+
+def move_message(mailbox: str, message_id: str, destination_folder_id: str) -> None:
+    base = f"{GRAPH_BASE_URL}/me" if mailbox == "me" else f"{GRAPH_BASE_URL}/users/{mailbox}"
+    _graph_post(f"{base}/messages/{message_id}/move", {"destinationId": destination_folder_id})
 
 
 def send_mail(mailbox: str, message: dict) -> None:

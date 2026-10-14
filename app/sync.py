@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.bank_import import BankImportError, parse_bank_file
 from app.basecone_client import BaseconeClient
 from app.basecone_forward import auto_forward_new_invoices, check_backlog_against_sent_items
+from app.mail_filing import file_basecone_confirmations, record_filing_errors
 from app.mail_labels import invoices_needing_relabel, record_label_errors, relabel_invoices
 from app.config import settings
 from app.email_client import fetch_invoice_attachments, invoice_dedup_key
@@ -28,6 +29,7 @@ class SyncResult:
     new_transactions: int = 0
     new_invoices: int = 0
     basecone_auto_forwarded: int = 0
+    confirmations_filed: int = 0
     mails_relabeled: int = 0
     errors: list[str] = None
     matching: MatchingSummary | None = None
@@ -240,6 +242,18 @@ def run_sync(session: Session) -> SyncResult:
     except Exception as exc:  # noqa: BLE001 -- surface any Basecone-forward error to the dashboard
         session.rollback()
         result.errors.append(f"Basecone doorsturen: {exc}")
+
+    # Files Basecone's "successfully processed" confirmation mails into
+    # their own folder (and marks them read) -- a database-free, mail-only
+    # side effect, so there's nothing here to commit/roll back; never lets
+    # a Graph/permission problem here abort the rest of the sync either.
+    try:
+        filing_result = file_basecone_confirmations(since)
+        result.confirmations_filed = filing_result.moved
+        result.errors.extend(filing_result.errors)
+        record_filing_errors(filing_result.errors)
+    except Exception as exc:  # noqa: BLE001
+        result.errors.append(f"Basecone-bevestigingsmails verplaatsen: {exc}")
 
     # Periodic label touch-up: picks up anything the per-action hooks in
     # app.basecone_forward/app.main missed (e.g. a backlog invoice whose

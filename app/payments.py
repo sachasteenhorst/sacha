@@ -100,23 +100,29 @@ def determine_payment_method(session: Session, supplier_name: str, incasso_hint:
     return PaymentMethod.INCASSO.value if is_incasso else PaymentMethod.ONBEKEND.value
 
 
-def learn_incasso_supplier(session: Session, supplier_name: str) -> None:
+def learn_incasso_supplier(session: Session, supplier_name: str) -> list[Invoice]:
     """Records that this supplier is paid by incasso (the dashboard's
     "Loopt via incasso" button) and immediately reclassifies every one of
     its OTHER still-open invoices too, so the whole backlog drops off "Nog
-    te betalen" at once instead of one row at a time."""
+    te betalen" at once instead of one row at a time. Returns every invoice
+    actually touched, so the caller can relabel exactly those (see
+    app.main.mark_invoice_incasso) -- a "Nog betalen" Outlook label on any
+    of them is now stale."""
     name_lower = _supplier_name_lower(supplier_name)
     if not name_lower:
-        return
+        return []
     existing = session.scalar(
         select(LearnedIncassoSupplier).where(LearnedIncassoSupplier.supplier_name_lower == name_lower)
     )
     if existing is None:
         session.add(LearnedIncassoSupplier(supplier_name_lower=name_lower))
 
+    changed = []
     for invoice in session.scalars(select(Invoice)):
         if _name_similarity(supplier_name, invoice.supplier_name) > 0:
             invoice.payment_method = PaymentMethod.INCASSO.value
+            changed.append(invoice)
+    return changed
 
 
 # Document kinds that could ever represent a bill THIS shop has to pay --
@@ -228,6 +234,34 @@ def is_payable_invoice(invoice: Invoice) -> bool:
         return False
     received_date = invoice.received_at.date() if invoice.received_at else None
     if received_date is None or received_date < settings.pay_from_date_value:
+        return False
+    return True
+
+
+def is_tracked_purchase_invoice(invoice: Invoice) -> bool:
+    """Whether this invoice is a genuine inkoopfactuur that belongs in this
+    shop's own payment tracking at all -- the STATIC identity checks from
+    is_payable_invoice (document kind, direction, a real positive amount,
+    who it's addressed to), but deliberately WITHOUT the DYNAMIC ones
+    (current status, paid_at, incasso, due_date, PAY_FROM_DATE). Used for
+    the Outlook "Nog betalen"/"Betaald" labels (see app.mail_labels): an
+    incasso invoice must still get "Betaald" once it's matched, but
+    is_payable_invoice itself already says False for ANY incasso invoice
+    regardless of payment state -- right for deciding what belongs on "Nog
+    te betalen", wrong for deciding "did this ever get paid"."""
+    if invoice.document_kind not in _PAYABLE_DOCUMENT_KINDS:
+        return False
+    if invoice.direction != "outgoing":
+        return False
+    if invoice.amount_cents is None or invoice.amount_cents <= 0:
+        return False
+    if _has_own_vat_number_as_invoice_number(invoice):
+        return False
+    if _is_consumer_domain_supplier(invoice):
+        return False
+    if _not_addressed_to_own_company(invoice):
+        return False
+    if _is_incasso_specification_subject(invoice):
         return False
     return True
 

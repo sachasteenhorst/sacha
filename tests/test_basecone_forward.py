@@ -115,10 +115,26 @@ def test_is_forwardable_excludes_configured_suppliers(tmp_path):
     # HelloRider's documents are copies of a sale this shop's own till
     # (CycleSoftware) already booked into Twinfield -- forwarding them too
     # would double-book it.
-    for supplier in ("Mobility Services", "Lease a Bike", "VWPFS B.V.", "HelloRider", "CycleSoftware"):
+    for supplier in ("Mobility Services", "Lease a Bike", "VWPFS B.V.", "HelloRider"):
         excluded = make_invoice(tmp_path, supplier_name=supplier)
         assert bf.is_forwardable(excluded) is False, supplier
         assert "CycleSoftware/Twinfield" in bf.basecone_status_label(excluded)
+
+
+def test_is_forwardable_true_for_real_cyclesoftware_vendor_invoice(tmp_path):
+    # Real production bug: "CycleSoftware" used to be on
+    # BASECONE_EXCLUDE_SUPPLIERS to keep our OWN sales-export rows from
+    # going to Basecone, but those are always document_kind SALES_INVOICE
+    # (never forwardable regardless of supplier name) -- the exclusion was
+    # dead weight for its intended purpose, and actively blocked a genuine
+    # inkoopfactuur CycleSoftware B.V. itself sends us for their software
+    # (arrives via noreply@twsc.nl).
+    real_vendor_invoice = make_invoice(
+        tmp_path, supplier_name="CycleSoftware B.V.", email_from="noreply@twsc.nl",
+        invoice_number="2027026", amount_cents=81297,
+    )
+    assert bf.is_forwardable(real_vendor_invoice) is True
+    assert bf.basecone_status_label(real_vendor_invoice) == "nee"
 
 
 def test_is_forwardable_excludes_hellorider_even_though_it_is_incoming(tmp_path):
@@ -286,6 +302,37 @@ def test_auto_forward_only_sends_new_confident_forwardable_invoices(session, tmp
     assert new_confident.in_basecone == BaseconeForwardStatus.YES.value
     assert backlog.in_basecone == BaseconeForwardStatus.UNKNOWN.value
     assert unconfident.in_basecone == BaseconeForwardStatus.UNKNOWN.value
+
+
+def test_auto_forward_skips_excluded_invoices(session, tmp_path, monkeypatch):
+    # Real production case: scripts/fix_tenways.py (and
+    # scripts/reparse_invoices.py's "reopened" branch) flip an old,
+    # previously-ignored document's document_kind to a forwardable one --
+    # that backlog must never get silently mass-forwarded by the next
+    # routine sync just because it's now "new and confident" and within
+    # the auto-forward window.
+    monkeypatch.setattr(settings, "auto_forward_basecone", True)
+    monkeypatch.setattr(settings, "auto_forward_from_date", "2026-01-01")
+    sent_calls = []
+    monkeypatch.setattr(bf, "send_mail", lambda mailbox, message: sent_calls.append(mailbox))
+
+    excluded = make_invoice(
+        tmp_path, attachment_filename="excluded.pdf", received_at=datetime(2026, 6, 1),
+        excluded_from_auto_forward=True,
+    )
+    normal = make_invoice(
+        tmp_path, attachment_filename="normal.pdf", received_at=datetime(2026, 6, 1),
+        email_message_id="<msg-2>",
+    )
+    session.add_all([excluded, normal])
+    session.commit()
+
+    result = bf.auto_forward_new_invoices(session)
+
+    assert result.sent == 1
+    assert sent_calls == ["facturen@vanderlindentweewielers.nl"]
+    assert excluded.in_basecone == BaseconeForwardStatus.UNKNOWN.value
+    assert normal.in_basecone == BaseconeForwardStatus.YES.value
 
 
 def test_auto_forward_respects_max_per_sync_cap(session, tmp_path, monkeypatch):

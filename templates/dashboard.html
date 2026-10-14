@@ -555,6 +555,12 @@
     <br><span class="status-error">&#9888; {{ status_bar.label_error_hint }}</span>
     {% endif %}
   </span>
+  <span class="status-chip">
+    <span class="status-dot status-{{ status_bar.filing_status }}"></span> Basecone-bevestigingsmails
+    {% if status_bar.filing_error_hint %}
+    <br><span class="status-error">&#9888; {{ status_bar.filing_error_hint }}</span>
+    {% endif %}
+  </span>
 </section>
 
 {% endblock %}

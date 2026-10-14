@@ -16,6 +16,7 @@ from app.payments import (
     get_payable_invoices,
     is_duplicate_of_existing,
     is_payable_invoice,
+    is_tracked_purchase_invoice,
     learn_incasso_supplier,
     mark_paid,
 )
@@ -107,6 +108,55 @@ def test_is_payable_invoice_false_without_due_date(session):
 
 def test_is_payable_invoice_false_for_other_document_kind(session):
     assert is_payable_invoice(make_invoice(document_kind=DocumentKind.OTHER.value)) is False
+
+
+# -- is_tracked_purchase_invoice (see app.mail_labels' payment categories) --
+
+def test_is_tracked_purchase_invoice_true_for_normal_open_invoice(session):
+    assert is_tracked_purchase_invoice(make_invoice()) is True
+
+
+def test_is_tracked_purchase_invoice_true_even_for_incasso():
+    # Unlike is_payable_invoice: an incasso invoice IS tracked (it still
+    # needs a "Betaald" label once it settles), it's just never "Nog
+    # betalen".
+    inv = make_invoice(payment_method=PaymentMethod.INCASSO.value)
+    assert is_tracked_purchase_invoice(inv) is True
+
+
+def test_is_tracked_purchase_invoice_true_even_when_already_matched_or_paid():
+    # Unlike is_payable_invoice: status/paid_at don't matter here at all --
+    # this answers "is it the kind of document we track payment for",
+    # not "is it still open".
+    matched = make_invoice(status=MatchStatus.MATCHED)
+    assert is_tracked_purchase_invoice(matched) is True
+    paid = make_invoice()
+    mark_paid(paid)
+    assert is_tracked_purchase_invoice(paid) is True
+
+
+def test_is_tracked_purchase_invoice_true_without_a_due_date():
+    # Unlike is_payable_invoice: no due_date requirement -- a payment label
+    # still makes sense without one.
+    assert is_tracked_purchase_invoice(make_invoice(due_date=None)) is True
+
+
+def test_is_tracked_purchase_invoice_false_for_incoming_document(session):
+    assert is_tracked_purchase_invoice(make_invoice(direction="incoming")) is False
+
+
+def test_is_tracked_purchase_invoice_false_for_sales_invoice(session):
+    inv = make_invoice(document_kind=DocumentKind.SALES_INVOICE.value, direction="incoming")
+    assert is_tracked_purchase_invoice(inv) is False
+
+
+def test_is_tracked_purchase_invoice_false_for_other_document_kind(session):
+    assert is_tracked_purchase_invoice(make_invoice(document_kind=DocumentKind.OTHER.value)) is False
+
+
+def test_is_tracked_purchase_invoice_false_for_zero_or_missing_amount(session):
+    assert is_tracked_purchase_invoice(make_invoice(amount_cents=0)) is False
+    assert is_tracked_purchase_invoice(make_invoice(amount_cents=None)) is False
 
 
 # -- is_payable_invoice: stricter exclusions (production bug: 258 false

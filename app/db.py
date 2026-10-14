@@ -43,6 +43,8 @@ _COLUMN_MIGRATIONS = {
         ("paid_at", "DATETIME"),
         ("notified_new_invoice", "BOOLEAN DEFAULT 0"),
         ("graph_category", "VARCHAR DEFAULT ''"),
+        ("graph_payment_category", "VARCHAR DEFAULT ''"),
+        ("excluded_from_auto_forward", "BOOLEAN DEFAULT 0"),
     ],
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),

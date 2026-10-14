@@ -99,6 +99,11 @@ def test_reparse_reopens_previously_auto_ignored_document(session, tmp_path, mon
     assert reopened == 1
     assert inv.status == MatchStatus.UNMATCHED
     assert inv.document_kind == "invoice"
+    # A classification fix must never turn into "suddenly auto-forward
+    # months of old invoices" -- this backlog document was never going to
+    # be auto-forwarded before (it was ignored), so it stays excluded until
+    # Sacha decides by hand to send it.
+    assert inv.excluded_from_auto_forward is True
 
 
 def test_reparse_never_reopens_manually_ignored_document(session, tmp_path, monkeypatch):

@@ -3,10 +3,13 @@ from datetime import date, datetime
 from app.config import settings
 from app.email_client import (
     _assign_direction,
+    _classify_cycletech_document,
     _classify_document_kind,
+    _classify_tenways_document,
     _derive_supplier_name,
     _domain_to_supplier_name,
     _extract_all_invoice_numbers,
+    _extract_cycletech_invoice_number,
     _extract_due_date,
     _extract_fields,
     _extract_invoice_number,
@@ -489,6 +492,138 @@ def test_extract_fields_falls_back_to_subject_when_text_has_no_number():
     subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/23162)"
     fields = _extract_fields(text, "notifications@tenways.com", "", subject, "invoice.pdf")
     assert fields["invoice_number"] == "INV/2026/23162"
+
+
+# -- Tenways supplier-name normalisation + document classification --
+# (real production bug: 104 real invoices/credit notes from
+# notifications@tenways.com were stored as document_kind "other"/"Geen
+# factuur" -- some of them because a later batch of Tenways' own
+# notifications switched display name to "Derk ten Kleij", a person at
+# Tenways using the same address, which became the stored supplier_name.)
+
+def test_derive_supplier_name_known_domain_wins_over_personal_display_name():
+    assert _derive_supplier_name("notifications@tenways.com", "Derk ten Kleij") == "Tenways"
+    assert _derive_supplier_name("notifications@tenways.com", "") == "Tenways"
+
+
+def test_classify_tenways_document_invoice_by_filename():
+    assert _classify_tenways_document("INV_2026_50218.pdf", "", "") == DocumentKind.INVOICE.value
+
+
+def test_classify_tenways_document_credit_note_by_filename():
+    assert _classify_tenways_document("RINV_2026_03285.pdf", "", "") == DocumentKind.INVOICE.value
+
+
+def test_classify_tenways_document_invoice_by_subject():
+    subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/50218)"
+    assert _classify_tenways_document("onbekend.pdf", subject, "") == DocumentKind.INVOICE.value
+
+
+def test_classify_tenways_document_credit_by_subject():
+    subject = "Tenways Technovation Europe B.V. Credit"
+    assert _classify_tenways_document("onbekend.pdf", subject, "") == DocumentKind.INVOICE.value
+
+
+def test_classify_tenways_document_quote_by_filename():
+    assert _classify_tenways_document("S0123456.pdf", "", "") == DocumentKind.OTHER.value
+
+
+def test_classify_tenways_document_quote_by_subject():
+    assert _classify_tenways_document("onbekend.pdf", "Quotation for your order", "") == DocumentKind.OTHER.value
+    assert _classify_tenways_document("onbekend.pdf", "Uw offerte van Tenways", "") == DocumentKind.OTHER.value
+
+
+def test_classify_tenways_document_falls_back_to_text_when_filename_and_subject_are_ambiguous():
+    assert _classify_tenways_document("onbekend.pdf", "Bericht van Tenways", "Please find attached our quotation.") == DocumentKind.OTHER.value
+    assert _classify_tenways_document("onbekend.pdf", "Bericht van Tenways", "Please find attached our invoice.") == DocumentKind.INVOICE.value
+
+
+def test_classify_tenways_document_returns_none_when_nothing_matches():
+    assert _classify_tenways_document("onbekend.pdf", "Bericht van Tenways", "geen van de trefwoorden hier") is None
+
+
+def test_classify_tenways_document_quote_filename_takes_priority_over_invoice_subject():
+    # Quotes must never be forwarded even if the subject is ambiguous --
+    # the filename convention wins when both signals are present.
+    subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/50218)"
+    assert _classify_tenways_document("S0123456.pdf", subject, "") == DocumentKind.OTHER.value
+
+
+def test_extract_fields_tenways_invoice_from_derk_ten_kleij_display_name():
+    text = "Invoice total due EUR 123,45\nVan der Linden Tweewielers"
+    subject = "Tenways Technovation Europe B.V. Invoice (Ref INV/2026/50218)"
+    fields = _extract_fields(text, "notifications@tenways.com", "Derk ten Kleij", subject, "INV_2026_50218.pdf")
+    assert fields["supplier_name"] == "Tenways"
+    assert fields["document_kind"] == DocumentKind.INVOICE.value
+
+
+def test_extract_fields_tenways_quote_from_derk_ten_kleij_never_a_vraagpost():
+    subject = "Quotation for your new bikes"
+    fields = _extract_fields("", "notifications@tenways.com", "Derk ten Kleij", subject, "S0123456.pdf")
+    assert fields["supplier_name"] == "Tenways"
+    assert fields["document_kind"] == DocumentKind.OTHER.value
+
+
+# -- CycleSoftware B.V. (noreply@twsc.nl) / Cycletech supplier fixes --
+# (real production bugs: "TWSC" used to be the known-domain name for
+# CycleSoftware's invoicing domain, and "CycleSoftware" sat on
+# BASECONE_EXCLUDE_SUPPLIERS -- see app/config.py. Cycletech invoices were
+# classified as "other", and their invoice_number sometimes picked up the
+# klantnummer instead of the real factuurnummer -- both numbers appear in
+# the filename "Factuur_<klantnummer>-<factuurnummer>.pdf".)
+
+def test_twsc_domain_maps_to_cyclesoftware_bv():
+    assert _domain_to_supplier_name("twsc.nl") == "CycleSoftware B.V."
+
+
+def test_cycletech_domain_maps_to_cycletech():
+    assert _derive_supplier_name("administratie@cycletech.nl", "") == "Cycletech"
+
+
+def test_classify_cycletech_document_invoice_by_filename():
+    assert _classify_cycletech_document("Factuur_122951-482075(1).pdf") == DocumentKind.INVOICE.value
+    assert _classify_cycletech_document("Factuur_122951-482075.pdf") == DocumentKind.INVOICE.value
+
+
+def test_classify_cycletech_document_returns_none_for_unrelated_filename():
+    assert _classify_cycletech_document("iets_anders.pdf") is None
+
+
+def test_extract_cycletech_invoice_number_is_the_second_number_not_the_klantnummer():
+    # 122951 is the klantnummer (ours), 482075 is the real factuurnummer --
+    # both filename variants (with/without the "(1)" duplicate-attachment
+    # suffix) must yield the same, correct number.
+    assert _extract_cycletech_invoice_number("Factuur_122951-482075(1).pdf") == "482075"
+    assert _extract_cycletech_invoice_number("Factuur_122951-482075.pdf") == "482075"
+
+
+def test_extract_fields_cycletech_invoice_both_filename_variants_match():
+    standalone = _extract_fields(
+        "Factuur 482075", "administratie@cycletech.nl", "", "Factuur 482075", "Factuur_122951-482075(1).pdf",
+    )
+    bundled = _extract_fields(
+        "Incasso overzicht", "administratie@cycletech.nl", "", "CYCLETECH | Incasso overzicht", "Factuur_122951-482075.pdf",
+    )
+    assert standalone["supplier_name"] == bundled["supplier_name"] == "Cycletech"
+    assert standalone["document_kind"] == bundled["document_kind"] == DocumentKind.INVOICE.value
+    assert standalone["invoice_number"] == bundled["invoice_number"] == "482075"
+
+
+def test_extract_fields_cycletech_invoice_dedupes_across_both_mails():
+    # Same amount/invoice_number/supplier -- invoice_dedup_key's
+    # supplier+number+amount fallback (used whenever the two copies aren't
+    # byte-identical, e.g. one came wrapped in a different mail) must now
+    # agree for the standalone mail and the bundled "incasso overzicht"
+    # copy of the exact same invoice, so it's never forwarded twice.
+    standalone = _extract_fields(
+        "Totaal EUR 45,00", "administratie@cycletech.nl", "", "Factuur 482075", "Factuur_122951-482075(1).pdf",
+    )
+    bundled = _extract_fields(
+        "Totaal EUR 45,00", "administratie@cycletech.nl", "", "CYCLETECH | Incasso overzicht", "Factuur_122951-482075.pdf",
+    )
+    key_a = invoice_dedup_key("", standalone["supplier_name"], standalone["invoice_number"], standalone["amount_cents"])
+    key_b = invoice_dedup_key("", bundled["supplier_name"], bundled["invoice_number"], bundled["amount_cents"])
+    assert key_a == key_b is not None
 
 
 # -- Due date ("Nog te betalen") --

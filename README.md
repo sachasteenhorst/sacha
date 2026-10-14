@@ -287,18 +287,34 @@ hoeven wisselen -- meteen ziet of hij al naar Basecone is:
   CycleSoftware/Lease a Bike-achtige verkoopkopie (zie "Basecone
   doorsturen" hierboven).
 
+Daarnaast, **onafhankelijk ernaast** (nooit in plaats van), een
+betaalstatus-label op elke échte inkoopfactuur (niet op "Geen factuur"-mails
+of eigen verkoopfacturen):
+
+- **"Nog betalen"** (rood) -- een inkoopfactuur die niet via incasso loopt
+  en nog niet gekoppeld/betaald is.
+- **"Betaald"** (blauw -- bewust niet groen, dat is al "Basecone ✓") --
+  zodra de factuur gekoppeld is aan een bankafschrijving of je op "Al
+  betaald" hebt geklikt. Een incasso-factuur krijgt nooit "Nog betalen",
+  maar wel "Betaald" zodra de incasso gekoppeld is.
+
 Je eigen bestaande categorieën op een mail blijven altijd staan -- dit zet
-alleen zijn eigen label erbij (of vervangt het eigen vorige label), nooit
+alleen zijn eigen labels erbij (of vervangt de eigen vorige labels), nooit
 iets anders.
 
-**Wanneer het label wordt bijgewerkt:**
+**Wanneer de labels worden bijgewerkt:**
 - Meteen na een geslaagde "Stuur naar Basecone" (automatisch of via de
   knop) -- wordt "Basecone ✓".
-- Meteen bij "Negeren" in het dashboard -- wordt "Geen factuur".
+- Meteen bij "Negeren" in het dashboard -- wordt "Geen factuur" (en geen
+  betaalstatus-label meer).
+- Meteen bij "Koppelen", "Klopt"/"Klopt niet" (match bevestigen/afwijzen),
+  "Al betaald" en "Loopt via incasso" -- werkt de betaalstatus bij (voor
+  "Loopt via incasso": elke andere nog openstaande factuur van diezelfde
+  leverancier wordt in één keer meegenomen).
 - Elke sync-ronde loopt er daarnaast een lichte opschoonronde overheen
   (hooguit `MAIL_LABEL_MAX_PER_SYNC`, standaard 50, per keer) die alleen
-  facturen aanraakt waarvan het label niet meer klopt met de huidige
-  situatie -- een factuur waarvan het label al goed staat kost dus geen
+  facturen aanraakt waarvan een van beide labels niet meer klopt met de
+  huidige situatie -- een factuur waarvan alles al goed staat kost dus geen
   Graph-aanroep.
 
 **Benodigde permissies**: zie "Azure AD app-registratie" hieronder
@@ -336,6 +352,38 @@ met exact deze namen -- "Basecone ✓", "Nog naar Basecone", "Geen factuur"
 categorie een mail krijgt) blijft daarna gewoon via deze app lopen; alleen
 het *aanmaken met kleur* was de stap die mogelijk niet via de gedeelde
 mailbox kan.
+
+## Basecone-bevestigingsmails opruimen
+
+De "succesvol verwerkt"-bevestiging die Basecone (via het e-mailadres van
+de boekhouder) terugstuurt na een doorgestuurde factuur, wordt automatisch
+verplaatst naar de map **"Succesvol naar Basecone"** in elke mailbox
+(aangemaakt als hij nog niet bestaat) en als gelezen gemarkeerd -- zo blijft
+de inbox van `facturen@`/`info@` overzichtelijk, maar blijft het bewijs dat
+de mail aankwam wel bewaard.
+
+**Let op: ongeverifieerd.** Deze app heeft nog nooit een echte
+bevestigingsmail van Basecone gezien, dus de standaardinstelling is een
+educated guess: het afzenderdomein van de boekhouder (`mailvanderlaangroep.nl`,
+hetzelfde adres als `BASECONE_FORWARD_ADDRESS`) plus een generieke
+`basecone.com`, gecombineerd met een paar waarschijnlijke
+onderwerpregel-woorden (`succesvol verwerkt`, `successfully processed`, ...)
+-- een mail moet BEIDE matchen om verplaatst te worden, zodat andere mail
+van hetzelfde adres nooit per ongeluk wordt opgeruimd. Zodra je een echte
+bevestigingsmail ziet: controleer de afzender en het onderwerp, en pas zo
+nodig `BASECONE_CONFIRMATION_SENDER_DOMAINS`/`BASECONE_CONFIRMATION_SUBJECT_KEYWORDS`
+aan in `.env` (geen nieuwe Graph-permissie nodig -- dit hergebruikt
+`Mail.ReadWrite.Shared`, dezelfde permissie als de e-maillabels hierboven).
+
+Bestaande bevestigingsmails van de laatste 12 maanden in één keer
+opruimen:
+
+```bash
+python3 scripts/file_basecone_confirmations.py          # dry-run, toont wat er zou gebeuren
+python3 scripts/file_basecone_confirmations.py --apply   # echt verplaatsen
+```
+
+Daarna gebeurt het vanzelf, elke sync-ronde.
 
 ## Vraagposten-pagina
 
@@ -962,6 +1010,7 @@ app/
   cyclesoftware_api.py     skelet voor een toekomstige live CS-koppeling (nog niet geimplementeerd)
   basecone_forward.py   Basecone-doorstuurcontrole + versturen (sendMail via Graph)
   mail_labels.py         Outlook-categorieën (labels) op factuurmails via Graph
+  mail_filing.py          Basecone-bevestigingsmails verplaatsen + als gelezen markeren via Graph
   vraagposten.py         bouwt de Vraagposten-lijst + voorgestelde acties
   sync.py               orchestreert e-mailsync + bankupload, draait de matcher
   sync_state.py          laatste-sync-info in geheugen, voor de statusbalk

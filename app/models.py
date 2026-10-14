@@ -235,6 +235,21 @@ class Invoice(Base):
     # desired category hasn't actually changed since last time. Added after
     # the first release -- see app/db.py's startup migration.
     graph_category: Mapped[str] = mapped_column(String, default="")
+    # The Outlook payment-status category (see app/mail_labels.py's
+    # desired_payment_category) we last successfully set -- "" when the
+    # invoice has none (never a bill to pay, or Sacha dismissed it by
+    # hand). Same relabel-skip reasoning as graph_category above. Added
+    # after the first release -- see app/db.py's startup migration.
+    graph_payment_category: Mapped[str] = mapped_column(String, default="")
+    # True only for a historical document a one-off backfill script
+    # reclassified from OTHER to an actually-forwardable kind (see
+    # scripts/fix_tenways.py) -- keeps app.basecone_forward's automatic
+    # AUTO_FORWARD_BASECONE sync step from suddenly mass-sending months of
+    # old invoices the moment their document_kind flips to "invoice".
+    # Never checked by is_forwardable/the manual "Stuur naar Basecone"
+    # button, so Sacha can still send these by hand whenever he decides to.
+    # Added after the first release -- see app/db.py's startup migration.
+    excluded_from_auto_forward: Mapped[bool] = mapped_column(Boolean, default=False)
 
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 

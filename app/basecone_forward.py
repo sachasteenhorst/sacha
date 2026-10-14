@@ -227,7 +227,8 @@ def auto_forward_new_invoices(session: Session) -> AutoForwardResult:
 
     eligible = [
         inv for inv in candidates
-        if is_forwardable(inv) and is_confident(inv) and inv.received_at and inv.received_at.date() >= since
+        if is_forwardable(inv) and is_confident(inv) and not inv.excluded_from_auto_forward
+        and inv.received_at and inv.received_at.date() >= since
     ]
     for invoice in eligible[: settings.auto_forward_max_per_sync]:
         try:

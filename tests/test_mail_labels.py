@@ -11,17 +11,20 @@ import app.mail_labels as mail_labels
 from app.db import Base
 from app.mail_labels import (
     CATEGORY_BASECONE_OK,
+    CATEGORY_BETAALD,
     CATEGORY_GEEN_FACTUUR,
+    CATEGORY_NOG_BETALEN,
     CATEGORY_NOG_NAAR_BASECONE,
     LabelSyncState,
     desired_category,
+    desired_payment_category,
     ensure_categories_exist,
     invoices_needing_relabel,
     label_error_hint,
     relabel_invoices,
     set_invoice_category,
 )
-from app.models import BaseconeForwardStatus, DocumentKind, Direction, Invoice, MatchStatus
+from app.models import BaseconeForwardStatus, DocumentKind, Direction, Invoice, MatchStatus, PaymentMethod
 
 
 @pytest.fixture()
@@ -100,6 +103,53 @@ def test_desired_category_cyclesoftware_sales_copy_is_geen_factuur():
     assert desired_category(inv) == CATEGORY_GEEN_FACTUUR
 
 
+# -- desired_payment_category --
+
+def test_desired_payment_category_open_non_incasso_invoice_is_nog_betalen():
+    inv = make_invoice(payment_method=PaymentMethod.ONBEKEND.value)
+    assert desired_payment_category(inv) == CATEGORY_NOG_BETALEN
+
+
+def test_desired_payment_category_matched_invoice_is_betaald():
+    inv = make_invoice(status=MatchStatus.MATCHED)
+    assert desired_payment_category(inv) == CATEGORY_BETAALD
+
+
+def test_desired_payment_category_paid_by_hand_is_betaald():
+    inv = make_invoice(paid_at=datetime(2026, 9, 5))
+    assert desired_payment_category(inv) == CATEGORY_BETAALD
+
+
+def test_desired_payment_category_incasso_not_yet_matched_is_none():
+    inv = make_invoice(payment_method=PaymentMethod.INCASSO.value)
+    assert desired_payment_category(inv) is None
+
+
+def test_desired_payment_category_incasso_once_matched_is_betaald():
+    inv = make_invoice(payment_method=PaymentMethod.INCASSO.value, status=MatchStatus.MATCHED)
+    assert desired_payment_category(inv) == CATEGORY_BETAALD
+
+
+def test_desired_payment_category_manually_ignored_is_none():
+    inv = make_invoice(manually_ignored=True)
+    assert desired_payment_category(inv) is None
+
+
+def test_desired_payment_category_other_document_kind_is_none():
+    inv = make_invoice(document_kind=DocumentKind.OTHER.value)
+    assert desired_payment_category(inv) is None
+
+
+def test_desired_payment_category_sales_invoice_is_none():
+    inv = make_invoice(document_kind=DocumentKind.SALES_INVOICE.value, direction=Direction.INCOMING.value)
+    assert desired_payment_category(inv) is None
+
+
+def test_desired_payment_category_incoming_document_is_none():
+    inv = make_invoice(direction=Direction.INCOMING.value)
+    assert desired_payment_category(inv) is None
+
+
 # -- set_invoice_category / ensure_categories_exist --
 
 def test_set_invoice_category_skips_without_graph_message_id():
@@ -108,7 +158,9 @@ def test_set_invoice_category_skips_without_graph_message_id():
 
 
 def test_set_invoice_category_skips_when_already_correct():
-    inv = make_invoice(graph_category=CATEGORY_NOG_NAAR_BASECONE)
+    # The default fixture invoice is also a tracked, not-yet-paid,
+    # non-incasso purchase invoice -- both categories must already match.
+    inv = make_invoice(graph_category=CATEGORY_NOG_NAAR_BASECONE, graph_payment_category=CATEGORY_NOG_BETALEN)
     assert set_invoice_category(inv) is False
 
 
@@ -137,20 +189,85 @@ def test_set_invoice_category_preserves_other_categories(monkeypatch):
 
     assert changed is True
     assert inv.graph_category == CATEGORY_NOG_NAAR_BASECONE
+    # The Basecone-status AND payment-status categories are applied
+    # together, in the same PATCH, side by side.
+    assert inv.graph_payment_category == CATEGORY_NOG_BETALEN
     patch_calls = [c for c in calls if c[0] == "PATCH"]
     assert len(patch_calls) == 1
     new_categories = patch_calls[0][2]["categories"]
     assert "Belangrijk" in new_categories
     assert "Oude label van mij" in new_categories
     assert CATEGORY_NOG_NAAR_BASECONE in new_categories
-    # Our two OTHER categories (not the one assigned) never leak in.
+    assert CATEGORY_NOG_BETALEN in new_categories
+    # Every OTHER category (not one of the two assigned) never leaks in.
     assert CATEGORY_BASECONE_OK not in new_categories
     assert CATEGORY_GEEN_FACTUUR not in new_categories
-    # masterCategories got the two still-missing categories created.
+    assert CATEGORY_BETAALD not in new_categories
+    # masterCategories got the still-missing categories created.
     created_names = {c[2]["displayName"] for c in calls if c[0] == "POST"}
     assert CATEGORY_NOG_NAAR_BASECONE in created_names
     assert CATEGORY_GEEN_FACTUUR in created_names
+    assert CATEGORY_NOG_BETALEN in created_names
     assert "Belangrijk" not in created_names  # already existed -- not recreated
+
+
+def test_set_invoice_category_applies_payment_category_even_when_basecone_status_is_unchanged(monkeypatch):
+    # Real scenario: an invoice was already labelled correctly for
+    # Basecone status, but just got matched against a bank transaction --
+    # only the payment category needs to change.
+    calls = []
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url.endswith("/outlook/masterCategories"):
+            return FakeResponse(200, {"value": [{"displayName": c} for c in [CATEGORY_NOG_NAAR_BASECONE, CATEGORY_NOG_BETALEN, CATEGORY_BETAALD]]})
+        return FakeResponse(200, {"categories": [CATEGORY_NOG_NAAR_BASECONE, CATEGORY_NOG_BETALEN]})
+
+    def fake_patch(url, headers=None, json=None, timeout=None):
+        calls.append(json)
+        return FakeResponse(200, {})
+
+    monkeypatch.setattr(email_client.requests, "get", fake_get)
+    monkeypatch.setattr(email_client.requests, "patch", fake_patch)
+
+    inv = make_invoice(
+        graph_category=CATEGORY_NOG_NAAR_BASECONE, graph_payment_category=CATEGORY_NOG_BETALEN,
+        status=MatchStatus.MATCHED,
+    )
+    changed = set_invoice_category(inv)
+
+    assert changed is True
+    assert inv.graph_payment_category == CATEGORY_BETAALD
+    new_categories = calls[0]["categories"]
+    assert CATEGORY_NOG_NAAR_BASECONE in new_categories
+    assert CATEGORY_BETAALD in new_categories
+    assert CATEGORY_NOG_BETALEN not in new_categories
+
+
+def test_set_invoice_category_omits_payment_category_entirely_when_none(monkeypatch):
+    # A document with no payment category at all (e.g. "Geen factuur")
+    # must never get a stray payment label.
+    calls = []
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if url.endswith("/outlook/masterCategories"):
+            return FakeResponse(200, {"value": []})
+        return FakeResponse(200, {"categories": []})
+
+    def fake_patch(url, headers=None, json=None, timeout=None):
+        calls.append(json)
+        return FakeResponse(200, {})
+
+    monkeypatch.setattr(email_client.requests, "get", fake_get)
+    monkeypatch.setattr(email_client.requests, "post", lambda *a, **k: FakeResponse(201, {}))
+    monkeypatch.setattr(email_client.requests, "patch", fake_patch)
+
+    inv = make_invoice(document_kind=DocumentKind.OTHER.value)
+    set_invoice_category(inv)
+
+    assert inv.graph_payment_category == ""
+    new_categories = calls[0]["categories"]
+    assert CATEGORY_NOG_BETALEN not in new_categories
+    assert CATEGORY_BETAALD not in new_categories
 
 
 def test_ensure_categories_exist_failure_is_swallowed(monkeypatch):
@@ -207,7 +324,9 @@ def test_set_invoice_category_raises_on_message_patch_permission_error(monkeypat
 # -- invoices_needing_relabel / relabel_invoices --
 
 def test_invoices_needing_relabel_skips_up_to_date_ones(session):
-    up_to_date = make_invoice(email_message_id="<a>", graph_category=CATEGORY_NOG_NAAR_BASECONE)
+    up_to_date = make_invoice(
+        email_message_id="<a>", graph_category=CATEGORY_NOG_NAAR_BASECONE, graph_payment_category=CATEGORY_NOG_BETALEN,
+    )
     stale = make_invoice(email_message_id="<b>", graph_category="")
     no_message_id = make_invoice(email_message_id="<c>", graph_message_id="")
     session.add_all([up_to_date, stale, no_message_id])
@@ -218,6 +337,19 @@ def test_invoices_needing_relabel_skips_up_to_date_ones(session):
     assert stale in needing
     assert up_to_date not in needing
     assert no_message_id not in needing
+
+
+def test_invoices_needing_relabel_catches_a_payment_category_only_change(session):
+    # Basecone status already correct, but the payment category is stale
+    # (e.g. the invoice just got matched) -- still needs a relabel.
+    inv = make_invoice(
+        email_message_id="<a>", graph_category=CATEGORY_NOG_NAAR_BASECONE, graph_payment_category=CATEGORY_NOG_BETALEN,
+        status=MatchStatus.MATCHED,
+    )
+    session.add(inv)
+    session.commit()
+
+    assert inv in invoices_needing_relabel(session)
 
 
 def test_relabel_invoices_stops_on_auth_error(monkeypatch):

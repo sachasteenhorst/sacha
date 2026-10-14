@@ -85,8 +85,16 @@ def _reparse_fields(session) -> tuple[int, int, int, int, int]:
             # Was auto-ignored earlier (document_kind was "other" back
             # then) -- better extraction now recognises it as a real
             # invoice/specification, so reopen it. Never touches a document
-            # Sacha ignored by hand via the dashboard.
+            # Sacha ignored by hand via the dashboard. This is, by
+            # definition, a historical document that was never going to be
+            # auto-forwarded before (it was ignored) -- a classification fix
+            # must never turn into "suddenly auto-forward months of old
+            # invoices to Basecone the moment it ships" (see
+            # scripts/fix_tenways.py, where this exact scenario first came
+            # up), so it's excluded from AUTO_FORWARD_BASECONE the same way;
+            # Sacha still sends these by hand whenever he decides to.
             inv.status = MatchStatus.UNMATCHED
+            inv.excluded_from_auto_forward = True
             reopened += 1
 
         updated += 1

@@ -25,6 +25,8 @@ from sqlalchemy.orm import Session
 from app import sync_state
 from app.bank_ponto import PontoError, get_state as get_ponto_state
 from app.bank_ponto import ponto_configured, ponto_error_hint, run_manual_ponto_refresh
+from app.mail_filing import filing_error_hint
+from app.mail_filing import get_state as get_filing_state
 from app.mail_labels import get_state as get_label_state
 from app.mail_labels import label_error_hint
 from app.basecone_forward import basecone_status_label, is_confident, is_forwardable, send_invoice_to_basecone
@@ -339,16 +341,26 @@ def _monthly_progress(session: Session) -> list[dict]:
 
 def _relabel_invoice_best_effort(invoice: Invoice) -> None:
     """Best-effort Outlook-category update after a manual dashboard action
-    that changes an invoice's desired label (currently: "Negeren") --
-    mirrors app.basecone_forward._relabel_after_basecone_change. Never
-    raises: a label-permission problem must never block the dashboard
-    action that triggered it, only show up in the status bar."""
+    that changes an invoice's desired label (Negeren/Al betaald/Loopt via
+    incasso/Koppelen/Klopt/Klopt niet) -- mirrors
+    app.basecone_forward._relabel_after_basecone_change. Never raises: a
+    label-permission problem must never block the dashboard action that
+    triggered it, only show up in the status bar."""
     from app.mail_labels import GraphApiError, GraphAuthError, note_single_label_error, set_invoice_category
 
     try:
         set_invoice_category(invoice)
     except (GraphAuthError, GraphApiError) as exc:
         note_single_label_error(str(exc))
+
+
+def _relabel_invoices_best_effort(invoices: list[Invoice]) -> None:
+    """Same as _relabel_invoice_best_effort, for every invoice a single
+    dashboard action affects at once (a match group can cover several
+    documents; "Loopt via incasso" reclassifies a supplier's whole
+    backlog)."""
+    for invoice in invoices:
+        _relabel_invoice_best_effort(invoice)
 
 
 def _dot_status(configured: bool, error: str | None) -> str:
@@ -522,6 +534,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         if ponto_state.last_ponto_synchronized_at else None
     )
     label_state = get_label_state()
+    filing_state = get_filing_state()
 
     status_bar = {
         "email_status": _dot_status(email_configured, last.email_error),
@@ -539,6 +552,8 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "ponto_error_hint": ponto_error_hint(ponto_state.last_error),
         "label_status": _dot_status(email_configured, label_state.last_error),
         "label_error_hint": label_error_hint(label_state.last_error),
+        "filing_status": _dot_status(email_configured, filing_state.last_error),
+        "filing_error_hint": filing_error_hint(filing_state.last_error),
     }
 
     # -- Month dropdown options --
@@ -805,6 +820,7 @@ def confirm_match_group(
         m.confirmed = True
         m.invoice.status = MatchStatus.MATCHED
     matches[0].transaction.status = MatchStatus.MATCHED
+    _relabel_invoices_best_effort([m.invoice for m in matches])
     session.commit()
     return _action_response(request, q, maand, anchor=anchor)
 
@@ -823,10 +839,12 @@ def reject_match_group(
         raise HTTPException(404, "Match niet gevonden")
     anchor = _next_anchor(_suggested_group_ids(session, q, maand), group_id, "suggested", "te-controleren")
     transaction = matches[0].transaction
+    invoices = [m.invoice for m in matches]
     for m in matches:
         m.invoice.status = MatchStatus.UNMATCHED
         session.delete(m)
     transaction.status = MatchStatus.UNMATCHED
+    _relabel_invoices_best_effort(invoices)
     session.commit()
     return _action_response(request, q, maand, anchor=anchor)
 
@@ -877,6 +895,7 @@ def manual_match(
         )
         invoice.status = MatchStatus.MATCHED
     transaction.status = MatchStatus.MATCHED
+    _relabel_invoices_best_effort(invoices)
     session.commit()
     return _action_response(request, q, maand, anchor=anchor)
 
@@ -962,6 +981,7 @@ def mark_invoice_paid(
         raise HTTPException(404, "Factuur niet gevonden")
     anchor = _next_anchor(_te_betalen_ids(session), invoice_id, "te-betalen", "nog-te-betalen")
     mark_paid(invoice)
+    _relabel_invoice_best_effort(invoice)
     session.commit()
     return _action_response(request, q, maand, anchor=anchor)
 
@@ -979,7 +999,8 @@ def mark_invoice_incasso(
     if invoice is None:
         raise HTTPException(404, "Factuur niet gevonden")
     anchor = _next_anchor(_te_betalen_ids(session), invoice_id, "te-betalen", "nog-te-betalen")
-    learn_incasso_supplier(session, invoice.supplier_name)
+    changed_invoices = learn_incasso_supplier(session, invoice.supplier_name)
+    _relabel_invoices_best_effort(changed_invoices)
     session.commit()
     return _action_response(request, q, maand, anchor=anchor)
 
