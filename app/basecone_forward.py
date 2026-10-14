@@ -78,6 +78,8 @@ def not_applicable_reason(invoice: Invoice) -> str | None:
     isn't incoming, and BASECONE_INCLUDE_INCOMING (ENRA) is a narrow
     exception to the incoming-direction rule specifically, not a blanket
     override of the supplier exclusion list."""
+    if invoice.addressee_status == "not_for_us":
+        return "niet aan ons gericht"
     supplier_lower = (invoice.supplier_name or "").lower()
     if any(name and name in supplier_lower for name in settings.own_company_name_list):
         return "eigen verkoopfactuur"

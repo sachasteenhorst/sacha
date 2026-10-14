@@ -161,6 +161,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.75rem 3rem; }
 .banner-warning { background: var(--warning-bg); color: var(--warning-text); }
 .banner-ok { background: #e7f3ec; color: var(--accent); }
 .banner-error { background: #fbeceb; color: var(--danger); }
+.banner.hidden { display: none; }
 
 .upload-box { margin-bottom: 1.5rem; }
 .upload-box .filter-form { margin-bottom: 0; }

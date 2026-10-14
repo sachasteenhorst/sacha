@@ -77,14 +77,23 @@ class Settings(BaseSettings):
     # these is SMALLER: a percentage of the invoice total, or a flat amount.
     payment_discount_percent: float = 3.0
     payment_discount_max_cents: int = 2500
-    # Own company names (comma-separated, matched case-insensitively against
-    # the sender's display name) -- a verkoopfactuur we ourselves sent to a
-    # customer, that ends up in a mailbox we scan (e.g. archived/CC'd into
-    # info@), is never a purchase to pay and must never count as an open
-    # inkoopfactuur. Any sender on the same domain as a configured mailbox
-    # (see graph_mailboxes) is always treated as "ourselves" too, with no
-    # config needed.
-    own_company_names: str = "Van der Linden Tweewielers,Hing B.V."
+    # Own company names (comma-separated) -- matched two ways: (1)
+    # case-insensitively against the sender's display name, to recognise a
+    # verkoopfactuur we ourselves sent to a customer that ends up in a
+    # mailbox we scan (e.g. archived/CC'd into info@) as never a purchase
+    # to pay; (2) punctuation/spacing-insensitively (see
+    # app.payments.mentions_own_company) against a genuine inkoopfactuur's
+    # own text, to catch one that was never actually addressed to us at
+    # all. "Vd Linden Tweewielers" is its own entry (not just a variant of
+    # "Van der Linden Tweewielers") since "van der" -> "vd" is a real
+    # abbreviation, not punctuation -- the normalisation can't bridge that,
+    # but it DOES mean each entry alone also matches its own
+    # punctuation/capitalization variants (e.g. "Hing B.V." already matches
+    # "HING BV"/"Hing bv", and "Van der Linden Tweewielers" already matches
+    # bare "vanderlindentweewielers"). Any sender on the same domain as a
+    # configured mailbox (see graph_mailboxes) is always treated as
+    # "ourselves" too, with no config needed.
+    own_company_names: str = "Van der Linden Tweewielers,Vd Linden Tweewielers,Hing B.V."
     # Suppliers/afzenders (kommagescheiden, hoofdletterongevoelig) wier
     # documenten NOOIT naar Basecone mogen, zelfs niet als extractie ze
     # herkent als een gewone uitgaande inkoopfactuur -- ze gaan al via een
@@ -138,13 +147,10 @@ class Settings(BaseSettings):
     # moved into and marked read. Created automatically if it doesn't exist.
     basecone_confirmation_folder: str = "Succesvol naar Basecone"
     # Sender domains (comma-separated, case-insensitive) a confirmation mail
-    # comes from. UNVERIFIED against a real confirmation mail as of writing
-    # (this app has never seen one) -- defaults to the accountant's own
-    # mail-processing domain (same one BASECONE_FORWARD_ADDRESS sends to,
-    # which very likely sends the confirmation back too) plus a generic
-    # "basecone.com" guess. Check an actual confirmation mail's sender and
-    # adjust this if it doesn't match.
-    basecone_confirmation_sender_domains: str = "mailvanderlaangroep.nl,basecone.com"
+    # comes from -- confirmed (no-reply@mailtobasecone.com is Basecone's
+    # real confirmation sender). The accountant's own mail-processing domain
+    # is kept alongside it, in case a confirmation ever comes from there too.
+    basecone_confirmation_sender_domains: str = "mailtobasecone.com,mailvanderlaangroep.nl"
     # Subject keywords (comma-separated, case-insensitive, matched as a
     # substring) that, together with the sender domain above, identify a
     # confirmation mail -- requiring BOTH avoids silently filing away other,

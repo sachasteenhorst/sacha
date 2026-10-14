@@ -19,6 +19,7 @@ from app.payments import (
     is_tracked_purchase_invoice,
     learn_incasso_supplier,
     mark_paid,
+    mentions_own_company,
 )
 
 
@@ -45,6 +46,7 @@ def make_invoice(**kwargs):
         status=MatchStatus.UNMATCHED,
         payment_method=PaymentMethod.ONBEKEND.value,
         due_date=date(2026, 9, 30),
+        addressee_status="ok",
     )
     defaults.update(kwargs)
     return Invoice(**defaults)
@@ -159,6 +161,41 @@ def test_is_tracked_purchase_invoice_false_for_zero_or_missing_amount(session):
     assert is_tracked_purchase_invoice(make_invoice(amount_cents=None)) is False
 
 
+def test_is_tracked_purchase_invoice_false_when_not_addressed_to_us(session):
+    inv = make_invoice(addressee_status="not_for_us")
+    assert is_tracked_purchase_invoice(inv) is False
+
+
+def test_is_tracked_purchase_invoice_true_when_addressee_unknown(session):
+    # "unknown" never blocks anything -- not enough signal either way.
+    inv = make_invoice(addressee_status="unknown")
+    assert is_tracked_purchase_invoice(inv) is True
+
+
+# -- mentions_own_company (see app.email_client._check_addressee) --
+
+def test_mentions_own_company_matches_hing_variants_regardless_of_punctuation():
+    assert mentions_own_company("Factuur voor HING BV, Fietsstraat 1") is True
+    assert mentions_own_company("Factuur voor Hing bv, Fietsstraat 1") is True
+    assert mentions_own_company("Factuur voor Hing B.V., Fietsstraat 1") is True
+
+
+def test_mentions_own_company_matches_van_der_linden_variants():
+    assert mentions_own_company("Van der Linden Tweewielers, Fietsstraat 1") is True
+    assert mentions_own_company("vanderlindentweewielers") is True
+    assert mentions_own_company("Factuur voor V.d. Linden Tweewielers") is True
+    assert mentions_own_company("Factuur voor vd Linden Tweewielers") is True
+
+
+def test_mentions_own_company_false_for_unrelated_text():
+    assert mentions_own_company("Factuur voor J. de Klant, Dorpsstraat 1, Amsterdam") is False
+
+
+def test_mentions_own_company_true_when_own_company_names_unset(monkeypatch):
+    monkeypatch.setattr(settings, "own_company_names", "")
+    assert mentions_own_company("iets willekeurigs") is True
+
+
 # -- is_payable_invoice: stricter exclusions (production bug: 258 false
 # "Nog te betalen" entries after the previous round's deploy) --
 
@@ -181,22 +218,41 @@ def test_is_payable_invoice_true_for_business_email_domain(session):
 
 
 def test_is_payable_invoice_false_when_not_addressed_to_own_company(session):
-    # No mention of "Van der Linden"/"Hing" anywhere in the document text --
-    # more likely addressed to a customer or private individual than a bill
+    # addressee_status is set once at extraction time (see
+    # app.email_client._check_addressee) -- "not_for_us" here means no
+    # mention of "Van der Linden"/"Hing" anywhere in the document text, more
+    # likely addressed to a customer or private individual than a bill
     # this shop owes.
-    inv = make_invoice(extracted_text="Factuur voor J. de Klant, Dorpsstraat 1, Amsterdam. Totaal: EUR 120,00")
+    inv = make_invoice(
+        extracted_text="Factuur voor J. de Klant, Dorpsstraat 1, Amsterdam. Totaal: EUR 120,00",
+        addressee_status="not_for_us",
+    )
     assert is_payable_invoice(inv) is False
 
 
 def test_is_payable_invoice_true_when_addressed_to_own_company(session):
-    inv = make_invoice(extracted_text="Factuur voor Van der Linden Tweewielers, Hoofdstraat 1. Totaal: EUR 120,00")
+    inv = make_invoice(
+        extracted_text="Factuur voor Van der Linden Tweewielers, Hoofdstraat 1. Totaal: EUR 120,00",
+        addressee_status="ok",
+    )
     assert is_payable_invoice(inv) is True
 
 
-def test_is_payable_invoice_not_excluded_when_no_text_at_all(session):
-    # No extracted_text to check against at all -- not enough signal to
-    # exclude on the addressee-name basis alone.
-    inv = make_invoice(extracted_text="")
+def test_is_payable_invoice_not_excluded_when_addressee_unknown(session):
+    # "unknown" (no text to check against at all) never excludes -- not
+    # enough signal, see module docstring on "niet blokkeren".
+    inv = make_invoice(extracted_text="", addressee_status="unknown")
+    assert is_payable_invoice(inv) is True
+
+
+def test_is_payable_invoice_true_again_after_toch_voor_ons_override(session):
+    # The dashboard's "Toch voor ons" button resets addressee_status to
+    # "ok" -- is_payable_invoice must respect that override even though the
+    # text itself never changed.
+    inv = make_invoice(
+        extracted_text="Factuur voor J. de Klant, Dorpsstraat 1, Amsterdam. Totaal: EUR 120,00",
+        addressee_status="ok", addressee_reviewed=True,
+    )
     assert is_payable_invoice(inv) is True
 
 

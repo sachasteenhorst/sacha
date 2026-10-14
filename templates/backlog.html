@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block breadcrumb %}Oude facturen naar Basecone{% endblock %}
+{% block content %}
+
+<section id="backlog">
+  <h2>Oude facturen naar Basecone ({{ total_count }})</h2>
+  <p class="hint">
+    Deze facturen zijn uitgesloten van automatisch doorsturen (herclassificatie van Tenways/CycleSoftware/
+    Cycletech-facturen die eerder als "Geen factuur" stonden) -- jij beslist of en wanneer ze alsnog naar
+    Basecone gaan. Ze worden rustig verstuurd, 1 per 2 seconden, op de achtergrond.
+    Facturen die "Niet aan ons gericht" staan, staan standaard uitgevinkt.
+  </p>
+
+  <div id="backlog-progress" class="banner banner-ok{% if not state.running and not state.done %} hidden{% endif %}" data-running="{{ 'true' if state.running else 'false' }}">
+    <span id="backlog-progress-text">{{ state.sent }} van {{ state.total }} verstuurd</span>
+    {% if state.errors %}
+    <br><span class="status-error">&#9888; {{ state.errors|length }} fout(en): {{ state.errors[0] }}</span>
+    {% endif %}
+  </div>
+
+  {% if supplier_groups %}
+  <form method="post" action="/invoices/backlog/send" id="backlog-form">
+    <table class="muted" style="margin-bottom:1rem;">
+      <thead><tr><th>Leverancier</th><th>Aantal</th><th>Totaal</th></tr></thead>
+      <tbody>
+        {% for group in supplier_groups %}
+        <tr><td>{{ group.supplier_name }}</td><td>{{ group.count }}</td><td class="amount">{{ group.total_cents|euros }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><th>Totaal</th><th>{{ total_count }}</th><th class="amount">{{ total_cents|euros }}</th></tr></tfoot>
+    </table>
+
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th></th><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>PDF</th></tr>
+      </thead>
+      <tbody>
+        {% for group in supplier_groups %}
+        {% for inv in group.invoices %}
+        <tr>
+          <td class="checkbox-cell">
+            <input type="checkbox" name="invoice_ids" value="{{ inv.id }}"{% if inv.addressee_status != "not_for_us" %} checked{% endif %}>
+          </td>
+          <td>{{ inv.received_at|dutch_date }}</td>
+          <td>{{ inv.supplier_name or "?" }}{% if inv.addressee_status == "not_for_us" %} <small class="muted-text">(niet aan ons gericht)</small>{% endif %}</td>
+          <td>{{ inv.invoice_number or "?" }}</td>
+          <td class="amount">{{ inv.amount_cents|euros }}</td>
+          <td>
+            {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <button class="btn btn-primary" type="submit" id="backlog-submit"{% if state.running %} disabled{% endif %}>Verstuur geselecteerde naar Basecone</button>
+  </form>
+  {% else %}
+  <p class="empty">Niets (meer) in de backlog. 🎉</p>
+  {% endif %}
+</section>
+
+{% if state.running %}
+<script>
+(function () {
+  "use strict";
+  var textEl = document.getElementById("backlog-progress-text");
+  var progressEl = document.getElementById("backlog-progress");
+  var submitBtn = document.getElementById("backlog-submit");
+
+  function poll() {
+    fetch("/invoices/backlog/status")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        textEl.textContent = data.sent + " van " + data.total + " verstuurd";
+        if (data.done) {
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        setTimeout(poll, 2000);
+      })
+      .catch(function () { setTimeout(poll, 5000); });
+  }
+
+  progressEl.classList.remove("hidden");
+  poll();
+})();
+</script>
+{% endif %}
+
+{% endblock %}

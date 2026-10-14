@@ -154,6 +154,7 @@ def _sync_invoices(session: Session, since: date, result: SyncResult) -> None:
                 due_date=inv.due_date,
                 due_date_estimated=inv.due_date_estimated,
                 payment_method=determine_payment_method(session, inv.supplier_name, inv.incasso_hint),
+                addressee_status=inv.addressee_status,
             )
         )
         result.new_invoices += 1

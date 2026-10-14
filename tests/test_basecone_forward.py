@@ -152,6 +152,12 @@ def test_is_forwardable_true_for_normal_outgoing_supplier_invoice(tmp_path):
     assert bf.basecone_status_label(normal) == "nee"
 
 
+def test_is_forwardable_false_when_not_addressed_to_us(tmp_path):
+    inv = make_invoice(tmp_path, addressee_status="not_for_us")
+    assert bf.is_forwardable(inv) is False
+    assert "niet aan ons gericht" in bf.basecone_status_label(inv)
+
+
 def test_is_forwardable_false_for_cyclesoftware_sales_invoice(tmp_path):
     # A CycleSoftware verkoopfactuur (this shop's own sale) must never reach
     # Basecone -- FORWARDABLE_DOCUMENT_KINDS simply never includes

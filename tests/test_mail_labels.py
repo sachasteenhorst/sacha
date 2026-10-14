@@ -13,6 +13,7 @@ from app.mail_labels import (
     CATEGORY_BASECONE_OK,
     CATEGORY_BETAALD,
     CATEGORY_GEEN_FACTUUR,
+    CATEGORY_NIET_VOOR_ONS,
     CATEGORY_NOG_BETALEN,
     CATEGORY_NOG_NAAR_BASECONE,
     LabelSyncState,
@@ -88,6 +89,18 @@ def test_desired_category_manually_ignored_is_geen_factuur():
     assert desired_category(inv) == CATEGORY_GEEN_FACTUUR
 
 
+def test_desired_category_not_for_us_wins_over_forwardable():
+    inv = make_invoice(addressee_status="not_for_us")
+    assert desired_category(inv) == CATEGORY_NIET_VOOR_ONS
+
+
+def test_desired_category_basecone_ok_wins_over_not_for_us():
+    # A historical fact (already sent) must never be relabeled away just
+    # because the addressee check flags it afterwards.
+    inv = make_invoice(in_basecone=BaseconeForwardStatus.YES.value, addressee_status="not_for_us")
+    assert desired_category(inv) == CATEGORY_BASECONE_OK
+
+
 def test_desired_category_open_inkoopfactuur_is_nog_naar_basecone():
     inv = make_invoice()
     assert desired_category(inv) == CATEGORY_NOG_NAAR_BASECONE
@@ -147,6 +160,11 @@ def test_desired_payment_category_sales_invoice_is_none():
 
 def test_desired_payment_category_incoming_document_is_none():
     inv = make_invoice(direction=Direction.INCOMING.value)
+    assert desired_payment_category(inv) is None
+
+
+def test_desired_payment_category_not_for_us_is_none():
+    inv = make_invoice(addressee_status="not_for_us")
     assert desired_payment_category(inv) is None
 
 

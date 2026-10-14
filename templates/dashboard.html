@@ -420,6 +420,9 @@
 <section id="niet-naar-basecone">
   <h2>Niet naar Basecone (<span data-counter="niet_naar_basecone">{{ counters.niet_naar_basecone }}</span>)</h2>
   <p class="hint">Deze facturen/creditnota's zijn nog niet naar de boekhouder (Basecone) gestuurd. Zonder dat ziet de accountant het document niet, ook al staat het hier als "gekoppeld".</p>
+  {% if backlog_count %}
+  <p class="hint">Daarnaast staan er <strong>{{ backlog_count }}</strong> oude, uitgesloten facturen (Tenways/CycleSoftware/Cycletech) te wachten -- <a href="/invoices/backlog">bekijk en verstuur de oude facturen naar Basecone</a>.</p>
+  {% endif %}
   {% if basecone_todo %}
   <form method="post" action="/invoices/forward-to-basecone-bulk">
     <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
@@ -487,6 +490,52 @@
   </div>
   {% else %}
   <p class="empty">Niets om te controleren.</p>
+  {% endif %}
+</section>
+
+<section id="niet-aan-ons-gericht">
+  <h2>Controleren: niet aan ons gericht (<span data-counter="niet_aan_ons_gericht">{{ addressee_review|length }}</span>)</h2>
+  <p class="hint">Deze documenten noemen nergens "Hing B.V." of "Van der Linden Tweewielers" -- mogelijk niet voor ons bedoeld. Gaan niet automatisch naar Basecone of "Zelf betalen" totdat je dit bevestigt.</p>
+  {% if addressee_review %}
+  <div class="table-scroll">
+  <table class="muted">
+    <thead>
+      <tr><th>Ontvangen</th><th>Leverancier</th><th>Factuurnr</th><th>Bedrag</th><th>Reden</th><th>PDF</th><th>Actie</th></tr>
+    </thead>
+    <tbody>
+      {% for inv in addressee_review %}
+      <tr id="row-addressee-review-{{ inv.id }}">
+        <td>{{ inv.received_at|dutch_date }}</td>
+        <td>{{ inv.supplier_name or "?" }}</td>
+        <td>{{ inv.invoice_number or "?" }}</td>
+        <td class="amount">{{ inv.amount_cents|euros }}</td>
+        <td>
+          {% if inv.addressee_status == "unknown" %}
+          <small class="muted-text">geadresseerde onbekend (PDF onleesbaar)</small>
+          {% else %}
+          <small class="muted-text">geen bekende naam gevonden</small>
+          {% endif %}
+        </td>
+        <td>
+          {% if inv.pdf_path %}<a href="/invoices/{{ inv.id }}/pdf" target="_blank" class="pdf-link">PDF</a>{% else %}<span class="muted-text">-</span>{% endif %}
+        </td>
+        <td class="actions">
+          <form method="post" action="/invoices/{{ inv.id }}/addressee-confirm-ours" class="ajax-row-form" data-counter-targets="niet_aan_ons_gericht">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-confirm">Toch voor ons</button>
+          </form>
+          <form method="post" action="/invoices/{{ inv.id }}/addressee-dismiss" class="ajax-row-form" data-counter-targets="niet_aan_ons_gericht">
+            <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="maand" value="{{ maand }}">
+            <button class="btn btn-ignore">Klopt, negeren</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">Niets om te controleren. 🎉</p>
   {% endif %}
 </section>
 

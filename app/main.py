@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app import sync_state
 from app.bank_ponto import PontoError, get_state as get_ponto_state
 from app.bank_ponto import ponto_configured, ponto_error_hint, run_manual_ponto_refresh
+from app.basecone_backlog import backlog_candidates, get_state as get_backlog_state, start_backlog_send
 from app.mail_filing import filing_error_hint
 from app.mail_filing import get_state as get_filing_state
 from app.mail_labels import get_state as get_label_state
@@ -480,6 +481,15 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
     basecone_todo = [inv for inv in not_yet_in_basecone if is_confident(inv)]
     basecone_review = [inv for inv in not_yet_in_basecone if not is_confident(inv)]
 
+    # -- Geadresseerde-check: never filtered by q/maand, its own worklist --
+    addressee_review_all = list(
+        session.scalars(
+            select(Invoice)
+            .where(Invoice.addressee_status.in_(("not_for_us", "unknown")), Invoice.addressee_reviewed.is_(False))
+            .order_by(Invoice.received_at.desc())
+        )
+    )
+
     oldest_unmatched_days = None
     if unmatched_transactions_all:
         oldest = min(t.booking_date for t in unmatched_transactions_all)
@@ -510,6 +520,7 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
         "gekoppeld_deze_maand": matched_this_month,
         "automatisch_afgehandeld": len(rule_handled_all),
         "niet_naar_basecone": len(basecone_todo),
+        "niet_aan_ons_gericht": len(addressee_review_all),
         "maand_label": MONTHS_NL[now_ams.month - 1],
     }
 
@@ -656,6 +667,8 @@ def dashboard(request: Request, user: str = Depends(require_auth), session: Sess
             "basecone_todo": basecone_todo_page,
             "basecone_pagination": basecone_pagination,
             "basecone_review": basecone_review,
+            "addressee_review": addressee_review_all,
+            "backlog_count": len(backlog_candidates(session)),
             "forward_error": request.query_params.get("forward_error"),
             "forward_ok": request.query_params.get("forward_ok"),
             "te_betalen": te_betalen_page,
@@ -1227,6 +1240,111 @@ def forward_to_basecone_bulk(
         forward_ok=str(sent) if sent else "",
         forward_error=first_error or "",
     )
+
+
+def _addressee_review_ids(session: Session) -> list[int]:
+    return [
+        inv.id for inv in session.scalars(
+            select(Invoice)
+            .where(Invoice.addressee_status.in_(("not_for_us", "unknown")), Invoice.addressee_reviewed.is_(False))
+            .order_by(Invoice.received_at.desc())
+        )
+    ]
+
+
+@app.post("/invoices/{invoice_id}/addressee-confirm-ours")
+def addressee_confirm_ours(
+    invoice_id: int,
+    request: Request,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_addressee_review_ids(session), invoice_id, "addressee-review", "niet-aan-ons-gericht")
+    invoice.addressee_status = "ok"
+    invoice.addressee_reviewed = True
+    _relabel_invoice_best_effort(invoice)
+    session.commit()
+    return _action_response(request, q, maand, anchor=anchor)
+
+
+@app.post("/invoices/{invoice_id}/addressee-dismiss")
+def addressee_dismiss(
+    invoice_id: int,
+    request: Request,
+    q: str = Form(""),
+    maand: str = Form(""),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(404, "Factuur niet gevonden")
+    anchor = _next_anchor(_addressee_review_ids(session), invoice_id, "addressee-review", "niet-aan-ons-gericht")
+    invoice.addressee_reviewed = True
+    _relabel_invoice_best_effort(invoice)
+    session.commit()
+    return _action_response(request, q, maand, anchor=anchor)
+
+
+@app.get("/invoices/backlog")
+def backlog_page(request: Request, user: str = Depends(require_auth), session: Session = Depends(get_session)):
+    candidates = backlog_candidates(session)
+    groups: dict[str, list[Invoice]] = {}
+    for inv in candidates:
+        groups.setdefault(inv.supplier_name or "Onbekend", []).append(inv)
+    supplier_groups = [
+        {
+            "supplier_name": name,
+            "invoices": invoices,
+            "count": len(invoices),
+            "total_cents": sum(inv.amount_cents or 0 for inv in invoices),
+        }
+        for name, invoices in sorted(groups.items())
+    ]
+    return templates.TemplateResponse(
+        "backlog.html",
+        {
+            "request": request,
+            "user": user,
+            "active_nav": "vandaag",
+            "supplier_groups": supplier_groups,
+            "total_count": len(candidates),
+            "total_cents": sum(inv.amount_cents or 0 for inv in candidates),
+            "state": get_backlog_state(),
+        },
+    )
+
+
+@app.post("/invoices/backlog/send")
+def backlog_send(
+    invoice_ids: list[int] = Form(default=[]),
+    user: str = Depends(require_auth),
+    session: Session = Depends(get_session),
+):
+    # Only ever sends invoices that are still genuinely valid backlog
+    # candidates right now -- a stale/tampered id in the submitted form
+    # never slips through.
+    valid_ids = {inv.id for inv in backlog_candidates(session)}
+    selected_ids = [invoice_id for invoice_id in invoice_ids if invoice_id in valid_ids]
+    start_backlog_send(selected_ids)
+    return RedirectResponse(url="/invoices/backlog", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/invoices/backlog/status")
+def backlog_status(user: str = Depends(require_auth)):
+    state = get_backlog_state()
+    return JSONResponse({
+        "running": state.running,
+        "total": state.total,
+        "sent": state.sent,
+        "errors": state.errors,
+        "done": state.done,
+    })
 
 
 @app.get("/vraagposten")

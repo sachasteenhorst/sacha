@@ -383,3 +383,100 @@ def test_forward_to_basecone_redirects_with_anchor_on_success(client, session_fa
 
     assert response.status_code == 303
     assert response.headers["location"] == f"/dashboard?forward_ok=1#row-basecone-pending-{inv_new_id}"
+
+
+# -- Controleren: niet aan ons gericht ("Toch voor ons" / "Klopt, negeren") --
+
+def make_addressee_review_invoice(session_factory, **kwargs):
+    defaults = dict(
+        email_message_id=f"<ar{kwargs.get('invoice_number', 'x')}>",
+        attachment_filename="f.pdf",
+        received_at=datetime(2026, 9, 5),
+        supplier_name="Onbekende Leverancier",
+        invoice_number="F-1",
+        amount_cents=5000,
+        document_kind=DocumentKind.INVOICE.value,
+        direction="outgoing",
+        status=MatchStatus.UNMATCHED,
+        addressee_status="not_for_us",
+        addressee_reviewed=False,
+    )
+    defaults.update(kwargs)
+    with session_factory() as s:
+        inv = Invoice(**defaults)
+        s.add(inv)
+        s.commit()
+        return inv.id
+
+
+def test_addressee_confirm_ours_resets_status_and_marks_reviewed(client, session_factory):
+    inv_id = make_addressee_review_invoice(session_factory)
+
+    response = client.post(f"/invoices/{inv_id}/addressee-confirm-ours", data={}, auth=AUTH)
+
+    assert response.status_code == 303
+    with session_factory() as s:
+        inv = s.get(Invoice, inv_id)
+        assert inv.addressee_status == "ok"
+        assert inv.addressee_reviewed is True
+
+
+def test_addressee_dismiss_keeps_status_but_marks_reviewed(client, session_factory):
+    inv_id = make_addressee_review_invoice(session_factory)
+
+    response = client.post(f"/invoices/{inv_id}/addressee-dismiss", data={}, auth=AUTH)
+
+    assert response.status_code == 303
+    with session_factory() as s:
+        inv = s.get(Invoice, inv_id)
+        assert inv.addressee_status == "not_for_us"
+        assert inv.addressee_reviewed is True
+
+
+def test_addressee_confirm_ours_redirects_with_anchor_to_next_row(client, session_factory):
+    # Sorted by received_at descending -> the newest comes first.
+    inv2_id = make_addressee_review_invoice(session_factory, invoice_number="F-OLD", received_at=datetime(2026, 9, 1))
+    inv1_id = make_addressee_review_invoice(session_factory, invoice_number="F-NEW", received_at=datetime(2026, 9, 10))
+
+    response = client.post(f"/invoices/{inv1_id}/addressee-confirm-ours", data={}, auth=AUTH)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/dashboard#row-addressee-review-{inv2_id}"
+
+
+def test_addressee_dismiss_falls_back_to_section_anchor_when_last_row(client, session_factory):
+    inv_id = make_addressee_review_invoice(session_factory)
+
+    response = client.post(f"/invoices/{inv_id}/addressee-dismiss", data={}, auth=AUTH)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard#niet-aan-ons-gericht"
+
+
+def test_addressee_confirm_ours_ajax_returns_json_ack(client, session_factory):
+    inv_id = make_addressee_review_invoice(session_factory)
+
+    response = client.post(f"/invoices/{inv_id}/addressee-confirm-ours", data={}, headers=AJAX_HEADERS, auth=AUTH)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+def test_addressee_confirm_ours_relabels_best_effort(client, session_factory, monkeypatch):
+    inv_id = make_addressee_review_invoice(session_factory)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/invoices/{inv_id}/addressee-confirm-ours", data={}, auth=AUTH)
+
+    assert calls == [inv_id]
+
+
+def test_addressee_dismiss_relabels_best_effort(client, session_factory, monkeypatch):
+    inv_id = make_addressee_review_invoice(session_factory)
+    calls = []
+    monkeypatch.setattr("app.mail_labels.set_invoice_category", lambda i: calls.append(i.id) or True)
+
+    client.post(f"/invoices/{inv_id}/addressee-dismiss", data={}, auth=AUTH)
+
+    assert calls == [inv_id]

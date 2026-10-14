@@ -29,6 +29,7 @@ import requests
 
 from app.config import settings
 from app.models import BaseconeForwardStatus, Direction, DocumentKind
+from app.payments import mentions_own_company
 
 INVOICE_DIR = "./data/invoices"
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
@@ -283,6 +284,20 @@ def _extract_cycletech_invoice_number(filename: str) -> str:
     return m.group(1) if m else ""
 
 
+def _check_addressee(text: str) -> str:
+    """"ok" | "not_for_us" | "unknown" -- whether a genuine inkoopfactuur's
+    own text mentions this shop at all (see
+    app.payments.mentions_own_company), stored on Invoice.addressee_status
+    so the dashboard's "Controleren: niet aan ons gericht" review (and its
+    "Toch voor ons"/"Klopt, negeren" buttons) can override it later without
+    needing to re-read the PDF. "unknown" (no text to check against) never
+    blocks anything -- it's just flagged for Sacha to look at, see
+    app.main's addressee-review section."""
+    if not (text or "").strip():
+        return "unknown"
+    return "ok" if mentions_own_company(text) else "not_for_us"
+
+
 class GraphAuthError(RuntimeError):
     pass
 
@@ -316,6 +331,7 @@ class InvoiceAttachment:
     due_date: date | None = None
     due_date_estimated: bool = False
     incasso_hint: bool = False
+    addressee_status: str = "ok"
 
     def __post_init__(self):
         if self.referenced_invoice_numbers is None:
@@ -732,6 +748,16 @@ def _extract_fields(
         # A verkoopfactuur we sent ourselves is never a purchase to pay --
         # never let it show up as an open inkoopfactuur.
         document_kind = DocumentKind.OTHER.value
+    # Geadresseerde-check: only for a genuine inkoopfactuur/specificatie --
+    # a quote/general-terms/own-sales-copy (document_kind OTHER/
+    # SALES_INVOICE) was never addressed to anyone in particular, and an
+    # incoming document (ENRA/King-style) is a statement ABOUT our account,
+    # not something that needs to name us. Checking those too would only
+    # risk flagging a legitimate document as "not for us" just because it
+    # doesn't happen to repeat our company name.
+    addressee_status = "ok"
+    if document_kind in (DocumentKind.INVOICE.value, DocumentKind.SPECIFICATION.value) and direction == Direction.OUTGOING.value:
+        addressee_status = _check_addressee(text)
     referenced_invoice_numbers = (
         _extract_all_invoice_numbers(text) if document_kind == DocumentKind.SPECIFICATION.value else []
     )
@@ -748,6 +774,7 @@ def _extract_fields(
         "due_date": due_date,
         "due_date_estimated": due_date_estimated,
         "incasso_hint": _text_suggests_incasso(text),
+        "addressee_status": addressee_status,
     }
 
 

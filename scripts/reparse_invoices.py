@@ -71,6 +71,10 @@ def _reparse_fields(session) -> tuple[int, int, int, int, int]:
         inv.referenced_invoice_numbers = fields["referenced_invoice_numbers"]
         inv.due_date = fields["due_date"]
         inv.due_date_estimated = fields["due_date_estimated"]
+        # Never overwrite Sacha's own "Toch voor ons"/"Klopt, negeren"
+        # review decision -- only ever refreshes an un-reviewed status.
+        if not inv.addressee_reviewed:
+            inv.addressee_status = fields["addressee_status"]
         # Never overwrite a payment_method already set by the dashboard's
         # "Loopt via incasso" button or an earlier reparse run -- only ever
         # fills in the still-default "onbekend".

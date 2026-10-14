@@ -273,6 +273,51 @@ moet inloggen met `scripts/graph_login.py`. Zonder die permissie blijft al
 het andere gewoon werken; de doorstuur-knop toont dan een duidelijke
 melding in plaats van te crashen.
 
+### Geadresseerde-check: "niet aan ons gericht"
+
+Soms komt er op een van de mailboxen een factuur binnen die helemaal niet
+voor Hing B.V. / Van der Linden Tweewielers bedoeld is (verkeerd
+doorgestuurd, verkeerde klant, etc.). Van elke inkoopfactuur/specificatie
+(nooit van je eigen CycleSoftware-verkoopfacturen, en nooit van inkomende
+documenten zoals ENRA/King, die over de rekening gaan en niet "aan" iemand
+gericht zijn) controleert de app of de PDF-tekst ergens een van de namen
+uit `OWN_COMPANY_NAMES` bevat:
+
+- **aan ons gericht** -- gewoon verder, niets verandert.
+- **niet aan ons gericht** -- gaat *niet* automatisch naar Basecone, telt
+  niet mee bij "Zelf betalen"/vraagposten, krijgt geen betaal-label, en
+  krijgt in Outlook het label **"Niet voor ons"** (paars). Staat in het
+  dashboard apart onder **"Controleren: niet aan ons gericht"** met twee
+  knoppen: **"Toch voor ons"** (zet de factuur weer helemaal normaal) en
+  **"Klopt, negeren"** (verdwijnt van de lijst, maar blijft uitgesloten).
+- **geadresseerde onbekend** -- de PDF-tekst was leeg/onleesbaar, dus de
+  app kon niets controleren. Blokkeert niets, staat ook in dezelfde lijst
+  zodat je het even kunt nakijken.
+
+Bestaande facturen opnieuw controleren: `python scripts/check_addressee.py`
+(dry-run, laat alleen de aantallen en een lijst van "niet"-gevallen zien)
+of met `--apply` om de status ook echt bij te werken.
+
+### Oude facturen naar Basecone (backlog)
+
+Facturen die ooit herclassificeerd zijn (bijv. de Tenways/CycleSoftware/
+Cycletech-fix, zie hierboven) krijgen `excluded_from_auto_forward=True` en
+gaan dus niet vanzelf mee in de automatische doorstuur-ronde. Op het
+dashboard, onder "Niet naar Basecone", staat een link **"bekijk en verstuur
+de oude facturen naar Basecone"** zodra zo'n backlog bestaat. Die opent
+`/invoices/backlog`: een overzicht per leverancier (aantal + totaalbedrag),
+en daaronder elke individuele factuur met een aanvinkvakje. Alles staat
+standaard aangevinkt, **behalve** facturen die "niet aan ons gericht" zijn
+-- die kun je alsnog met de hand aanvinken als je zeker weet dat ze toch
+voor ons bedoeld zijn.
+
+Na bevestigen worden de aangevinkte facturen **rustig** verstuurd: één per
+twee seconden, op de achtergrond, met een voortgangsbalk die elke twee
+seconden ververst (zodat honderd-plus facturen niet in één request hoeven
+te passen, wat de browser of een reverse proxy allang zou hebben afgebroken
+voordat het klaar was). Er kan maar één verstuurronde tegelijk lopen; een
+tweede keer op de knop drukken terwijl er al eentje bezig is, doet niets.
+
 ## E-maillabels (Outlook-categorieën)
 
 Elke factuurmail in `facturen@`/`info@` krijgt automatisch een Outlook-categorie,
@@ -286,6 +331,9 @@ hoeven wisselen -- meteen ziet of hij al naar Basecone is:
   algemene post, een handmatig genegeerd document, of een
   CycleSoftware/Lease a Bike-achtige verkoopkopie (zie "Basecone
   doorsturen" hierboven).
+- **"Niet voor ons"** (paars) -- de geadresseerde-check (zie hierboven)
+  heeft nergens "Hing B.V."/"Van der Linden Tweewielers" gevonden in de
+  factuur.
 
 Daarnaast, **onafhankelijk ernaast** (nooit in plaats van), een
 betaalstatus-label op elke échte inkoopfactuur (niet op "Geen factuur"-mails
@@ -346,9 +394,9 @@ python3 scripts/label_mails.py --apply
 
 **Als de categorieën geen kleur krijgen** (zie de kanttekening bij
 `MailboxSettings.ReadWrite` hierboven): open de mailbox (`facturen@`/
-`info@`) eenmalig zelf in Outlook, maak de drie categorieën met de hand aan
-met exact deze namen -- "Basecone ✓", "Nog naar Basecone", "Geen factuur"
--- en geef ze een kleur (groen/oranje/grijs). Het labelen zelf (welke
+`info@`) eenmalig zelf in Outlook, maak de vier categorieën met de hand aan
+met exact deze namen -- "Basecone ✓", "Nog naar Basecone", "Geen factuur",
+"Niet voor ons" -- en geef ze een kleur (groen/oranje/grijs/paars). Het labelen zelf (welke
 categorie een mail krijgt) blijft daarna gewoon via deze app lopen; alleen
 het *aanmaken met kleur* was de stap die mogelijk niet via de gedeelde
 mailbox kan.
@@ -362,16 +410,13 @@ verplaatst naar de map **"Succesvol naar Basecone"** in elke mailbox
 de inbox van `facturen@`/`info@` overzichtelijk, maar blijft het bewijs dat
 de mail aankwam wel bewaard.
 
-**Let op: ongeverifieerd.** Deze app heeft nog nooit een echte
-bevestigingsmail van Basecone gezien, dus de standaardinstelling is een
-educated guess: het afzenderdomein van de boekhouder (`mailvanderlaangroep.nl`,
-hetzelfde adres als `BASECONE_FORWARD_ADDRESS`) plus een generieke
-`basecone.com`, gecombineerd met een paar waarschijnlijke
-onderwerpregel-woorden (`succesvol verwerkt`, `successfully processed`, ...)
--- een mail moet BEIDE matchen om verplaatst te worden, zodat andere mail
-van hetzelfde adres nooit per ongeluk wordt opgeruimd. Zodra je een echte
-bevestigingsmail ziet: controleer de afzender en het onderwerp, en pas zo
-nodig `BASECONE_CONFIRMATION_SENDER_DOMAINS`/`BASECONE_CONFIRMATION_SUBJECT_KEYWORDS`
+Het afzenderadres is bevestigd: `no-reply@mailtobasecone.com` (met
+`mailvanderlaangroep.nl`, de boekhouder zelf, als extra mogelijke afzender).
+De onderwerpregel-woorden (`succesvol verwerkt`, `successfully processed`,
+...) zijn nog een educated guess -- een mail moet BEIDE (afzenderdomein EN
+onderwerp-trefwoord) matchen om verplaatst te worden, zodat andere mail van
+hetzelfde adres nooit per ongeluk wordt opgeruimd. Klopt het onderwerp niet
+met een echte bevestigingsmail: pas `BASECONE_CONFIRMATION_SUBJECT_KEYWORDS`
 aan in `.env` (geen nieuwe Graph-permissie nodig -- dit hergebruikt
 `Mail.ReadWrite.Shared`, dezelfde permissie als de e-maillabels hierboven).
 

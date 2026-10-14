@@ -7,8 +7,15 @@ Two INDEPENDENT sets of categories, applied together to the ORIGINAL
 e-mail (via its graph_mailbox/graph_message_id -- see app/email_client.py),
 never touching any other category already on the message:
 
-Basecone status (always exactly one of these three):
+Basecone status (always exactly one of these four):
 - "Basecone ✓" (green)      -- in_basecone == "yes"
+- "Niet voor ons" (purple)      -- addressee_status == "not_for_us" (see
+                                    app.email_client._check_addressee) --
+                                    takes priority over everything below
+                                    except an already-sent document, since a
+                                    document not even addressed to us
+                                    should never look like a normal open
+                                    vraagpost
 - "Nog naar Basecone" (orange)  -- an open inkoopfactuur/specificatie that
                                     still needs forwarding (see
                                     app.basecone_forward.is_forwardable)
@@ -66,18 +73,20 @@ from app.payments import is_tracked_purchase_invoice
 CATEGORY_BASECONE_OK = "Basecone ✓"
 CATEGORY_NOG_NAAR_BASECONE = "Nog naar Basecone"
 CATEGORY_GEEN_FACTUUR = "Geen factuur"
+CATEGORY_NIET_VOOR_ONS = "Niet voor ons"
 CATEGORY_NOG_BETALEN = "Nog betalen"
 CATEGORY_BETAALD = "Betaald"
 
 # Outlook's "preset" category colors, per Microsoft Graph's outlookCategory
-# documentation: preset4=Green, preset1=Orange, preset12=Gray, preset0=Red,
-# preset7=Blue. "Betaald" deliberately gets Blue, not Green -- that's
-# already "Basecone ✓", a different label with a different meaning, and
-# the two sit side by side on the same message.
+# documentation: preset4=Green, preset1=Orange, preset12=Gray, preset8=
+# Purple, preset0=Red, preset7=Blue. "Betaald" deliberately gets Blue, not
+# Green -- that's already "Basecone ✓", a different label with a different
+# meaning, and the two sit side by side on the same message.
 CATEGORY_COLORS = {
     CATEGORY_BASECONE_OK: "preset4",
     CATEGORY_NOG_NAAR_BASECONE: "preset1",
     CATEGORY_GEEN_FACTUUR: "preset12",
+    CATEGORY_NIET_VOOR_ONS: "preset8",
     CATEGORY_NOG_BETALEN: "preset0",
     CATEGORY_BETAALD: "preset7",
 }
@@ -103,6 +112,8 @@ def desired_category(invoice: Invoice) -> str:
     e-mail right now."""
     if invoice.in_basecone == BaseconeForwardStatus.YES.value:
         return CATEGORY_BASECONE_OK
+    if invoice.addressee_status == "not_for_us":
+        return CATEGORY_NIET_VOOR_ONS
     if invoice.manually_ignored:
         return CATEGORY_GEEN_FACTUUR
     if is_forwardable(invoice):

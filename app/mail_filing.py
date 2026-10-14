@@ -3,17 +3,14 @@ dedicated Outlook folder (and marks them read) in each configured mailbox --
 so facturen@/info@'s inbox doesn't fill up with confirmations nobody needs
 to act on, while keeping proof they arrived.
 
-UNVERIFIED sender/subject pattern (see app.config.Settings): this app has
-never seen a real Basecone confirmation mail, so the defaults are a
-best-effort guess -- the accountant's own mail-processing domain (the same
-one BASECONE_FORWARD_ADDRESS sends to, which very likely sends the
-confirmation back too) plus a generic "basecone.com", combined with a few
-plausible Dutch/English subject phrases. Check a real confirmation mail's
-sender and subject once you have one, and adjust
-BASECONE_CONFIRMATION_SENDER_DOMAINS/_SUBJECT_KEYWORDS if they don't match
--- requiring BOTH a known domain AND a known subject phrase is deliberate,
-so a looser pattern never silently files away unrelated mail from the same
-domain.
+Sender domain confirmed (no-reply@mailtobasecone.com, see
+app.config.Settings) -- the subject-keyword list is still an educated
+guess (a few plausible Dutch/English phrases), since the exact wording
+hasn't been confirmed yet. Adjust
+BASECONE_CONFIRMATION_SENDER_DOMAINS/_SUBJECT_KEYWORDS if a real
+confirmation mail doesn't match -- requiring BOTH a known domain AND a
+known subject phrase is deliberate, so a looser pattern never silently
+files away unrelated mail from the same domain.
 
 Off entirely wherever the normal e-mail sync already is: a Graph/permission
 problem here never breaks the sync (see file_basecone_confirmations) and is

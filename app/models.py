@@ -251,6 +251,21 @@ class Invoice(Base):
     # Added after the first release -- see app/db.py's startup migration.
     excluded_from_auto_forward: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Whether a genuine inkoopfactuur's own text mentions this shop (see
+    # app.email_client._check_addressee/app.payments.mentions_own_company)
+    # -- "ok" (addressed to us, or the check doesn't apply to this
+    # document), "not_for_us" (mentions neither "Hing B.V." nor "Van der
+    # Linden Tweewielers" anywhere), "unknown" (no extracted text at all to
+    # check -- never blocks anything, just flagged for Sacha to look at).
+    # Added after the first release -- see app/db.py's startup migration.
+    addressee_status: Mapped[str] = mapped_column(String, default="ok")
+    # True once Sacha has looked at a "not_for_us"/"unknown" flag and
+    # clicked either "Toch voor ons" (which also resets addressee_status to
+    # "ok") or "Klopt, negeren" (which leaves addressee_status as it was) --
+    # either way, it drops off the "Controleren: niet aan ons gericht" list.
+    # Added after the first release -- see app/db.py's startup migration.
+    addressee_reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+
     status: Mapped[MatchStatus] = mapped_column(Enum(MatchStatus), default=MatchStatus.UNMATCHED, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

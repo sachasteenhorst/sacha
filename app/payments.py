@@ -25,6 +25,7 @@ tried in this order:
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 
 from sqlalchemy import select
@@ -170,21 +171,39 @@ def _is_consumer_domain_supplier(invoice: Invoice) -> bool:
     return any(consumer_domain in labels for consumer_domain in settings.consumer_email_domain_list)
 
 
-def _not_addressed_to_own_company(invoice: Invoice) -> bool:
-    """True when NONE of our own company names appear anywhere in the
-    document's text -- a real inkoopfactuur addressed to us always mentions
-    our name/address somewhere; one that doesn't is more likely addressed to
-    a customer or a private individual (e.g. their own receipt, forwarded or
-    CC'd into a scanned mailbox by mistake) than a bill we owe. Skipped
-    entirely (never excludes) when OWN_COMPANY_NAMES itself is empty, since
-    then there's nothing to check against."""
+def _normalize_for_name_match(value: str) -> str:
+    """Strips everything except letters/digits -- "Hing B.V.", "HING BV"
+    and "Hing bv" all normalize to the identical "hingbv", so the
+    punctuation/capitalization a supplier happens to use never matters."""
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def mentions_own_company(text: str) -> bool:
+    """Whether `text` mentions one of OWN_COMPANY_NAMES anywhere, tolerant
+    of punctuation/spacing (see _normalize_for_name_match) -- shared by
+    _not_addressed_to_own_company below (one of several is_payable_invoice
+    exclusions) and app.email_client's addressee check (a dedicated
+    "Controleren: niet aan ons gericht" review flow). True (never flags
+    anything) when OWN_COMPANY_NAMES itself is empty, since then there's
+    nothing to check against."""
     own_names = settings.own_company_name_list
     if not own_names:
-        return False
-    text_lower = (invoice.extracted_text or "").lower()
-    if not text_lower:
-        return False  # no text to check at all -- not enough signal to exclude on this basis
-    return not any(name in text_lower for name in own_names)
+        return True
+    normalized_text = _normalize_for_name_match(text)
+    return any(_normalize_for_name_match(name) in normalized_text for name in own_names)
+
+
+def _not_addressed_to_own_company(invoice: Invoice) -> bool:
+    """True when the addressee check (see app.email_client._check_addressee,
+    which sets invoice.addressee_status) found this document doesn't
+    mention our company anywhere -- a real inkoopfactuur addressed to us
+    always mentions our name/address somewhere; one that doesn't is more
+    likely addressed to a customer or a private individual than a bill we
+    owe. Reads the STORED status rather than re-deriving it from text,
+    which is what makes the dashboard's "Toch voor ons" button (see
+    app.main) actually override this exclusion -- "unknown" (no text to
+    check at all) never excludes, same as before this status existed."""
+    return invoice.addressee_status == "not_for_us"
 
 
 def _is_payable_ignoring_receipt_date(invoice: Invoice) -> bool:

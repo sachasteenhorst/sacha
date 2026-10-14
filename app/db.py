@@ -45,6 +45,8 @@ _COLUMN_MIGRATIONS = {
         ("graph_category", "VARCHAR DEFAULT ''"),
         ("graph_payment_category", "VARCHAR DEFAULT ''"),
         ("excluded_from_auto_forward", "BOOLEAN DEFAULT 0"),
+        ("addressee_status", "VARCHAR DEFAULT 'ok'"),
+        ("addressee_reviewed", "BOOLEAN DEFAULT 0"),
     ],
     "matches": [
         ("group_id", "VARCHAR DEFAULT ''"),
