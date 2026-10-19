@@ -1,5 +1,5 @@
 {
- "bijgewerkt": "2026-10-15T04:45:31Z",
+ "bijgewerkt": "2026-10-19T04:43:53Z",
  "winkels": {
   "Jumbo": {
    "status": "ok",
@@ -17,7 +17,15 @@
     },
     {
      "k": "pompoen",
-     "titel": "Verse spinazie of pompoen blokjes",
+     "titel": "Verse spinazie, pompoen blokjes of zoete aardappel blokjes",
+     "actie": "voor 4,99",
+     "prijs": 4.99,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "zoete-aardappel",
+     "titel": "Verse spinazie, pompoen blokjes of zoete aardappel blokjes",
      "actie": "voor 4,99",
      "prijs": 4.99,
      "perKg": null,
@@ -25,7 +33,7 @@
     },
     {
      "k": "spinazie",
-     "titel": "Verse spinazie of pompoen blokjes",
+     "titel": "Verse spinazie, pompoen blokjes of zoete aardappel blokjes",
      "actie": "voor 4,99",
      "prijs": 4.99,
      "perKg": null,
@@ -131,18 +139,10 @@
   },
   "Dirk": {
    "status": "ok",
-   "geldig": "t/m zo 18 okt",
+   "geldig": "t/m di 20 okt",
    "bron": "https://www.dirk.nl/aanbiedingen",
-   "aantal": 117,
+   "aantal": 105,
    "items": [
-    {
-     "k": "aardbeien",
-     "titel": "Hollandse aardbeien",
-     "actie": "€ 2,49",
-     "prijs": 2.49,
-     "perKg": 6.23,
-     "eenheid": "Bak 400 gram"
-    },
     {
      "k": "mango",
      "titel": "Mango",
@@ -267,137 +267,121 @@
   },
   "Aldi": {
    "status": "ok",
-   "geldig": "t/m zo 18 okt",
+   "geldig": "t/m zo 25 okt",
    "bron": "https://www.aldi.nl/aanbiedingen.html",
-   "aantal": 154,
+   "aantal": 122,
    "items": [
     {
-     "k": "zalm",
-     "titel": "Gemarineerde zalmfilets",
-     "actie": "€ 4,59 (OP=OP)",
-     "prijs": 4.59,
+     "k": "zoete-aardappel",
+     "titel": "Zoete aardappelen",
+     "actie": "€ 1,49 (OP=OP)",
+     "prijs": 1.49,
      "perKg": null,
-     "eenheid": "Inhoud: 2 stuks, 250 g"
+     "eenheid": "Per kg"
     },
     {
-     "k": "aardappel",
-     "titel": "Kruimige aardappelen",
-     "actie": "€ 4,99 (OP=OP)",
-     "prijs": 4.99,
-     "perKg": 0.5,
-     "eenheid": "10 kg"
+     "k": "paprika",
+     "titel": "Gyros met paprika",
+     "actie": "€ 4,49 (OP=OP)",
+     "prijs": 4.49,
+     "perKg": 5.99,
+     "eenheid": "750 g"
     },
     {
-     "k": "kaas",
-     "titel": "Tex Mex geraspte kaas",
-     "actie": "€ 3,49 (OP=OP)",
-     "prijs": 3.49,
-     "perKg": 6.98,
-     "eenheid": "500 g"
-    },
-    {
-     "k": "aardbeien",
-     "titel": "Nederlandse aardbeien",
-     "actie": "€ 2,99 (-20%)",
-     "prijs": 2.99,
-     "perKg": 11.96,
-     "eenheid": "400 g"
-    },
-    {
-     "k": "broccoli",
-     "titel": "Broccoli",
-     "actie": "€ 0,99 (-13%)",
-     "prijs": 0.99,
-     "perKg": 1.98,
-     "eenheid": "500 g"
-    },
-    {
-     "k": "sperziebonen",
-     "titel": "Sperziebonen",
-     "actie": "€ 1,19 (-38%)",
-     "prijs": 1.19,
-     "perKg": 2.38,
-     "eenheid": "500 g"
-    },
-    {
-     "k": "wortel",
-     "titel": "Wortels",
-     "actie": "€ 0,89 (-31%)",
-     "prijs": 0.89,
-     "perKg": 0.89,
-     "eenheid": "1 kg"
-    },
-    {
-     "k": "komkommer",
-     "titel": "Komkommer",
-     "actie": "€ 0,59",
+     "k": "courgette",
+     "titel": "Courgette",
+     "actie": "€ 0,59 (-21%)",
      "prijs": 0.59,
      "perKg": null,
      "eenheid": "Per stuk"
     },
     {
-     "k": "ui",
-     "titel": "Uien",
-     "actie": "€ 1,49 (-11%)",
-     "prijs": 1.49,
-     "perKg": 0.75,
-     "eenheid": "2 kg"
+     "k": "bloemkool",
+     "titel": "Bloemkool",
+     "actie": "€ 1,39 (NU VOOR)",
+     "prijs": 1.39,
+     "perKg": null,
+     "eenheid": "Per stuk"
     },
     {
-     "k": "mango",
-     "titel": "Eetrijpe mango's",
-     "actie": "€ 2,49 (OP=OP)",
+     "k": "avocado",
+     "titel": "Eetrijpe avocado's",
+     "actie": "€ 2,49",
      "prijs": 2.49,
      "perKg": null,
-     "eenheid": "2-pack"
+     "eenheid": "2 stuks"
     },
     {
-     "k": "eieren",
-     "titel": "Scharreleieren",
-     "actie": "€ 4,49 (OP=OP)",
-     "prijs": 4.49,
+     "k": "appel",
+     "titel": "Elstar appels",
+     "actie": "€ 1,79",
+     "prijs": 1.79,
+     "perKg": 1.19,
+     "eenheid": "1.5 kg"
+    },
+    {
+     "k": "pompoen",
+     "titel": "Pompoen Hokkaido",
+     "actie": "€ 0,99 (-37%)",
+     "prijs": 0.99,
      "perKg": null,
-     "eenheid": "20 stuks"
+     "eenheid": "Per stuk"
     },
     {
-     "k": "bloem",
-     "titel": "Tarwebloem",
-     "actie": "€ 1,39 (OP=OP)",
-     "prijs": 1.39,
-     "perKg": 0.69,
-     "eenheid": "2 kg"
+     "k": "peer",
+     "titel": "Conference peren",
+     "actie": "€ 0,89 (-50%)",
+     "prijs": 0.89,
+     "perKg": 0.89,
+     "eenheid": "1 kg"
     },
     {
-     "k": "pasta",
-     "titel": "Pasta",
-     "actie": "€ 1,49 (OP=OP)",
-     "prijs": 1.49,
-     "perKg": 2.98,
-     "eenheid": "500 g"
+     "k": "yoghurt",
+     "titel": "Griekse stijl yoghurt 2%",
+     "actie": "€ 1,79 (OP=OP)",
+     "prijs": 1.79,
+     "perKg": 1.63,
+     "eenheid": "1.1 kg"
     },
     {
-     "k": "kipfilet",
-     "titel": "Kipfilet",
-     "actie": "€ 8,39 (-12%)",
-     "prijs": 8.39,
-     "perKg": 10.49,
-     "eenheid": "800 g"
+     "k": "kokosmelk",
+     "titel": "Biologische kokosmelk",
+     "actie": "€ 0,99 (OP=OP)",
+     "prijs": 0.99,
+     "perKg": null,
+     "eenheid": "200 ml"
+    },
+    {
+     "k": "gehakt",
+     "titel": "Extra mager rundergehakt",
+     "actie": "€ 8,99 (OP=OP)",
+     "prijs": 8.99,
+     "perKg": 11.99,
+     "eenheid": "750 g"
+    },
+    {
+     "k": "tomaat",
+     "titel": "Semi-gedroogde tomaten of zoete pepers",
+     "actie": "€ 1,79",
+     "prijs": 1.79,
+     "perKg": 14.92,
+     "eenheid": "120 g"
     },
     {
      "k": "kaas",
-     "titel": "Goudse 30+ kaas plakken",
-     "actie": "€ 2,49 (TOT -29%)",
-     "prijs": 2.49,
-     "perKg": 8.3,
-     "eenheid": "250-300 g"
+     "titel": "Gouda geraspte kaas",
+     "actie": "€ 1,49 (TOT -31%)",
+     "prijs": 1.49,
+     "perKg": 7.45,
+     "eenheid": "200 g"
     }
    ]
   },
   "DekaMarkt": {
    "status": "ok",
-   "geldig": "t/m ma 19 okt",
+   "geldig": "t/m di 20 okt",
    "bron": "https://www.dekamarkt.nl/aanbiedingen",
-   "aantal": 141,
+   "aantal": 130,
    "items": [
     {
      "k": "peer",
@@ -491,85 +475,13 @@
   },
   "Vomar": {
    "status": "ok",
-   "geldig": "week 42",
-   "bron": "https://view.publitas.com/folder-deze-week/online-weekendfolder-week-42/",
-   "aantal": 890,
+   "geldig": "week 43",
+   "bron": "https://view.publitas.com/folder-deze-week/online-weekfolder-week-43/",
+   "aantal": 872,
    "items": [
     {
-     "k": "pasta",
-     "titel": "Primoro Pasta",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "Alle soorten 500 gram. Per stuk van 1.35 tot 1.69 Prijsvoorbeeld: Penne",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "aardbeien",
-     "titel": "Hollandse Aardbeien",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "sperziebonen",
-     "titel": "Hak Haricots Verts",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "kalkoen",
-     "titel": "Kip-Kalkoen Gehakt",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "gehakt",
-     "titel": "Kip-Kalkoen Gehakt",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "bloemkool",
-     "titel": "Hollandse Bloemkool Per stuk",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "spinazie",
-     "titel": "Hollandse Gewassen Spinazie",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "appel",
-     "titel": "Royal Gala Appels",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "zalm",
-     "titel": "Poké Bowl Keuze uit: • Tonijn • Zalm • Kip Bak 280 gram",
+     "k": "courgette",
+     "titel": "Courgette",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -584,8 +496,32 @@
      "eenheid": ""
     },
     {
-     "k": "champignons",
-     "titel": "of Gesneden Kastanje Champignons",
+     "k": "wraps",
+     "titel": "Santa Maria Wraps",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kaas",
+     "titel": "Noordwoudse Geraspte Kaas",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "yoghurt",
+     "titel": "Activia Yoghurt",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "kaas",
+     "titel": "Noordwoudse Gesneden Kaas 48+",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -640,16 +576,8 @@
      "eenheid": ""
     },
     {
-     "k": "gehakt",
-     "titel": "Half-om-Half Gehakt Per kilo",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "mango",
-     "titel": "Mango of Speculoos Donut",
+     "k": "zalm",
+     "titel": "Zalmfilet met Huid Pak 4 stuks. Circa 500 gram",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -657,23 +585,63 @@
     },
     {
      "k": "kaas",
-     "titel": "Uniekaas Gesneden Kaas",
+     "titel": "Parrano Geraspte Kaas",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "kaas",
-     "titel": "PER STUK Uniekaas Geraspte Kaas",
+     "k": "yoghurt",
+     "titel": "Arla Biologische Yoghurt of Kefir",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "pompoen",
-     "titel": "Halloween Masker • Keuze uit pompoen of skelet • Met geluid en verlichting",
+     "k": "yoghurt",
+     "titel": "of Campina Greek Style Yoghurt bak 450 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "tomaat",
+     "titel": "Naturel of Tomaat Lente-ui. Pot 300 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "ui",
+     "titel": "Naturel of Tomaat Lente-ui. Pot 300 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "aardbeien",
+     "titel": "Bonne Maman Jam Aardbei of Abrikoos. Pot 750 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pasta",
+     "titel": "Honig Pasta Alle soorten 250-700 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "aardbeien",
+     "titel": "3.49 Hollandse Aardbeien",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -683,145 +651,49 @@
   },
   "Lidl": {
    "status": "ok",
-   "geldig": "t/m zo 22 nov",
+   "geldig": "t/m zo 29 nov",
    "bron": "https://www.lidl.nl/c/aanbiedingen/a10008785",
-   "aantal": 111,
+   "aantal": 54,
    "items": [
     {
-     "k": "gehakt",
-     "titel": "Extra mager rundergehakt",
-     "actie": "€ 9,99",
-     "prijs": 9.99,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "zalm",
-     "titel": "Zalmfilet op huid",
+     "k": "peer",
+     "titel": "Conference peren",
      "actie": "In de aanbieding",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "witvis",
-     "titel": "Kabeljauwfilet",
-     "actie": "€ 12,99",
-     "prijs": 12.99,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "spinazie",
-     "titel": "Iglo roerbaksensatie kip-spinazie",
-     "actie": "€ 3,99",
-     "prijs": 3.99,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "aardbeien",
-     "titel": "Tesseire zero aardbei",
-     "actie": "€ 2,99",
-     "prijs": 2.99,
-     "perKg": null,
-     "eenheid": "600 ml"
-    },
-    {
-     "k": "rode-biet",
-     "titel": "HAK rode bieten",
-     "actie": "€ 0,99",
-     "prijs": 0.99,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "yoghurt",
-     "titel": "Optimel yoghurt vanille",
-     "actie": "€ 1,19",
-     "prijs": 1.19,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "yoghurt",
-     "titel": "Optimel yoghurt bosvruchten",
-     "actie": "€ 1,19",
-     "prijs": 1.19,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "bonen",
-     "titel": "HAK bruine bonen",
-     "actie": "€ 0,99",
-     "prijs": 0.99,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "COMBINO Penne rigate",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "COMBINO Spaghetti",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "COMBINO Fusilli",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "Glutenvrije pasta",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "spinazie",
-     "titel": "Tortellini ricotta & spinazie",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "COMBINO Lasagnebladen",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
+     "k": "avocado",
+     "titel": "Avocado in net",
+     "actie": "€ 2,29 (was € 2,79)",
+     "prijs": 2.29,
+     "perKg": 3.05,
+     "eenheid": "Net 750 g"
     },
     {
      "k": "kipfilet",
-     "titel": "ZWAGERMAN Kipfilet met tuinkruiden",
-     "actie": "In de aanbieding",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
+     "titel": "Kipfilet",
+     "actie": "€ 9,49",
+     "prijs": 9.49,
+     "perKg": 10.54,
+     "eenheid": "900 gram"
     },
     {
-     "k": "kipfilet",
-     "titel": "ZWAGERMAN Kipfilet pittig",
-     "actie": "In de aanbieding",
-     "prijs": null,
+     "k": "mango",
+     "titel": "DubbelFrisss Boost ananas-mango",
+     "actie": "€ 0,98",
+     "prijs": 0.98,
      "perKg": null,
-     "eenheid": ""
+     "eenheid": "1,5 l"
+    },
+    {
+     "k": "appel",
+     "titel": "DUBBEL FRISSS Boost bosvruchten-appel",
+     "actie": "€ 0,98",
+     "prijs": 0.98,
+     "perKg": null,
+     "eenheid": "1,5 l"
     }
    ]
   },
