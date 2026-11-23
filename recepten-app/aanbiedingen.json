@@ -1,5 +1,5 @@
 {
- "bijgewerkt": "2026-11-19T13:12:26Z",
+ "bijgewerkt": "2026-11-23T14:36:26Z",
  "winkels": {
   "Jumbo": {
    "status": "ok",
@@ -99,9 +99,9 @@
   },
   "Dirk": {
    "status": "ok",
-   "geldig": "t/m zo 22 nov",
+   "geldig": "t/m di 24 nov",
    "bron": "https://www.dirk.nl/aanbiedingen",
-   "aantal": 119,
+   "aantal": 107,
    "items": [
     {
      "k": "aardappel",
@@ -211,114 +211,122 @@
   },
   "Aldi": {
    "status": "ok",
-   "geldig": "t/m zo 22 nov",
+   "geldig": "t/m zo 29 nov",
    "bron": "https://www.aldi.nl/aanbiedingen.html",
-   "aantal": 149,
+   "aantal": 163,
    "items": [
     {
-     "k": "blauwe-bessen",
-     "titel": "Blauwe bessen",
-     "actie": "€ 3,29",
-     "prijs": 3.29,
-     "perKg": 10.97,
-     "eenheid": "300 g"
-    },
-    {
-     "k": "peer",
-     "titel": "Doyenne du comice peren",
-     "actie": "€ 1,65",
-     "prijs": 1.65,
-     "perKg": 1.65,
-     "eenheid": "1 kg"
-    },
-    {
      "k": "aardappel",
-     "titel": "Extra grote kruimige aardappelen",
-     "actie": "€ 2,49 (-28%)",
-     "prijs": 2.49,
-     "perKg": 0.83,
-     "eenheid": "3 kg"
+     "titel": "Kruimige aardappelen",
+     "actie": "€ 4,99 (OP=OP)",
+     "prijs": 4.99,
+     "perKg": 0.5,
+     "eenheid": "10 kg"
     },
     {
-     "k": "avocado",
-     "titel": "Eetrijpe avocado's",
-     "actie": "€ 1,99 (-28%)",
-     "prijs": 1.99,
+     "k": "prei",
+     "titel": "Prei",
+     "actie": "€ 0,39 (-29%)",
+     "prijs": 0.39,
      "perKg": null,
-     "eenheid": "2 pack"
+     "eenheid": "Per stuk"
     },
     {
-     "k": "wraps",
-     "titel": "Wraps",
-     "actie": "€ 1,69 (OP=OP)",
+     "k": "courgette",
+     "titel": "Courgette",
+     "actie": "€ 0,59",
+     "prijs": 0.59,
+     "perKg": null,
+     "eenheid": "Per stuk"
+    },
+    {
+     "k": "champignons",
+     "titel": "Kastanjechampignons",
+     "actie": "€ 1,69",
      "prijs": 1.69,
-     "perKg": null,
-     "eenheid": "12 stuks, 744 g"
-    },
-    {
-     "k": "gehakt",
-     "titel": "Gemengd gehakt gekruid",
-     "actie": "€ 2,99 (-34%)",
-     "prijs": 2.99,
-     "perKg": 5.98,
-     "eenheid": "500 g"
-    },
-    {
-     "k": "brood",
-     "titel": "Mini Turks brood",
-     "actie": "€ 1,29 (OP=OP)",
-     "prijs": 1.29,
-     "perKg": null,
-     "eenheid": "2 stuks, 200 g"
-    },
-    {
-     "k": "sperziebonen",
-     "titel": "Appelmoes, rode kool of sperziebonen",
-     "actie": "€ 1,29 (OP=OP)",
-     "prijs": 1.29,
-     "perKg": null,
-     "eenheid": "710 ml"
-    },
-    {
-     "k": "rode-kool",
-     "titel": "Appelmoes, rode kool of sperziebonen",
-     "actie": "€ 1,29 (OP=OP)",
-     "prijs": 1.29,
-     "perKg": null,
-     "eenheid": "710 ml"
+     "perKg": 6.76,
+     "eenheid": "250 g"
     },
     {
      "k": "appel",
-     "titel": "Appel- of perensap",
-     "actie": "€ 2,29 (OP=OP)",
-     "prijs": 2.29,
-     "perKg": null,
-     "eenheid": "1 l"
+     "titel": "Elstar appels",
+     "actie": "€ 1,99 (-18%)",
+     "prijs": 1.99,
+     "perKg": 1.33,
+     "eenheid": "1.5 kg"
     },
     {
-     "k": "room",
-     "titel": "Choco met slagroom",
-     "actie": "€ 0,79 (OP=OP)",
-     "prijs": 0.79,
-     "perKg": 4.39,
-     "eenheid": "180 g"
+     "k": "kipfilet",
+     "titel": "Kipfilet",
+     "actie": "€ 5,49 (-20%)",
+     "prijs": 5.49,
+     "perKg": 10.98,
+     "eenheid": "500 g"
+    },
+    {
+     "k": "zalm",
+     "titel": "Zalmfilets op huid",
+     "actie": "€ 7,99 (OP=OP)",
+     "prijs": 7.99,
+     "perKg": 15.98,
+     "eenheid": "4 stuks, 500 g"
+    },
+    {
+     "k": "kaas",
+     "titel": "Grand cru-kaas stuk",
+     "actie": "€ 2,99 (OP=OP)",
+     "prijs": 2.99,
+     "perKg": 14.95,
+     "eenheid": "200 g"
+    },
+    {
+     "k": "paprika",
+     "titel": "Rode paprika's",
+     "actie": "€ 1,79 (OP=OP)",
+     "prijs": 1.79,
+     "perKg": 3.58,
+     "eenheid": "500 g"
+    },
+    {
+     "k": "pindakaas",
+     "titel": "Pindakaas",
+     "actie": "€ 3,49 (Tot -24%)",
+     "prijs": 3.49,
+     "perKg": 5.37,
+     "eenheid": "650 g"
+    },
+    {
+     "k": "rode-biet",
+     "titel": "Piccalilly, milde zuurkool of rode bieten-schijven",
+     "actie": "€ 1,79 (OP=OP)",
+     "prijs": 1.79,
+     "perKg": 2.59,
+     "eenheid": "670-690 g"
+    },
+    {
+     "k": "zalm",
+     "titel": "Pokébowl kip, zalm of tonijn",
+     "actie": "€ 3,99 (OP=OP)",
+     "prijs": 3.99,
+     "perKg": 11.4,
+     "eenheid": "330-350 g"
+    },
+    {
+     "k": "champignons",
+     "titel": "Fruitcocktail, asperges of mini-champignons",
+     "actie": "€ 2,49 (OP=OP)",
+     "prijs": 2.49,
+     "perKg": null,
+     "eenheid": "314-370 ml"
     }
    ]
   },
   "DekaMarkt": {
    "status": "ok",
-   "geldig": "t/m ma 23 nov",
+   "geldig": "t/m di 24 nov",
    "bron": "https://www.dekamarkt.nl/aanbiedingen",
-   "aantal": 113,
+   "aantal": 100,
    "items": [
-    {
-     "k": "zalm",
-     "titel": "Hoogland Zalmfilet Met Huid",
-     "actie": "€ 7,49 (was € 12,25)",
-     "prijs": 7.49,
-     "perKg": null,
-     "eenheid": ""
-    },
     {
      "k": "blauwe-bessen",
      "titel": "Blauwe Bessen",
@@ -411,69 +419,29 @@
   },
   "Vomar": {
    "status": "ok",
-   "geldig": "week 47",
-   "bron": "https://view.publitas.com/folder-deze-week/online-weekendfolder-week-47-7ewevadmae98/",
-   "aantal": 784,
+   "geldig": "week 48",
+   "bron": "https://view.publitas.com/folder-deze-week/online-weekfolder-week-48/",
+   "aantal": 748,
    "items": [
     {
-     "k": "mango",
-     "titel": "Keuze uit: • Mango • Fruitpunch XL-schaal 500 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
      "k": "kaas",
-     "titel": "Echte Kaas Plakken Jong 48+",
+     "titel": "Noordwoudse Gesneden Kaas 48+",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "rode-biet",
-     "titel": "Hak Rode Bietjes",
+     "k": "sperziebonen",
+     "titel": "Sperziebonen",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "pasta",
-     "titel": "Honig Mixen en Pasta",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "pasta",
-     "titel": "Prijsvoorbeeld: Knorr Good Pasta Carbonara",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "eieren",
-     "titel": "Verse Scharreleieren Tray 30 stuks",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "wortel",
-     "titel": "Geschrapte Wortelen Zak 500 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "champignons",
-     "titel": "VOMAR Gesneden Kastanje Champignons",
+     "k": "appel",
+     "titel": "Pink Lady Appels",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -488,24 +456,16 @@
      "eenheid": ""
     },
     {
-     "k": "stoofvlees",
-     "titel": "Ierse Sukadelappen",
+     "k": "aardappel",
+     "titel": "Stamppot Aardappelen",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "kaas",
-     "titel": "Beemster Kaas",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "kaas",
-     "titel": "Galbani Geraspte Kaas",
+     "k": "champignons",
+     "titel": "VOMAR Gesneden Kastanje Champignons",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -528,48 +488,8 @@
      "eenheid": ""
     },
     {
-     "k": "tomaat",
-     "titel": "Naturel of Tomaat Lente-ui. Pot 300 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "ui",
-     "titel": "Naturel of Tomaat Lente-ui. Pot 300 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "rijst",
-     "titel": "Lassie Rijst Alle soorten 250-375 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "aardbeien",
-     "titel": "Aardbei of Abrikoos. Pot 250 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "rode-biet",
-     "titel": "Bio+ Bietjes Pak 500 gram",
-     "actie": "in de weekfolder",
-     "prijs": null,
-     "perKg": null,
-     "eenheid": ""
-    },
-    {
-     "k": "appel",
-     "titel": "Biologische Appels",
+     "k": "zalm",
+     "titel": "Zalmfilet met Huid Pak 4 stuks. Circa 500 gram",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -577,7 +497,31 @@
     },
     {
      "k": "gehakt",
-     "titel": "Biologisch Mager Rundergehakt",
+     "titel": "Rundergehakt Per kilo",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pasta",
+     "titel": "of Pasta All Uovo of Gnocchi",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "pasta",
+     "titel": "Daily Chef Verse Pasta Spaghetti, Tagliatelle of Pappardelle. 250 gram",
+     "actie": "in de weekfolder",
+     "prijs": null,
+     "perKg": null,
+     "eenheid": ""
+    },
+    {
+     "k": "blauwe-bessen",
+     "titel": "4.29 Blauwe Bessen",
      "actie": "in de weekfolder",
      "prijs": null,
      "perKg": null,
@@ -587,49 +531,33 @@
   },
   "Lidl": {
    "status": "ok",
-   "geldig": "t/m zo 22 nov",
+   "geldig": "t/m zo 29 nov",
    "bron": "https://www.lidl.nl/c/aanbiedingen/a10008785",
-   "aantal": 35,
+   "aantal": 49,
    "items": [
     {
-     "k": "peer",
-     "titel": "Conference peren",
-     "actie": "€ 1,79",
-     "prijs": 1.79,
-     "perKg": 1.79,
-     "eenheid": "1 kg"
-    },
-    {
-     "k": "zalm",
-     "titel": "- Zalmfilet op huid",
-     "actie": "€ 5,99",
-     "prijs": 5.99,
-     "perKg": 23.96,
-     "eenheid": "250 g"
+     "k": "avocado",
+     "titel": "Avocado in net",
+     "actie": "€ 2,79",
+     "prijs": 2.79,
+     "perKg": 3.99,
+     "eenheid": "700 g"
     },
     {
      "k": "kaas",
-     "titel": "Milbona Gouda oud stuk",
-     "actie": "€ 5,14",
-     "prijs": 5.14,
-     "perKg": 11.42,
-     "eenheid": "450 g"
-    },
-    {
-     "k": "kaas",
-     "titel": "Milbona Goudse oude kaas plakken",
-     "actie": "€ 6,99",
-     "prijs": 6.99,
+     "titel": "Milbona Plakken Goudse jonge kaas",
+     "actie": "In de aanbieding",
+     "prijs": null,
      "perKg": null,
      "eenheid": ""
     },
     {
-     "k": "gehakt",
-     "titel": "- Half-om-half gehakt",
-     "actie": "€ 4,59",
-     "prijs": 4.59,
-     "perKg": 9.18,
-     "eenheid": "500 g"
+     "k": "kipfilet",
+     "titel": "- Kipfilet",
+     "actie": "€ 9,49",
+     "prijs": 9.49,
+     "perKg": null,
+     "eenheid": ""
     }
    ]
   },
